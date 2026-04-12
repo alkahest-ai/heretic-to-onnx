@@ -33,7 +33,11 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
     quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
     quantizer.process()
     q4_model = quantizer.model.model
-    q4f16_model = onnx_float16.convert_float_to_float16(q4_model, keep_io_types=True)
+    q4f16_model = onnx_float16.convert_float_to_float16(
+        q4_model,
+        keep_io_types=True,
+        disable_shape_infer=True,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     external_data_path = output_path.with_name(f"{{output_path.name}}_data")
