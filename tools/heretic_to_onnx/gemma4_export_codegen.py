@@ -457,11 +457,16 @@ def render_gemma4_export_runner(
                 "dynamic_axes": session_spec["dynamic_axes"],
                 "opset_version": opset_version,
                 "do_constant_folding": True,
+                "dynamo": False,
             }}
             try:
                 torch.onnx.export(module, **export_kwargs, external_data=True)
             except TypeError:
-                torch.onnx.export(module, **export_kwargs, use_external_data_format=True)
+                export_kwargs.pop("dynamo", None)
+                try:
+                    torch.onnx.export(module, **export_kwargs, external_data=True)
+                except TypeError:
+                    torch.onnx.export(module, **export_kwargs, use_external_data_format=True)
             _normalize_external_data(output_path)
 
 
