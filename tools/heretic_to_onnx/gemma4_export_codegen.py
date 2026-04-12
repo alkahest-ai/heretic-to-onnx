@@ -450,7 +450,10 @@ def render_gemma4_export_runner(
             dummy_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
             vision_batch = image_processor(images=[dummy_image], return_tensors="pt")
             pixel_values = vision_batch["pixel_values"].to(device)
-            pixel_position_ids = vision_batch["pixel_position_ids"].to(device)
+            pixel_position_ids = vision_batch.get("image_position_ids", vision_batch.get("pixel_position_ids"))
+            if pixel_position_ids is None:
+                raise RuntimeError("Gemma 4 image processor did not return image_position_ids/pixel_position_ids")
+            pixel_position_ids = pixel_position_ids.to(device)
 
             sampling_rate = int(getattr(feature_extractor, "sampling_rate", 16000))
             dummy_audio = np.zeros(sampling_rate, dtype=np.float32)
