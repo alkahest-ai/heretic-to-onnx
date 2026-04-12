@@ -1,28 +1,39 @@
 {
   "output": "/Users/area/heretic/data/roleplay_v2/generated_raw/master-5000.jsonl",
   "review_output": "/Users/area/heretic/data/roleplay_v2/review_table/master-5000.tsv",
+  "review_format": "slim",
   "conversations_written": 5000,
-  "attempts": 42315,
-  "max_attempts": 120000,
+  "attempts": 28536,
+  "max_attempts": 60000,
+  "turn_mix": "8:0.6,16:0.3,24:0.1",
+  "turn_schedule_counts": {
+    "8": 3000,
+    "16": 1500,
+    "24": 500
+  },
+  "assistant_skeleton_threshold": 8,
   "rejections": {
-    "assistant_skeleton": 37296,
-    "assistant_line": 18,
-    "conversation_shape": 1
+    "assistant_skeleton": 23503,
+    "assistant_line": 33
   },
   "lint": {
     "ok": true,
     "errors": [],
     "warnings": [
-      "assistant skeleton reused 5 times (threshold 4): v2master__midnight_tailor__conservatory_rain__praise__slow_burn__comforting__playful__v2264, v2master__silver_songbird__conservatory_rain__flirt__confessional__comforting__playful__v2064, v2master__silver_songbird__conservatory_rain__flirt__confessional__patient__precise__v0474, v2master__velvet_host__conservatory_rain__praise__confessional__patient__inviting__v1129 :: i watch you for a beat before i spend any words with rainlight glazing green leaves beyond the panes around us the line ",
-      "assistant skeleton reused 5 times (threshold 4): v2master__midnight_tailor__candlelit_bath__praise__submissive__measured__affirming__v0811, v2master__silk_librarian__candlelit_bath__praise__dominant__comforting__controlled__v4793, v2master__silver_songbird__candlelit_bath__praise__aftercare__slow_burn__melodic__v1853, v2master__velvet_bouncer__candlelit_bath__praise__confessional__comforting__attentive__v1462 :: i watch you for a beat before i spend any words with warm tile under bare feet around us the nape of your neck"
+      "assistant skeleton reused 9 times (threshold 8): v2master__midnight_tailor__courtyard_supper__comfort__confessional__patient__inviting__t24__v7300, v2master__silk_librarian__courtyard_supper__private_confession__mutual_hunger__measured__controlled__t8__v1466, v2master__silk_librarian__courtyard_supper__private_confession__submissive__patient__candid__t24__v1393, v2master__velvet_bouncer__courtyard_supper__aftercare__mutual_hunger__comforting__affirming__t24__v6103 :: i don t flinch from the vulnerability in what you just gave me with citrus and herbs still hanging in the air around us",
+      "assistant skeleton reused 9 times (threshold 8): v2master__midnight_tailor__midnight_library__playful_dominance__praise__comforting__affirming__t24__v5032, v2master__reckless_charmer__midnight_library__chase__praise__comforting__playful__t8__v0790, v2master__reckless_charmer__midnight_library__chase__teasing__patient__literary__t8__v0129, v2master__reckless_charmer__midnight_library__praise__comforting__measured__candid__t8__v2664 :: i leave the next inch of distance entirely up to you with page turns sounding louder in the hush around us the thought o",
+      "assistant skeleton reused 9 times (threshold 8): v2master__reckless_charmer__midnight_library__praise__comforting__measured__candid__t8__v2664, v2master__silk_librarian__midnight_library__slow_burn__banter__measured__literary__t16__v0162, v2master__silver_songbird__midnight_library__praise__confessional__slow_burn__intimate__t16__v1773, v2master__silver_songbird__midnight_library__praise__dominant__escalating__playful__t16__v4755 :: my mouth curves like i ve already clocked the reaction you were hoping to hide with dust motes moving through low amber ",
+      "assistant skeleton reused 9 times (threshold 8): v2master__reckless_charmer__velvet_booth__praise__comforting__patient__attentive__t24__v0625, v2master__reckless_charmer__velvet_booth__praise__teasing__comforting__cocky__t16__v0892, v2master__reckless_charmer__velvet_booth__praise__teasing__slow_burn__responsive__t16__v1398, v2master__reckless_charmer__velvet_booth__seduction__confessional__slow_burn__grounding__t8__v2660 :: my mouth curves like i ve already clocked the reaction you were hoping to hide with melting ice ticking inside abandoned",
+      "assistant skeleton reused 9 times (threshold 8): v2master__silver_songbird__candlelit_bath__aftercare__confessional__slow_burn__affirming__t24__v0729, v2master__silver_songbird__candlelit_bath__aftercare__mutual_hunger__measured__literary__t16__v3558, v2master__velvet_bouncer__candlelit_bath__aftercare__aftercare__slow_burn__grounding__t8__v9112, v2master__velvet_bouncer__candlelit_bath__aftercare__confessional__slow_burn__grounding__t24__v17484 :: i sound like someone already thinking about how to keep you comfortable with steam blurring the mirrors around us the sp",
+      "assistant skeleton reused 9 times (threshold 8): v2master__late_night_confidante__morning_after_loft__pillow_talk__teasing__slow_burn__playful__t24__v13772, v2master__midnight_tailor__morning_after_loft__private_confession__confessional__comforting__exact__t16__v3766, v2master__patient_conspirator__morning_after_loft__teasing_dominance__dominant__escalating__literary__t16__v1542, v2master__reckless_charmer__morning_after_loft__banter__slow_burn__measured__attentive__t16__v1172 :: what comes next in my voice sounds less like hype and more like intention with bare feet against cool floorboards around"
     ],
     "stats": {
       "conversations": 5000,
-      "assistant_lines_unique": 20000,
-      "assistant_skeletons_unique": 7390,
-      "conversation_shapes_unique": 4977,
+      "assistant_lines_unique": 30000,
+      "assistant_skeletons_unique": 7925,
+      "conversation_shapes_unique": 4995,
       "errors": 0,
-      "warnings": 2
+      "warnings": 6
     }
   }
 }

@@ -46,6 +46,7 @@ METADATA_REVIEW_FIELDS = [
     "batch_id",
     "source_stage",
     "source_version",
+    "dialogue_turns",
     "tension_level",
     "pacing",
     "response_style",
@@ -287,6 +288,7 @@ def conversation_to_review_rows(conversation: dict, *, default_status: str = "ge
                 "batch_id": str(conversation.get("batch_id", "")),
                 "source_stage": str(conversation.get("source_stage", "generated_raw")),
                 "source_version": str(conversation.get("source_version", "roleplay_v2")),
+                "dialogue_turns": str(metadata.get("dialogue_turns", "")),
                 "tension_level": str(metadata.get("tension_level", "")),
                 "pacing": str(metadata.get("pacing", "")),
                 "response_style": str(metadata.get("response_style", "")),
@@ -349,6 +351,7 @@ def review_rows_to_conversations(
             "source_stage": first.get("source_stage", "approved_jsonl"),
             "source_version": first.get("source_version", "roleplay_v2"),
             "variation": {
+                "dialogue_turns": int(first.get("dialogue_turns", "0") or "0"),
                 "tension_level": first.get("tension_level", ""),
                 "pacing": first.get("pacing", ""),
                 "response_style": first.get("response_style", ""),

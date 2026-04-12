@@ -837,9 +837,60 @@ def weighted_choice(rng: random.Random, values: list[str]) -> str:
     return values[rng.randrange(len(values))]
 
 
+def parse_turn_mix(spec: str) -> list[tuple[int, float]]:
+    mix: list[tuple[int, float]] = []
+    for chunk in spec.split(","):
+        item = chunk.strip()
+        if not item:
+            continue
+        turns_text, weight_text = item.split(":", 1)
+        turns = int(turns_text)
+        weight = float(weight_text)
+        if turns <= 0 or turns % 2 != 0:
+            raise ValueError("turn counts must be positive even numbers")
+        if weight <= 0:
+            raise ValueError("turn mix weights must be positive")
+        mix.append((turns, weight))
+    if not mix:
+        raise ValueError("turn mix cannot be empty")
+    return mix
+
+
+def build_turn_schedule(count: int, mix: list[tuple[int, float]], rng: random.Random) -> list[int]:
+    total_weight = sum(weight for _, weight in mix)
+    exact_counts = [(turns, (count * weight) / total_weight) for turns, weight in mix]
+    floor_counts = {turns: int(value) for turns, value in exact_counts}
+    assigned = sum(floor_counts.values())
+    remainders = sorted(
+        ((value - floor_counts[turns], turns) for turns, value in exact_counts),
+        reverse=True,
+    )
+    for _, turns in remainders[: max(0, count - assigned)]:
+        floor_counts[turns] += 1
+
+    schedule: list[int] = []
+    for turns, _ in mix:
+        schedule.extend([turns] * floor_counts[turns])
+    rng.shuffle(schedule)
+    return schedule
+
+
+def recommended_assistant_skeleton_threshold(count: int) -> int:
+    if count >= 4000:
+        return 8
+    if count >= 2000:
+        return 6
+    return 4
+
+
 def assistant_skeleton(text: str) -> str:
     cleaned = re.sub(r"[^a-z0-9\s]", " ", text.lower())
     return " ".join(re.sub(r"\s+", " ", cleaned).strip().split()[:24])
+
+
+def normalize_text(text: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
 
 
 def choose_combo(rng: random.Random, personas: list[dict], scenes: list[dict]) -> tuple[dict, dict, str]:
@@ -858,6 +909,28 @@ def choose_variation(rng: random.Random, persona: dict, scene: dict, axes: dict)
         "pacing": weighted_choice(rng, pacing_pool),
         "response_style": weighted_choice(rng, style_pool),
     }
+
+
+def build_move_plan(rng: random.Random, lane: str, *, dialogue_turns: int) -> list[str]:
+    required_pairs = dialogue_turns // 2
+    if required_pairs % 4 != 0:
+        raise ValueError("dialogue_turns must map to a multiple of 4 exchange pairs")
+
+    segment_count = required_pairs // 4
+    lane_plans = LANE_BLUEPRINTS[lane]["move_plans"]
+    move_plan: list[str] = []
+    last_segment: list[str] | None = None
+    for _ in range(segment_count):
+        segment = list(rng.choice(lane_plans))
+        if last_segment is not None and segment == last_segment and len(lane_plans) > 1:
+            for _retry in range(6):
+                candidate = list(rng.choice(lane_plans))
+                if candidate != last_segment:
+                    segment = candidate
+                    break
+        move_plan.extend(segment)
+        last_segment = segment
+    return move_plan
 
 
 def build_system_prompt(persona: dict, scene: dict, lane: str, variation: dict) -> str:
@@ -975,22 +1048,40 @@ def build_conversation(
     scene: dict,
     lane: str,
     variation: dict,
+    dialogue_turns: int,
 ) -> dict:
-    move_plan = list(weighted_choice(rng, LANE_BLUEPRINTS[lane]["move_plans"]))
+    move_plan = build_move_plan(rng, lane, dialogue_turns=dialogue_turns)
     messages = [{"role": "system", "content": build_system_prompt(persona, scene, lane, variation)}]
+    assistant_seen: set[str] = set()
     for turn_index, move in enumerate(move_plan):
         beat = "open" if turn_index == 0 else "push" if turn_index < len(move_plan) - 1 else "close"
         messages.append({"role": "user", "content": render_user_turn(rng, lane=lane, scene=scene, beat=beat)})
+        assistant_text = ""
+        for _retry in range(8):
+            candidate = render_assistant_turn(
+                rng,
+                persona=persona,
+                scene=scene,
+                variation=variation,
+                move=move,
+            )
+            normalized = normalize_text(candidate)
+            if normalized not in assistant_seen:
+                assistant_text = candidate
+                assistant_seen.add(normalized)
+                break
+        if not assistant_text:
+            assistant_text = render_assistant_turn(
+                rng,
+                persona=persona,
+                scene=scene,
+                variation=variation,
+                move=move,
+            )
         messages.append(
             {
                 "role": "assistant",
-                "content": render_assistant_turn(
-                    rng,
-                    persona=persona,
-                    scene=scene,
-                    variation=variation,
-                    move=move,
-                ),
+                "content": assistant_text,
             }
         )
     return {
@@ -1004,6 +1095,7 @@ def build_conversation(
         "source_version": "roleplay_v2",
         "variation": {
             **variation,
+            "dialogue_turns": dialogue_turns,
             "assistant_move_plan": move_plan,
         },
         "tags": [
@@ -1012,6 +1104,7 @@ def build_conversation(
             "synthetic",
             lane,
             variation["tension_level"],
+            f"turns_{dialogue_turns}",
         ],
         "messages": messages,
     }
@@ -1059,6 +1152,11 @@ def main() -> int:
     parser.add_argument("--id-prefix", default="v2b001", help="Conversation id prefix")
     parser.add_argument("--batch-id", default="batch-0001", help="Batch label")
     parser.add_argument(
+        "--turn-mix",
+        default="8:0.6,16:0.3,24:0.1",
+        help="Dialogue-turn mix as comma-separated turns:weight entries",
+    )
+    parser.add_argument(
         "--max-attempts",
         type=int,
         default=0,
@@ -1073,8 +1171,8 @@ def main() -> int:
     parser.add_argument(
         "--assistant-skeleton-threshold",
         type=int,
-        default=2,
-        help="Maximum times one assistant skeleton may appear in a batch",
+        default=0,
+        help="Maximum times one assistant skeleton may appear in a batch; default scales with --count",
     )
     parser.add_argument(
         "--conversation-shape-threshold",
@@ -1089,6 +1187,13 @@ def main() -> int:
     scenes = load_yaml(Path(args.scenes).expanduser().resolve())
     axes = load_yaml(Path(args.axes).expanduser().resolve())
     rng = random.Random(args.seed)
+    turn_mix = parse_turn_mix(args.turn_mix)
+    turn_schedule = build_turn_schedule(args.count, turn_mix, rng)
+    assistant_skeleton_threshold = (
+        args.assistant_skeleton_threshold
+        if args.assistant_skeleton_threshold > 0
+        else recommended_assistant_skeleton_threshold(args.count)
+    )
 
     output_path = Path(args.output).expanduser().resolve()
     review_output_path = Path(args.review_output).expanduser().resolve()
@@ -1104,11 +1209,12 @@ def main() -> int:
     attempts = 0
     while len(rows) < args.count and attempts < max_attempts:
         attempts += 1
+        dialogue_turns = turn_schedule[len(rows)]
         persona, scene, lane = choose_combo(rng, personas, scenes)
         variation = choose_variation(rng, persona, scene, axes)
         conversation_id = (
             f"{args.id_prefix}__{persona['id']}__{scene['id']}__{lane}__"
-            f"{variation['tension_level']}__{variation['pacing']}__{variation['response_style']}__v{attempts:04d}"
+            f"{variation['tension_level']}__{variation['pacing']}__{variation['response_style']}__t{dialogue_turns}__v{attempts:04d}"
         )
         conversation = build_conversation(
             rng,
@@ -1118,6 +1224,7 @@ def main() -> int:
             scene=scene,
             lane=lane,
             variation=variation,
+            dialogue_turns=dialogue_turns,
         )
         signature = _conversation_signature(conversation)
         if signature in conversation_signatures:
@@ -1129,6 +1236,7 @@ def main() -> int:
                 "persona_id": persona["id"],
                 "scene_id": scene["id"],
                 "lane": lane,
+                "dialogue_turns": dialogue_turns,
                 "tension_level": variation["tension_level"],
                 "pacing": variation["pacing"],
                 "response_style": variation["response_style"],
@@ -1154,7 +1262,7 @@ def main() -> int:
         skeletons = [assistant_skeleton(line) for line in assistant_lines]
         skeleton_conflict = False
         for skeleton in skeletons:
-            if assistant_skeleton_counts[skeleton] >= args.assistant_skeleton_threshold:
+            if assistant_skeleton_counts[skeleton] >= assistant_skeleton_threshold:
                 skeleton_conflict = True
                 break
         if skeleton_conflict:
@@ -1175,7 +1283,7 @@ def main() -> int:
     lint_report = lint_conversations(
         rows,
         assistant_line_threshold=max(args.assistant_line_threshold, 2),
-        assistant_skeleton_threshold=max(args.assistant_skeleton_threshold, 3),
+        assistant_skeleton_threshold=max(assistant_skeleton_threshold, 3),
         conversation_shape_threshold=max(args.conversation_shape_threshold, 3),
     )
     if lint_report["errors"]:
@@ -1199,6 +1307,9 @@ def main() -> int:
         "conversations_written": len(rows),
         "attempts": attempts,
         "max_attempts": max_attempts,
+        "turn_mix": args.turn_mix,
+        "turn_schedule_counts": dict(Counter(turn_schedule)),
+        "assistant_skeleton_threshold": assistant_skeleton_threshold,
         "rejections": dict(rejection_counts),
         "lint": lint_report,
     }
