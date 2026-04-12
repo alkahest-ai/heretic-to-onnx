@@ -41,9 +41,9 @@ This is the dataset that should shape:
 
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 - later tuned portfolio variants
 
 ### Public data
@@ -119,9 +119,9 @@ Ship these direct conversions first:
 
 - `alkahest-ai/rally-2b`
 - `alkahest-ai/rally-4b`
-- `alkahest-ai/sheena-4b`
-- `alkahest-ai/sheena-2b`
-- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/alkahest-4b`
+- `alkahest-ai/alkahest-2b`
+- `alkahest-ai/alkahest-0.8b`
 
 ### Phase 2
 
@@ -129,9 +129,9 @@ Build `roleplay_v2` and tune:
 
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
 ## Sources
 

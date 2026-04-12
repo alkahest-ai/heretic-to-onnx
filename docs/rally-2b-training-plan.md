@@ -125,7 +125,7 @@ Recommended order for the first paid window:
 
 1. run direct conversion for `rally-2b`
 2. run direct conversion for `rally-4b`
-3. run direct conversion for `sheena-4b`
+3. run direct conversion for `alkahest-4b`
 4. compile approved `roleplay_v2`
 5. fine-tune `rally-2b-rp`
 6. merge the tuned checkpoint

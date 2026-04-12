@@ -29,14 +29,14 @@ Before launch, make sure the account behind `HF_TOKEN` has:
 2. write access to:
    - `alkahest-ai/rally-2b`
    - `alkahest-ai/rally-4b`
-   - `alkahest-ai/sheena-4b`
-   - `alkahest-ai/sheena-2b`
-   - `alkahest-ai/sheena-0.8b`
+   - `alkahest-ai/alkahest-4b`
+   - `alkahest-ai/alkahest-2b`
+   - `alkahest-ai/alkahest-0.8b`
    - `alkahest-ai/rally-2b-rp`
    - `alkahest-ai/rally-4b-rp`
-   - `alkahest-ai/sheena-4b-rp`
-   - `alkahest-ai/sheena-2b-rp`
-   - `alkahest-ai/sheena-0.8b-rp`
+   - `alkahest-ai/alkahest-4b-rp`
+   - `alkahest-ai/alkahest-2b-rp`
+   - `alkahest-ai/alkahest-0.8b-rp`
 
 ## Dataset
 
@@ -78,14 +78,14 @@ Safest first live order:
 
 1. `bash scripts/phala_run_rally_2b_direct.sh`
 2. `bash scripts/phala_run_rally_4b_direct.sh`
-3. `bash scripts/phala_run_sheena_4b_direct.sh`
-4. `bash scripts/phala_run_sheena_2b_direct.sh`
-5. `bash scripts/phala_run_sheena_0_8b_direct.sh`
+3. `bash scripts/phala_run_alkahest_4b_direct.sh`
+4. `bash scripts/phala_run_alkahest_2b_direct.sh`
+5. `bash scripts/phala_run_alkahest_0_8b_direct.sh`
 6. `bash scripts/phala_run_rally_2b_rp.sh`
 7. `bash scripts/phala_run_rally_4b_rp.sh`
-8. `bash scripts/phala_run_sheena_2b_rp.sh`
-9. `bash scripts/phala_run_sheena_0_8b_rp.sh`
-10. `bash scripts/phala_run_sheena_4b_rp.sh`
+8. `bash scripts/phala_run_alkahest_2b_rp.sh`
+9. `bash scripts/phala_run_alkahest_0_8b_rp.sh`
+10. `bash scripts/phala_run_alkahest_4b_rp.sh`
 
 If you want the all-in-one portfolio run instead:
 
@@ -101,17 +101,17 @@ Direct browser ONNX repos:
 
 - `alkahest-ai/rally-2b`
 - `alkahest-ai/rally-4b`
-- `alkahest-ai/sheena-4b`
-- `alkahest-ai/sheena-2b`
-- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/alkahest-4b`
+- `alkahest-ai/alkahest-2b`
+- `alkahest-ai/alkahest-0.8b`
 
 Roleplay-tuned browser ONNX repos:
 
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
 ## Reality Check
 

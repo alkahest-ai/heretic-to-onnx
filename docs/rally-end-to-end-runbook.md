@@ -168,4 +168,4 @@ If you also want the Qwen training pass in the same window:
 bash scripts/phala_gpu_tee_oneclick.sh all
 ```
 
-That final step also converts direct `sheena-4b`, `sheena-2b`, and `sheena-0.8b`, then fine-tunes and exports `sheena-4b-rp`, `sheena-2b-rp`, and `sheena-0.8b-rp`.
+That final step also converts direct `alkahest-4b`, `alkahest-2b`, and `alkahest-0.8b`, then fine-tunes and exports `alkahest-4b-rp`, `alkahest-2b-rp`, and `alkahest-0.8b-rp`.

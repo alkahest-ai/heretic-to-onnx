@@ -25,26 +25,26 @@ HF_OWNER="${HF_OWNER:-alkahest-ai}"
 
 RALLY2_SOURCE_MODEL="${RALLY2_SOURCE_MODEL:-p-e-w/gemma-4-E2B-it-heretic-ara}"
 RALLY4_SOURCE_MODEL="${RALLY4_SOURCE_MODEL:-coder3101/gemma-4-E4B-it-heretic}"
-SHEENA4_SOURCE_MODEL="${SHEENA4_SOURCE_MODEL:-tvall43/Qwen3.5-4B-heretic}"
-SHEENA2_SOURCE_MODEL="${SHEENA2_SOURCE_MODEL:-tvall43/Qwen3.5-2B-heretic-v3b}"
-SHEENA08_SOURCE_MODEL="${SHEENA08_SOURCE_MODEL:-tvall43/Qwen3.5-0.8B-heretic-v3}"
+ALKAHEST4_SOURCE_MODEL="${ALKAHEST4_SOURCE_MODEL:-${SHEENA4_SOURCE_MODEL:-tvall43/Qwen3.5-4B-heretic}}"
+ALKAHEST2_SOURCE_MODEL="${ALKAHEST2_SOURCE_MODEL:-${SHEENA2_SOURCE_MODEL:-tvall43/Qwen3.5-2B-heretic-v3b}}"
+ALKAHEST08_SOURCE_MODEL="${ALKAHEST08_SOURCE_MODEL:-${SHEENA08_SOURCE_MODEL:-tvall43/Qwen3.5-0.8B-heretic-v3}}"
 
 RALLY2_DIRECT_REPO="${RALLY2_DIRECT_REPO:-${HF_OWNER}/rally-2b}"
 RALLY4_DIRECT_REPO="${RALLY4_DIRECT_REPO:-${HF_OWNER}/rally-4b}"
-SHEENA4_DIRECT_REPO="${SHEENA4_DIRECT_REPO:-${HF_OWNER}/sheena-4b}"
-SHEENA2_DIRECT_REPO="${SHEENA2_DIRECT_REPO:-${HF_OWNER}/sheena-2b}"
-SHEENA08_DIRECT_REPO="${SHEENA08_DIRECT_REPO:-${HF_OWNER}/sheena-0.8b}"
+ALKAHEST4_DIRECT_REPO="${ALKAHEST4_DIRECT_REPO:-${SHEENA4_DIRECT_REPO:-${HF_OWNER}/alkahest-4b}}"
+ALKAHEST2_DIRECT_REPO="${ALKAHEST2_DIRECT_REPO:-${SHEENA2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b}}"
+ALKAHEST08_DIRECT_REPO="${ALKAHEST08_DIRECT_REPO:-${SHEENA08_DIRECT_REPO:-${HF_OWNER}/alkahest-0.8b}}"
 RALLY2_TUNED_REPO="${RALLY2_TUNED_REPO:-${HF_OWNER}/rally-2b-rp}"
 RALLY4_TUNED_REPO="${RALLY4_TUNED_REPO:-${HF_OWNER}/rally-4b-rp}"
-SHEENA4_TUNED_REPO="${SHEENA4_TUNED_REPO:-${HF_OWNER}/sheena-4b-rp}"
-SHEENA2_TUNED_REPO="${SHEENA2_TUNED_REPO:-${HF_OWNER}/sheena-2b-rp}"
-SHEENA08_TUNED_REPO="${SHEENA08_TUNED_REPO:-${HF_OWNER}/sheena-0.8b-rp}"
+ALKAHEST4_TUNED_REPO="${ALKAHEST4_TUNED_REPO:-${SHEENA4_TUNED_REPO:-${HF_OWNER}/alkahest-4b-rp}}"
+ALKAHEST2_TUNED_REPO="${ALKAHEST2_TUNED_REPO:-${SHEENA2_TUNED_REPO:-${HF_OWNER}/alkahest-2b-rp}}"
+ALKAHEST08_TUNED_REPO="${ALKAHEST08_TUNED_REPO:-${SHEENA08_TUNED_REPO:-${HF_OWNER}/alkahest-0.8b-rp}}"
 
 RALLY_MAX_STEPS="${RALLY_MAX_STEPS:-300}"
 RALLY4_MAX_STEPS="${RALLY4_MAX_STEPS:-250}"
-SHEENA4_MAX_STEPS="${SHEENA4_MAX_STEPS:-300}"
-SHEENA2_MAX_STEPS="${SHEENA2_MAX_STEPS:-325}"
-SHEENA08_MAX_STEPS="${SHEENA08_MAX_STEPS:-350}"
+ALKAHEST4_MAX_STEPS="${ALKAHEST4_MAX_STEPS:-${SHEENA4_MAX_STEPS:-300}}"
+ALKAHEST2_MAX_STEPS="${ALKAHEST2_MAX_STEPS:-${SHEENA2_MAX_STEPS:-325}}"
+ALKAHEST08_MAX_STEPS="${ALKAHEST08_MAX_STEPS:-${SHEENA08_MAX_STEPS:-350}}"
 
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
@@ -223,37 +223,37 @@ run_rally4() {
     "$RALLY4_TUNED_REPO"
 }
 
-run_sheena4() {
-  local output_dir="$MODEL_ROOT/sheena-4b-rp"
-  local merged_dir="$MODEL_ROOT/sheena-4b-rp-merged"
-  train_model "sheena-4b-rp" "$SHEENA4_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA4_MAX_STEPS"
+run_alkahest4() {
+  local output_dir="$MODEL_ROOT/alkahest-4b-rp"
+  local merged_dir="$MODEL_ROOT/alkahest-4b-rp-merged"
+  train_model "alkahest-4b-rp" "$ALKAHEST4_SOURCE_MODEL" "$output_dir" "$merged_dir" "$ALKAHEST4_MAX_STEPS"
   convert_tuned_model \
-    "sheena-4b-rp" \
+    "alkahest-4b-rp" \
     "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" \
     "$merged_dir" \
-    "$SHEENA4_TUNED_REPO"
+    "$ALKAHEST4_TUNED_REPO"
 }
 
-run_sheena2() {
-  local output_dir="$MODEL_ROOT/sheena-2b-rp"
-  local merged_dir="$MODEL_ROOT/sheena-2b-rp-merged"
-  train_model "sheena-2b-rp" "$SHEENA2_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA2_MAX_STEPS"
+run_alkahest2() {
+  local output_dir="$MODEL_ROOT/alkahest-2b-rp"
+  local merged_dir="$MODEL_ROOT/alkahest-2b-rp-merged"
+  train_model "alkahest-2b-rp" "$ALKAHEST2_SOURCE_MODEL" "$output_dir" "$merged_dir" "$ALKAHEST2_MAX_STEPS"
   convert_tuned_model \
-    "sheena-2b-rp" \
+    "alkahest-2b-rp" \
     "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" \
     "$merged_dir" \
-    "$SHEENA2_TUNED_REPO"
+    "$ALKAHEST2_TUNED_REPO"
 }
 
-run_sheena08() {
-  local output_dir="$MODEL_ROOT/sheena-0.8b-rp"
-  local merged_dir="$MODEL_ROOT/sheena-0.8b-rp-merged"
-  train_model "sheena-0.8b-rp" "$SHEENA08_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA08_MAX_STEPS"
+run_alkahest08() {
+  local output_dir="$MODEL_ROOT/alkahest-0.8b-rp"
+  local merged_dir="$MODEL_ROOT/alkahest-0.8b-rp-merged"
+  train_model "alkahest-0.8b-rp" "$ALKAHEST08_SOURCE_MODEL" "$output_dir" "$merged_dir" "$ALKAHEST08_MAX_STEPS"
   convert_tuned_model \
-    "sheena-0.8b-rp" \
+    "alkahest-0.8b-rp" \
     "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" \
     "$merged_dir" \
-    "$SHEENA08_TUNED_REPO"
+    "$ALKAHEST08_TUNED_REPO"
 }
 
 usage() {
@@ -267,17 +267,26 @@ modes:
   dataset-compile
   rally-2b-direct
   rally-4b-direct
-  sheena-4b-direct
-  sheena-2b-direct
-  sheena-0.8b-direct
+  alkahest-4b-direct
+  alkahest-2b-direct
+  alkahest-0.8b-direct
   rally
   rally-4b
-  sheena-4b
-  sheena-2b
-  sheena-0.8b
+  alkahest-4b
+  alkahest-2b
+  alkahest-0.8b
   all-gemma
   all-qwen
   all
+
+legacy aliases:
+  sheena-4b-direct
+  sheena-2b-direct
+  sheena-0.8b-direct
+  sheena-4b
+  sheena-2b
+  sheena-0.8b
+  sheena
 EOF
 }
 
@@ -300,14 +309,14 @@ case "$MODE" in
   rally-4b-direct)
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
     ;;
-  sheena-4b-direct)
-    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA4_DIRECT_REPO"
+  alkahest-4b-direct|sheena-4b-direct)
+    convert_direct "alkahest-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$ALKAHEST4_DIRECT_REPO"
     ;;
-  sheena-2b-direct)
-    convert_direct "sheena-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$SHEENA2_DIRECT_REPO"
+  alkahest-2b-direct|sheena-2b-direct)
+    convert_direct "alkahest-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$ALKAHEST2_DIRECT_REPO"
     ;;
-  sheena-0.8b-direct)
-    convert_direct "sheena-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$SHEENA08_DIRECT_REPO"
+  alkahest-0.8b-direct|sheena-0.8b-direct)
+    convert_direct "alkahest-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$ALKAHEST08_DIRECT_REPO"
     ;;
   rally)
     compile_approved_dataset
@@ -317,17 +326,17 @@ case "$MODE" in
     compile_approved_dataset
     run_rally4
     ;;
-  sheena-4b|sheena)
+  alkahest-4b|sheena-4b|sheena)
     compile_approved_dataset
-    run_sheena4
+    run_alkahest4
     ;;
-  sheena-2b)
+  alkahest-2b|sheena-2b)
     compile_approved_dataset
-    run_sheena2
+    run_alkahest2
     ;;
-  sheena-0.8b)
+  alkahest-0.8b|sheena-0.8b)
     compile_approved_dataset
-    run_sheena08
+    run_alkahest08
     ;;
   all-gemma)
     bootstrap_env
@@ -339,27 +348,27 @@ case "$MODE" in
     ;;
   all-qwen)
     bootstrap_env
-    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA4_DIRECT_REPO"
-    convert_direct "sheena-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$SHEENA2_DIRECT_REPO"
-    convert_direct "sheena-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$SHEENA08_DIRECT_REPO"
+    convert_direct "alkahest-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$ALKAHEST4_DIRECT_REPO"
+    convert_direct "alkahest-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$ALKAHEST2_DIRECT_REPO"
+    convert_direct "alkahest-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$ALKAHEST08_DIRECT_REPO"
     compile_approved_dataset
-    run_sheena4
-    run_sheena2
-    run_sheena08
+    run_alkahest4
+    run_alkahest2
+    run_alkahest08
     ;;
   all)
     bootstrap_env
     convert_direct "rally-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" "$RALLY2_DIRECT_REPO"
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
-    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA4_DIRECT_REPO"
-    convert_direct "sheena-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$SHEENA2_DIRECT_REPO"
-    convert_direct "sheena-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$SHEENA08_DIRECT_REPO"
+    convert_direct "alkahest-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$ALKAHEST4_DIRECT_REPO"
+    convert_direct "alkahest-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$ALKAHEST2_DIRECT_REPO"
+    convert_direct "alkahest-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$ALKAHEST08_DIRECT_REPO"
     compile_approved_dataset
     run_rally
     run_rally4
-    run_sheena4
-    run_sheena2
-    run_sheena08
+    run_alkahest4
+    run_alkahest2
+    run_alkahest08
     ;;
   *)
     usage

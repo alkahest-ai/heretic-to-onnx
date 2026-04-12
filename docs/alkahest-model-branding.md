@@ -1,156 +1,60 @@
 # Alkahest Model Branding
 
-This document aligns model naming with the portfolio rules in the second-brain.
+This document defines the public naming rule for the browser ONNX portfolio.
 
-## Portfolio Alignment
+## Brand Split
 
-Your second-brain frames `Alkahest` as:
+Use the public families like this:
 
-- the private generative AI substrate
-- the routing and inference posture layer
-- the shared rails under Phantasy, Rally, and related products
+- `Rally` = Gemma-based browser packages
+- `Alkahest` = Qwen-based browser packages
 
-That means the model line should read like **platform substrate**, not like a product story.
+That keeps the portfolio readable without hiding provenance.
 
-## Branding Rule
+## Current Public Repos
 
-Use `Alkahest` as the outward-facing family name.
-
-But always keep real provenance in:
-
-- model cards
-- internal docs
-- release notes
-- any compliance or attribution fields required by the source license
-
-So the pattern is:
-
-- public family name: `Alkahest`
-- internal or model-card provenance: original upstream base + fine-tune source
-
-## Recommended Naming Pattern
-
-Use concise names that encode family, size, and tune lane.
-
-Examples:
-
-- `Alkahest-G4-E2B-Heretic-ONNX`
-- `Alkahest-G4-E4B-Heretic-ONNX`
-- `Alkahest-G4-E2B-Roleplay-v1`
-- `Alkahest-G4-E4B-Roleplay-v1`
-- `Alkahest-Q35-4B-Heretic-v1`
-
-If you want a softer external name, you can shorten public labels while keeping the technical repo name explicit.
-
-## Current Naming Decision
-
-Use the companion names directly.
-
-Current line:
-
-- `alkahest-ai/rally-2b` = Gemma 4 E2B Heretic ONNX
-- `alkahest-ai/rally-4b` = Gemma 4 E4B Heretic ONNX
-- `alkahest-ai/sheena-4b` = Qwen 3.5 4B Heretic ONNX
-- `alkahest-ai/sheena-2b` = Qwen 3.5 2B Heretic ONNX
-- `alkahest-ai/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
-
-Future tuned line:
-
-- `alkahest-ai/rally-2b-rp`
-- `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
-
-This is cleaner than repeating `alkahest` in every slug.
-
-## Recommended Two-Layer Naming System
-
-Use **two separate naming modes**:
-
-- descriptive names for direct upstream conversions
-- Alkahest family names for your own tuned models
-
-### 1. Direct conversion repos
-
-These should stay size-explicit so operators know what they are:
+Direct browser ONNX repos:
 
 - `alkahest-ai/rally-2b`
 - `alkahest-ai/rally-4b`
-- `alkahest-ai/sheena-4b`
+- `alkahest-ai/alkahest-4b`
+- `alkahest-ai/alkahest-2b`
+- `alkahest-ai/alkahest-0.8b`
 
-### 2. Alkahest-tuned family repos
+Roleplay-tuned browser ONNX repos:
 
-These are the models you want to read as your own portfolio line.
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
-The goal is:
+## Provenance Rule
 
-- same family language across Gemma and Qwen
-- no base-family name in the repo slug
-- enough structure that operators still know which size/tier they are dealing with
+Public slugs can use the Alkahest and Rally families, but every model card should still include:
 
-## Recommended Naming Decision
+- source model repo
+- base architecture lineage
+- tuning lineage
+- ONNX export / quantization lineage
 
-The cleanest compromise is:
+Branding should simplify the portfolio, not erase where the model came from.
 
-- use the companion names directly
-- use size suffixes for the raw/direct variants
-- use explicit `-rp` suffixes for the tuned variants so operators can distinguish them instantly
+## Why This Split
 
-Recommended pattern:
+This repo now has two public browser families:
 
-- direct conversion:
-  - `alkahest-ai/rally-2b`
-  - `alkahest-ai/rally-4b`
-  - `alkahest-ai/sheena-4b`
-  - `alkahest-ai/sheena-2b`
-  - `alkahest-ai/sheena-0.8b`
-- tuned family:
-  - `alkahest-ai/rally-2b-rp`
-  - `alkahest-ai/rally-4b-rp`
-  - `alkahest-ai/sheena-4b-rp`
-  - `alkahest-ai/sheena-2b-rp`
-  - `alkahest-ai/sheena-0.8b-rp`
+- Rally for the Gemma lane that is already the more proven export path
+- Alkahest for the Qwen lane that gives smaller browser-friendly options
 
-## Provenance Pattern
+That makes the portfolio easier to reason about:
 
-Each model card should include a section like:
+- Gemma family choice is a Rally decision
+- Qwen family choice is an Alkahest decision
+- both still carry explicit provenance in docs and model cards
 
-- `Brand family`: Alkahest
-- `Derived from`: original upstream repo id
-- `Tuning lineage`: Heretic / roleplay tune / merge details
-- `Export lineage`: ONNX q4f16 browser package if applicable
+## Compatibility Note
 
-This gives you branding without pretending the base architecture came from nowhere.
+Older scripts and notes may still reference `sheena-*`.
 
-## What To Avoid
-
-- do not hide provenance completely
-- do not imply you authored the original base architecture if you did not
-- do not let the repo name become so abstract that operators cannot tell what family it belongs to
-
-## Repo Naming Recommendation
-
-Use a split between brand and technical artifact.
-
-Examples:
-
-- Hugging Face repo: `alkahest-ai/rally-2b`
-- model card title: `Rally 2B`
-- provenance section:
-  - source model: `p-e-w/gemma-4-E2B-it-heretic-ara`
-  - base architecture lineage: `google/gemma-4-E2B-it`
-
-## Why This Matches The Second-Brain
-
-Your second-brain consistently treats Alkahest as:
-
-- substrate
-- private inference posture
-- shared rails
-
-So an Alkahest-branded model family is coherent as long as:
-
-- Phantasy stays the runtime/OS story
-- Rally stays the proof-point product story
-- Alkahest remains the underlying model/inference layer
+Treat those as legacy aliases only. New docs, manifests, wrapper scripts, and published repo IDs should use `alkahest-*` for the Qwen line.

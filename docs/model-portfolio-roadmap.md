@@ -17,9 +17,9 @@ Current naming decision:
 
 - `alkahest-ai/rally-2b` = Gemma 4 E2B Heretic ONNX
 - `alkahest-ai/rally-4b` = Gemma 4 E4B Heretic ONNX
-- `alkahest-ai/sheena-4b` = Qwen 3.5 4B Heretic ONNX
-- `alkahest-ai/sheena-2b` = Qwen 3.5 2B Heretic ONNX
-- `alkahest-ai/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
+- `alkahest-ai/alkahest-4b` = Qwen 3.5 4B Heretic ONNX
+- `alkahest-ai/alkahest-2b` = Qwen 3.5 2B Heretic ONNX
+- `alkahest-ai/alkahest-0.8b` = Qwen 3.5 0.8B Heretic ONNX
 
 Direct provenance should still live in model cards and internal docs.
 
@@ -55,9 +55,9 @@ After direct conversions work, move to your own tuned checkpoints.
 
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
 The direct conversion repos stay size-explicit, and the tuned repos also stay size-explicit so the portfolio stays operationally clear.
 
@@ -81,26 +81,26 @@ That keeps the deployment story consistent:
 - export to ONNX
 - run in browser/WebGPU
 
-## Wave 3: Qwen Variance Lane
+## Wave 3: Qwen Alkahest Lane
 
 ### Qwen 3.5 4B Heretic
 
 - Source: `tvall43/Qwen3.5-4B-heretic`
 - Goal: add a non-Gemma multimodal browser family to the Alkahest portfolio
-- Public name: `alkahest-ai/sheena-4b`
+- Public name: `alkahest-ai/alkahest-4b`
 - Status: Qwen3.5 export scaffold is now present, but it is less proven than the Gemma 4 path
 
 ### Qwen 3.5 2B Heretic
 
 - Source: `tvall43/Qwen3.5-2B-heretic-v3b`
-- Goal: smaller Sheena desktop/browser lane with better consumer feasibility than 4B
-- Public name: `alkahest-ai/sheena-2b`
+- Goal: smaller Alkahest desktop/browser lane with better consumer feasibility than 4B
+- Public name: `alkahest-ai/alkahest-2b`
 
 ### Qwen 3.5 0.8B Heretic
 
 - Source: `tvall43/Qwen3.5-0.8B-heretic-v3`
-- Goal: lowest-cost Sheena browser lane and best default candidate for broad free chat
-- Public name: `alkahest-ai/sheena-0.8b`
+- Goal: lowest-cost Alkahest browser lane and best default candidate for broad free chat
+- Public name: `alkahest-ai/alkahest-0.8b`
 
 ## Roleplay Dataset Plan
 
@@ -139,10 +139,10 @@ Qwen is useful for portfolio variance and now has matching exporter scaffolds in
 
 Important distinction:
 
-- `rally` lanes are currently `text + image + audio`
-- `sheena` lanes are currently `text + image`
+- `rally` lanes are currently shipped as `text + image`
+- `alkahest` Qwen lanes are currently shipped as `text + image`
 
-So no, the full portfolio is not identical in modality coverage.
+Audio remains outside the working browser export path right now, so the two public families are aligned on modality today.
 
 ## Recommended H200 Work Order
 

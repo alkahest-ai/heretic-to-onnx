@@ -45,17 +45,19 @@ Available modes:
 - `dataset-compile`: build the approved `roleplay_v2` corpus and train/val splits, enforcing `MIN_APPROVED_ROWS`
 - `rally-2b-direct`: convert and publish `alkahest-ai/rally-2b`
 - `rally-4b-direct`: convert and publish `alkahest-ai/rally-4b`
-- `sheena-4b-direct`: convert and publish `alkahest-ai/sheena-4b`
-- `sheena-2b-direct`: convert and publish `alkahest-ai/sheena-2b`
-- `sheena-0.8b-direct`: convert and publish `alkahest-ai/sheena-0.8b`
+- `alkahest-4b-direct`: convert and publish `alkahest-ai/alkahest-4b`
+- `alkahest-2b-direct`: convert and publish `alkahest-ai/alkahest-2b`
+- `alkahest-0.8b-direct`: convert and publish `alkahest-ai/alkahest-0.8b`
 - `rally`: compile approved `roleplay_v2`, train tuned `rally-2b-rp`, export tuned `rally-2b-rp` to ONNX, publish it
 - `rally-4b`: compile approved `roleplay_v2`, train tuned `rally-4b-rp`, export tuned `rally-4b-rp` to ONNX, publish it
-- `sheena-4b`: compile approved `roleplay_v2`, train tuned `sheena-4b-rp`, export tuned `sheena-4b-rp` to ONNX, publish it
-- `sheena-2b`: compile approved `roleplay_v2`, train tuned `sheena-2b-rp`, export tuned `sheena-2b-rp` to ONNX, publish it
-- `sheena-0.8b`: compile approved `roleplay_v2`, train tuned `sheena-0.8b-rp`, export tuned `sheena-0.8b-rp` to ONNX, publish it
+- `alkahest-4b`: compile approved `roleplay_v2`, train tuned `alkahest-4b-rp`, export tuned `alkahest-4b-rp` to ONNX, publish it
+- `alkahest-2b`: compile approved `roleplay_v2`, train tuned `alkahest-2b-rp`, export tuned `alkahest-2b-rp` to ONNX, publish it
+- `alkahest-0.8b`: compile approved `roleplay_v2`, train tuned `alkahest-0.8b-rp`, export tuned `alkahest-0.8b-rp` to ONNX, publish it
 - `all-gemma`: bootstrap, both direct Gemma conversions, approved-corpus compile, both tuned Gemma conversions
-- `all-qwen`: bootstrap, all direct Sheena conversions, approved-corpus compile, all tuned Sheena conversions
+- `all-qwen`: bootstrap, all direct Alkahest Qwen conversions, approved-corpus compile, all tuned Alkahest Qwen conversions
 - `all`: direct conversions plus approved-corpus compile plus all tuned conversions
+
+Legacy `sheena-*` mode names are still accepted as compatibility aliases.
 
 ## Recommended First Paid Run
 
@@ -80,12 +82,12 @@ bash scripts/phala_gpu_tee_oneclick.sh all
 
 That adds:
 
-5. direct `alkahest-ai/sheena-4b`
-6. direct `alkahest-ai/sheena-2b`
-7. direct `alkahest-ai/sheena-0.8b`
-8. tuned `alkahest-ai/sheena-4b-rp`
-9. tuned `alkahest-ai/sheena-2b-rp`
-10. tuned `alkahest-ai/sheena-0.8b-rp`
+5. direct `alkahest-ai/alkahest-4b`
+6. direct `alkahest-ai/alkahest-2b`
+7. direct `alkahest-ai/alkahest-0.8b`
+8. tuned `alkahest-ai/alkahest-4b-rp`
+9. tuned `alkahest-ai/alkahest-2b-rp`
+10. tuned `alkahest-ai/alkahest-0.8b-rp`
 
 ## Important Env Vars
 
@@ -98,18 +100,20 @@ Defaults are already embedded, but these are the most useful overrides:
 - `HF_PRIVATE`: default `1`
 - `RALLY2_DIRECT_REPO`: default `alkahest-ai/rally-2b`
 - `RALLY4_DIRECT_REPO`: default `alkahest-ai/rally-4b`
-- `SHEENA4_DIRECT_REPO`: default `alkahest-ai/sheena-4b`
-- `SHEENA2_DIRECT_REPO`: default `alkahest-ai/sheena-2b`
-- `SHEENA08_DIRECT_REPO`: default `alkahest-ai/sheena-0.8b`
+- `ALKAHEST4_DIRECT_REPO`: default `alkahest-ai/alkahest-4b`
+- `ALKAHEST2_DIRECT_REPO`: default `alkahest-ai/alkahest-2b`
+- `ALKAHEST08_DIRECT_REPO`: default `alkahest-ai/alkahest-0.8b`
 - `RALLY2_TUNED_REPO`: default `alkahest-ai/rally-2b-rp`
 - `RALLY4_TUNED_REPO`: default `alkahest-ai/rally-4b-rp`
-- `SHEENA4_SOURCE_MODEL`: default `tvall43/Qwen3.5-4B-heretic`
-- `SHEENA2_SOURCE_MODEL`: default `tvall43/Qwen3.5-2B-heretic-v3b`
-- `SHEENA08_SOURCE_MODEL`: default `tvall43/Qwen3.5-0.8B-heretic-v3`
-- `SHEENA4_TUNED_REPO`: default `alkahest-ai/sheena-4b-rp`
-- `SHEENA2_TUNED_REPO`: default `alkahest-ai/sheena-2b-rp`
-- `SHEENA08_TUNED_REPO`: default `alkahest-ai/sheena-0.8b-rp`
-- `RALLY_MAX_STEPS`, `RALLY4_MAX_STEPS`, `SHEENA4_MAX_STEPS`, `SHEENA2_MAX_STEPS`, `SHEENA08_MAX_STEPS`
+- `ALKAHEST4_SOURCE_MODEL`: default `tvall43/Qwen3.5-4B-heretic`
+- `ALKAHEST2_SOURCE_MODEL`: default `tvall43/Qwen3.5-2B-heretic-v3b`
+- `ALKAHEST08_SOURCE_MODEL`: default `tvall43/Qwen3.5-0.8B-heretic-v3`
+- `ALKAHEST4_TUNED_REPO`: default `alkahest-ai/alkahest-4b-rp`
+- `ALKAHEST2_TUNED_REPO`: default `alkahest-ai/alkahest-2b-rp`
+- `ALKAHEST08_TUNED_REPO`: default `alkahest-ai/alkahest-0.8b-rp`
+- `RALLY_MAX_STEPS`, `RALLY4_MAX_STEPS`, `ALKAHEST4_MAX_STEPS`, `ALKAHEST2_MAX_STEPS`, `ALKAHEST08_MAX_STEPS`
+
+Legacy `SHEENA*` env vars still work as fallbacks during the migration.
 
 Example:
 
@@ -126,14 +130,14 @@ If you prefer one entrypoint per output, use:
 
 - `scripts/phala_run_rally_2b_direct.sh`
 - `scripts/phala_run_rally_4b_direct.sh`
-- `scripts/phala_run_sheena_4b_direct.sh`
-- `scripts/phala_run_sheena_2b_direct.sh`
-- `scripts/phala_run_sheena_0_8b_direct.sh`
+- `scripts/phala_run_alkahest_4b_direct.sh`
+- `scripts/phala_run_alkahest_2b_direct.sh`
+- `scripts/phala_run_alkahest_0_8b_direct.sh`
 - `scripts/phala_run_rally_2b_rp.sh`
 - `scripts/phala_run_rally_4b_rp.sh`
-- `scripts/phala_run_sheena_4b_rp.sh`
-- `scripts/phala_run_sheena_2b_rp.sh`
-- `scripts/phala_run_sheena_0_8b_rp.sh`
+- `scripts/phala_run_alkahest_4b_rp.sh`
+- `scripts/phala_run_alkahest_2b_rp.sh`
+- `scripts/phala_run_alkahest_0_8b_rp.sh`
 - `scripts/phala_run_all_models.sh`
 
 ## Reviewing The Synthetic Dataset
@@ -167,4 +171,4 @@ Gemma 4 is still the more proven export lane in this repo.
 
 Qwen3.5 now has the same plan/script/execute scaffold and package path, but it is less proven because it has not been executed on a real GPU runtime from this workspace yet.
 
-For consumer browser chat, `sheena-0.8b` and `sheena-2b` are the better first Qwen deployment targets than `sheena-4b`.
+For consumer browser chat, `alkahest-0.8b` and `alkahest-2b` are the better first Qwen deployment targets than `alkahest-4b`.

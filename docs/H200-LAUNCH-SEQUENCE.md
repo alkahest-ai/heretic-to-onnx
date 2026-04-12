@@ -10,17 +10,17 @@ Direct ONNX repos:
 
 - `alkahest-ai/rally-2b`
 - `alkahest-ai/rally-4b`
-- `alkahest-ai/sheena-4b`
-- `alkahest-ai/sheena-2b`
-- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/alkahest-4b`
+- `alkahest-ai/alkahest-2b`
+- `alkahest-ai/alkahest-0.8b`
 
 Roleplay-tuned ONNX repos:
 
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
 ## Reality Check
 
@@ -92,14 +92,14 @@ Write access to target repos:
 
 - `alkahest-ai/rally-2b`
 - `alkahest-ai/rally-4b`
-- `alkahest-ai/sheena-4b`
-- `alkahest-ai/sheena-2b`
-- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/alkahest-4b`
+- `alkahest-ai/alkahest-2b`
+- `alkahest-ai/alkahest-0.8b`
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
 Notes:
 
@@ -171,9 +171,9 @@ This is the lowest-risk order:
 ```bash
 bash scripts/phala_run_rally_2b_direct.sh
 bash scripts/phala_run_rally_4b_direct.sh
-bash scripts/phala_run_sheena_4b_direct.sh
-bash scripts/phala_run_sheena_2b_direct.sh
-bash scripts/phala_run_sheena_0_8b_direct.sh
+bash scripts/phala_run_alkahest_4b_direct.sh
+bash scripts/phala_run_alkahest_2b_direct.sh
+bash scripts/phala_run_alkahest_0_8b_direct.sh
 ```
 
 What each direct run does:
@@ -196,9 +196,9 @@ After the direct repos are done, run the tuned models:
 ```bash
 bash scripts/phala_run_rally_2b_rp.sh
 bash scripts/phala_run_rally_4b_rp.sh
-bash scripts/phala_run_sheena_4b_rp.sh
-bash scripts/phala_run_sheena_2b_rp.sh
-bash scripts/phala_run_sheena_0_8b_rp.sh
+bash scripts/phala_run_alkahest_4b_rp.sh
+bash scripts/phala_run_alkahest_2b_rp.sh
+bash scripts/phala_run_alkahest_0_8b_rp.sh
 ```
 
 What each tuned run does:
@@ -269,16 +269,16 @@ http://localhost:4173/browser-chat/
 Validation order:
 
 1. `onnx-community/Qwen3.5-0.8B-ONNX`
-2. `alkahest-ai/sheena-0.8b`
-3. `alkahest-ai/sheena-0.8b-rp`
+2. `alkahest-ai/alkahest-0.8b`
+3. `alkahest-ai/alkahest-0.8b-rp`
 4. `alkahest-ai/rally-2b`
 5. `alkahest-ai/rally-2b-rp`
 
 Smoke tests to run:
 
 1. text-only chat
-2. image prompt on Sheena and Rally
-3. audio prompt on Rally
+2. image prompt on Alkahest and Rally
+3. confirm audio is not advertised for the shipped Rally browser lane
 4. clear browser cache from the UI and reload the model
 
 ## Phase 11: Consume The Models In Other Apps
@@ -291,8 +291,8 @@ For your other browser/WebGPU apps:
 
 Recommended product defaults:
 
-- default browser tier: `alkahest-ai/sheena-0.8b` or `alkahest-ai/sheena-0.8b-rp`
-- stronger desktop tier: `alkahest-ai/sheena-2b` or `alkahest-ai/sheena-2b-rp`
+- default browser tier: `alkahest-ai/alkahest-0.8b` or `alkahest-ai/alkahest-0.8b-rp`
+- stronger desktop tier: `alkahest-ai/alkahest-2b` or `alkahest-ai/alkahest-2b-rp`
 - premium desktop-only tier: `alkahest-ai/rally-2b` or `alkahest-ai/rally-2b-rp`
 - do not make `rally-4b` the default consumer browser model
 
@@ -309,8 +309,8 @@ If you are short on the 24-hour window, the highest-value completion order is:
 
 1. `rally-2b`
 2. `rally-2b-rp`
-3. `sheena-0.8b`
-4. `sheena-0.8b-rp`
-5. `sheena-2b`
-6. `sheena-2b-rp`
+3. `alkahest-0.8b`
+4. `alkahest-0.8b-rp`
+5. `alkahest-2b`
+6. `alkahest-2b-rp`
 7. everything else

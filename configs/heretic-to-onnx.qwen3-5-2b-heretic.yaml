@@ -1,7 +1,7 @@
 source_model_id: tvall43/Qwen3.5-2B-heretic-v3b
 base_model_id: Qwen/Qwen3.5-2B
 architecture: qwen3_5_conditional_generation
-target_repo_id: alkahest-ai/sheena-2b
+target_repo_id: alkahest-ai/alkahest-2b
 target_dtype: q4f16
 target_device: webgpu
 modalities:

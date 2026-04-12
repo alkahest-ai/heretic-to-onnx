@@ -70,22 +70,22 @@ You can override the model from the URL:
 - `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-0.8B-ONNX`
 - `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-2B-ONNX`
 - `http://localhost:4173/browser-chat/?model=alkahest-ai/rally-2b`
-- `http://localhost:4173/browser-chat/?model=alkahest-ai/sheena-0.8b`
+- `http://localhost:4173/browser-chat/?model=alkahest-ai/alkahest-0.8b`
 
 ## Recommended Deployment Shape
 
 For the first real deployment:
 
 1. ship the static app
-2. point the default at `onnx-community/Qwen3.5-0.8B-ONNX` or `alkahest-ai/sheena-0.8b`
-3. keep `alkahest-ai/sheena-2b` as the next desktop-quality step up
-4. offer `alkahest-ai/rally-2b` and `alkahest-ai/sheena-4b` as heavier desktop tiers
+2. point the default at `onnx-community/Qwen3.5-0.8B-ONNX` or `alkahest-ai/alkahest-0.8b`
+3. keep `alkahest-ai/alkahest-2b` as the next desktop-quality step up
+4. offer `alkahest-ai/rally-2b` and `alkahest-ai/alkahest-4b` as heavier desktop tiers
 5. keep `alkahest-ai/rally-4b` as an explicit high-memory option, not the default
 
 If you want a broader consumer browser tier, prioritize:
 
-- `alkahest-ai/sheena-0.8b`
-- `alkahest-ai/sheena-2b`
+- `alkahest-ai/alkahest-0.8b`
+- `alkahest-ai/alkahest-2b`
 
 Those are better default browser-chat candidates than the larger Gemma and Qwen 4B lanes.
 
@@ -101,4 +101,4 @@ Do not promise:
 
 - “works on phones”
 
-The model packages remain multimodal after text-only fine-tuning. This UI now lets you attach image inputs for Gemma and Qwen, plus audio inputs for Rally / Gemma, so you can smoke-test that those paths still work after roleplay tuning.
+The model packages remain multimodal at the architecture level after text-only fine-tuning, but the current shipped browser exports are only validated for text + image. Use image prompts to regression-test Gemma and Qwen; do not treat browser audio as part of the supported Rally path yet.

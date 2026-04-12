@@ -42,7 +42,7 @@ python3 -m tools.heretic_to_onnx convert \
 
 python3 -m tools.heretic_to_onnx convert \
   --config configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml \
-  --work-dir build/work/sheena-4b \
+  --work-dir build/work/alkahest-4b \
   --export-mode script \
   --quantize-mode script
 ```
@@ -53,17 +53,17 @@ Direct ONNX repos:
 
 - `alkahest-ai/rally-2b`
 - `alkahest-ai/rally-4b`
-- `alkahest-ai/sheena-4b`
-- `alkahest-ai/sheena-2b`
-- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/alkahest-4b`
+- `alkahest-ai/alkahest-2b`
+- `alkahest-ai/alkahest-0.8b`
 
 Roleplay-tuned ONNX repos:
 
 - `alkahest-ai/rally-2b-rp`
 - `alkahest-ai/rally-4b-rp`
-- `alkahest-ai/sheena-4b-rp`
-- `alkahest-ai/sheena-2b-rp`
-- `alkahest-ai/sheena-0.8b-rp`
+- `alkahest-ai/alkahest-4b-rp`
+- `alkahest-ai/alkahest-2b-rp`
+- `alkahest-ai/alkahest-0.8b-rp`
 
 ## Dataset
 
@@ -101,8 +101,10 @@ It uses:
 - Transformers.js
 - WebGPU
 - a built-in model picker for Gemma and Qwen browser ONNX repos
-- image input for Gemma and Qwen, plus audio input for Rally / Gemma
+- image input for Gemma and Qwen browser lanes
 - `onnx-community/Qwen3.5-0.8B-ONNX` by default
+
+Current shipped browser exports are `text + image`. Audio is not part of the working Rally/Gemma browser path right now.
 
 Run it locally from the repo root:
 
@@ -136,14 +138,16 @@ Per-model wrappers:
 
 - `scripts/phala_run_rally_2b_direct.sh`
 - `scripts/phala_run_rally_4b_direct.sh`
-- `scripts/phala_run_sheena_4b_direct.sh`
-- `scripts/phala_run_sheena_2b_direct.sh`
-- `scripts/phala_run_sheena_0_8b_direct.sh`
+- `scripts/phala_run_alkahest_4b_direct.sh`
+- `scripts/phala_run_alkahest_2b_direct.sh`
+- `scripts/phala_run_alkahest_0_8b_direct.sh`
 - `scripts/phala_run_rally_2b_rp.sh`
 - `scripts/phala_run_rally_4b_rp.sh`
-- `scripts/phala_run_sheena_4b_rp.sh`
-- `scripts/phala_run_sheena_2b_rp.sh`
-- `scripts/phala_run_sheena_0_8b_rp.sh`
+- `scripts/phala_run_alkahest_4b_rp.sh`
+- `scripts/phala_run_alkahest_2b_rp.sh`
+- `scripts/phala_run_alkahest_0_8b_rp.sh`
+
+Legacy `sheena-*` wrapper names and one-click modes still work as compatibility aliases.
 
 Run the full H200 portfolio flow from the repo root with:
 
