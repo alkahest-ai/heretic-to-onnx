@@ -37,6 +37,7 @@ $PYTHON_BIN -m pip install \
   "safetensors>=0.4.3" \
   "sentencepiece>=0.2.0" \
   "onnx>=1.17.0" \
+  "onnxscript>=0.1.0" \
   "onnxruntime-gpu>=1.20.0" \
   "onnxconverter-common>=1.14.0" \
   "huggingface_hub[cli]>=0.31.0" \
