@@ -289,6 +289,13 @@ def render_gemma4_export_runner(
                     cache_position = cache_position + int(q_offset)
                 return cache_position
 
+            def _materialize_mask(mask_function, batch_size, cache_position, kv_arange):
+                batch_idx = torch.arange(batch_size, device=cache_position.device, dtype=torch.long).view(batch_size, 1, 1)
+                head_idx = torch.zeros(1, device=cache_position.device, dtype=torch.long).view(1, 1, 1)
+                q_idx = cache_position.view(1, -1, 1)
+                kv_idx = kv_arange.view(1, 1, -1)
+                return mask_function(batch_idx, head_idx, q_idx, kv_idx).to(dtype=torch.bool)
+
             def _patched_sdpa_mask(*args, **kwargs):
                 if original_signature is not None:
                     bound = original_signature.bind_partial(*args, **kwargs)
@@ -354,18 +361,19 @@ def render_gemma4_export_runner(
                     if can_skip and (padding_mask is None or padding_mask.all()):
                         return None
 
-                vmap_for_bhqkv = getattr(masking_utils, "_vmap_for_bhqkv", None)
-                if vmap_for_bhqkv is None:
-                    return original_sdpa_mask(*args, **kwargs)
-
                 kv_arange = torch.arange(kv_length, device=cache_position.device)
                 if torch.is_tensor(kv_offset):
                     kv_arange = kv_arange + kv_offset.to(device=cache_position.device, dtype=kv_arange.dtype)
                 elif kv_offset:
                     kv_arange = kv_arange + int(kv_offset)
 
-                mask = vmap_for_bhqkv(mask_function, bh_indices=False)(None, None, cache_position, kv_arange)
-                mask = mask[None, None, :, :].expand(batch_size, -1, -1, -1)
+                mask = _materialize_mask(mask_function, batch_size, cache_position, kv_arange)
+                if mask.ndim == 2:
+                    mask = mask.unsqueeze(0)
+                if mask.ndim == 3:
+                    mask = mask.unsqueeze(1)
+                if mask.shape[0] != batch_size:
+                    mask = mask.expand(batch_size, -1, -1, -1)
 
                 if padding_mask is not None:
                     mask = mask & padding_mask[:, None, None, :]
