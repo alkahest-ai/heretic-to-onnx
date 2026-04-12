@@ -57,8 +57,6 @@ Available modes:
 - `all-qwen`: bootstrap, all direct Alkahest Qwen conversions, approved-corpus compile, all tuned Alkahest Qwen conversions
 - `all`: direct conversions plus approved-corpus compile plus all tuned conversions
 
-Legacy `sheena-*` mode names are still accepted as compatibility aliases.
-
 ## Recommended First Paid Run
 
 Use:
@@ -112,8 +110,6 @@ Defaults are already embedded, but these are the most useful overrides:
 - `ALKAHEST2_TUNED_REPO`: default `alkahest-ai/alkahest-2b-rp`
 - `ALKAHEST08_TUNED_REPO`: default `alkahest-ai/alkahest-0.8b-rp`
 - `RALLY_MAX_STEPS`, `RALLY4_MAX_STEPS`, `ALKAHEST4_MAX_STEPS`, `ALKAHEST2_MAX_STEPS`, `ALKAHEST08_MAX_STEPS`
-
-Legacy `SHEENA*` env vars still work as fallbacks during the migration.
 
 Example:
 

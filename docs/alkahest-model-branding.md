@@ -52,9 +52,3 @@ That makes the portfolio easier to reason about:
 - Gemma family choice is a Rally decision
 - Qwen family choice is an Alkahest decision
 - both still carry explicit provenance in docs and model cards
-
-## Compatibility Note
-
-Older scripts and notes may still reference `sheena-*`.
-
-Treat those as legacy aliases only. New docs, manifests, wrapper scripts, and published repo IDs should use `alkahest-*` for the Qwen line.

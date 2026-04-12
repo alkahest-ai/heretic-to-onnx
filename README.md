@@ -147,8 +147,6 @@ Per-model wrappers:
 - `scripts/phala_run_alkahest_2b_rp.sh`
 - `scripts/phala_run_alkahest_0_8b_rp.sh`
 
-Legacy `sheena-*` wrapper names and one-click modes still work as compatibility aliases.
-
 Run the full H200 portfolio flow from the repo root with:
 
 ```bash

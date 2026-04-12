@@ -25,26 +25,26 @@ HF_OWNER="${HF_OWNER:-alkahest-ai}"
 
 RALLY2_SOURCE_MODEL="${RALLY2_SOURCE_MODEL:-p-e-w/gemma-4-E2B-it-heretic-ara}"
 RALLY4_SOURCE_MODEL="${RALLY4_SOURCE_MODEL:-coder3101/gemma-4-E4B-it-heretic}"
-ALKAHEST4_SOURCE_MODEL="${ALKAHEST4_SOURCE_MODEL:-${SHEENA4_SOURCE_MODEL:-tvall43/Qwen3.5-4B-heretic}}"
-ALKAHEST2_SOURCE_MODEL="${ALKAHEST2_SOURCE_MODEL:-${SHEENA2_SOURCE_MODEL:-tvall43/Qwen3.5-2B-heretic-v3b}}"
-ALKAHEST08_SOURCE_MODEL="${ALKAHEST08_SOURCE_MODEL:-${SHEENA08_SOURCE_MODEL:-tvall43/Qwen3.5-0.8B-heretic-v3}}"
+ALKAHEST4_SOURCE_MODEL="${ALKAHEST4_SOURCE_MODEL:-tvall43/Qwen3.5-4B-heretic}"
+ALKAHEST2_SOURCE_MODEL="${ALKAHEST2_SOURCE_MODEL:-tvall43/Qwen3.5-2B-heretic-v3b}"
+ALKAHEST08_SOURCE_MODEL="${ALKAHEST08_SOURCE_MODEL:-tvall43/Qwen3.5-0.8B-heretic-v3}"
 
 RALLY2_DIRECT_REPO="${RALLY2_DIRECT_REPO:-${HF_OWNER}/rally-2b}"
 RALLY4_DIRECT_REPO="${RALLY4_DIRECT_REPO:-${HF_OWNER}/rally-4b}"
-ALKAHEST4_DIRECT_REPO="${ALKAHEST4_DIRECT_REPO:-${SHEENA4_DIRECT_REPO:-${HF_OWNER}/alkahest-4b}}"
-ALKAHEST2_DIRECT_REPO="${ALKAHEST2_DIRECT_REPO:-${SHEENA2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b}}"
-ALKAHEST08_DIRECT_REPO="${ALKAHEST08_DIRECT_REPO:-${SHEENA08_DIRECT_REPO:-${HF_OWNER}/alkahest-0.8b}}"
+ALKAHEST4_DIRECT_REPO="${ALKAHEST4_DIRECT_REPO:-${HF_OWNER}/alkahest-4b}"
+ALKAHEST2_DIRECT_REPO="${ALKAHEST2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b}"
+ALKAHEST08_DIRECT_REPO="${ALKAHEST08_DIRECT_REPO:-${HF_OWNER}/alkahest-0.8b}"
 RALLY2_TUNED_REPO="${RALLY2_TUNED_REPO:-${HF_OWNER}/rally-2b-rp}"
 RALLY4_TUNED_REPO="${RALLY4_TUNED_REPO:-${HF_OWNER}/rally-4b-rp}"
-ALKAHEST4_TUNED_REPO="${ALKAHEST4_TUNED_REPO:-${SHEENA4_TUNED_REPO:-${HF_OWNER}/alkahest-4b-rp}}"
-ALKAHEST2_TUNED_REPO="${ALKAHEST2_TUNED_REPO:-${SHEENA2_TUNED_REPO:-${HF_OWNER}/alkahest-2b-rp}}"
-ALKAHEST08_TUNED_REPO="${ALKAHEST08_TUNED_REPO:-${SHEENA08_TUNED_REPO:-${HF_OWNER}/alkahest-0.8b-rp}}"
+ALKAHEST4_TUNED_REPO="${ALKAHEST4_TUNED_REPO:-${HF_OWNER}/alkahest-4b-rp}"
+ALKAHEST2_TUNED_REPO="${ALKAHEST2_TUNED_REPO:-${HF_OWNER}/alkahest-2b-rp}"
+ALKAHEST08_TUNED_REPO="${ALKAHEST08_TUNED_REPO:-${HF_OWNER}/alkahest-0.8b-rp}"
 
 RALLY_MAX_STEPS="${RALLY_MAX_STEPS:-300}"
 RALLY4_MAX_STEPS="${RALLY4_MAX_STEPS:-250}"
-ALKAHEST4_MAX_STEPS="${ALKAHEST4_MAX_STEPS:-${SHEENA4_MAX_STEPS:-300}}"
-ALKAHEST2_MAX_STEPS="${ALKAHEST2_MAX_STEPS:-${SHEENA2_MAX_STEPS:-325}}"
-ALKAHEST08_MAX_STEPS="${ALKAHEST08_MAX_STEPS:-${SHEENA08_MAX_STEPS:-350}}"
+ALKAHEST4_MAX_STEPS="${ALKAHEST4_MAX_STEPS:-300}"
+ALKAHEST2_MAX_STEPS="${ALKAHEST2_MAX_STEPS:-325}"
+ALKAHEST08_MAX_STEPS="${ALKAHEST08_MAX_STEPS:-350}"
 
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
@@ -278,15 +278,6 @@ modes:
   all-gemma
   all-qwen
   all
-
-legacy aliases:
-  sheena-4b-direct
-  sheena-2b-direct
-  sheena-0.8b-direct
-  sheena-4b
-  sheena-2b
-  sheena-0.8b
-  sheena
 EOF
 }
 
@@ -309,13 +300,13 @@ case "$MODE" in
   rally-4b-direct)
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
     ;;
-  alkahest-4b-direct|sheena-4b-direct)
+  alkahest-4b-direct)
     convert_direct "alkahest-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$ALKAHEST4_DIRECT_REPO"
     ;;
-  alkahest-2b-direct|sheena-2b-direct)
+  alkahest-2b-direct)
     convert_direct "alkahest-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$ALKAHEST2_DIRECT_REPO"
     ;;
-  alkahest-0.8b-direct|sheena-0.8b-direct)
+  alkahest-0.8b-direct)
     convert_direct "alkahest-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$ALKAHEST08_DIRECT_REPO"
     ;;
   rally)
@@ -326,15 +317,15 @@ case "$MODE" in
     compile_approved_dataset
     run_rally4
     ;;
-  alkahest-4b|sheena-4b|sheena)
+  alkahest-4b)
     compile_approved_dataset
     run_alkahest4
     ;;
-  alkahest-2b|sheena-2b)
+  alkahest-2b)
     compile_approved_dataset
     run_alkahest2
     ;;
-  alkahest-0.8b|sheena-0.8b)
+  alkahest-0.8b)
     compile_approved_dataset
     run_alkahest08
     ;;
