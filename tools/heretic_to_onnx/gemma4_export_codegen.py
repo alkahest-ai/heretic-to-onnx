@@ -250,6 +250,49 @@ def render_gemma4_export_runner(
             return {{}}
 
 
+        def _patch_masking_utils_for_scalar_q_length():
+            try:
+                from transformers import masking_utils
+            except Exception:
+                return
+
+            original_sdpa_mask = getattr(masking_utils, "sdpa_mask", None)
+            if original_sdpa_mask is None or getattr(original_sdpa_mask, "__name__", "") == "_patched_sdpa_mask":
+                return
+
+            def _patched_sdpa_mask(*args, **kwargs):
+                q_length = kwargs.get("q_length")
+                if q_length is not None:
+                    attention_mask = kwargs.get("attention_mask")
+                    q_offset = kwargs.get("q_offset", 0)
+                    device = torch.device("cpu")
+                    if torch.is_tensor(q_length):
+                        device = q_length.device
+                    elif torch.is_tensor(attention_mask):
+                        device = attention_mask.device
+
+                    if torch.is_tensor(q_length) and q_length.ndim == 0:
+                        q_length = torch.arange(int(q_length.item()), device=device, dtype=torch.long)
+                    elif isinstance(q_length, int):
+                        q_length = torch.arange(q_length, device=device, dtype=torch.long)
+
+                    if torch.is_tensor(q_length) and torch.is_tensor(q_offset):
+                        q_length = q_length + q_offset.to(device=device, dtype=torch.long)
+                    elif torch.is_tensor(q_length) and q_offset:
+                        q_length = q_length + int(q_offset)
+
+                    kwargs["q_length"] = q_length
+
+                return original_sdpa_mask(*args, **kwargs)
+
+            _patched_sdpa_mask.__name__ = "_patched_sdpa_mask"
+            masking_utils.sdpa_mask = _patched_sdpa_mask
+            try:
+                masking_utils.ALL_MASK_ATTENTION_FUNCTIONS._global_mapping["sdpa"] = masking_utils.sdpa_mask
+            except Exception:
+                pass
+
+
         def _load_image_processor(source_path: Path, base_path: Path):
             last_error = None
             for root in (source_path, base_path):
@@ -569,6 +612,7 @@ def render_gemma4_export_runner(
             if not CONTRACT["ok"]:
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
+            _patch_masking_utils_for_scalar_q_length()
             image_processor = _load_image_processor(source_path, base_path)
             feature_extractor = _load_feature_extractor(source_path, base_path)
             processor_config = _resolve_processor_config(source_path, base_path)
