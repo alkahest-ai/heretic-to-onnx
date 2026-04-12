@@ -1,0 +1,28 @@
+{
+  "output": "/Users/area/heretic/data/roleplay_v2/generated_raw/master-5000.jsonl",
+  "review_output": "/Users/area/heretic/data/roleplay_v2/review_table/master-5000.tsv",
+  "conversations_written": 5000,
+  "attempts": 42315,
+  "max_attempts": 120000,
+  "rejections": {
+    "assistant_skeleton": 37296,
+    "assistant_line": 18,
+    "conversation_shape": 1
+  },
+  "lint": {
+    "ok": true,
+    "errors": [],
+    "warnings": [
+      "assistant skeleton reused 5 times (threshold 4): v2master__midnight_tailor__conservatory_rain__praise__slow_burn__comforting__playful__v2264, v2master__silver_songbird__conservatory_rain__flirt__confessional__comforting__playful__v2064, v2master__silver_songbird__conservatory_rain__flirt__confessional__patient__precise__v0474, v2master__velvet_host__conservatory_rain__praise__confessional__patient__inviting__v1129 :: i watch you for a beat before i spend any words with rainlight glazing green leaves beyond the panes around us the line ",
+      "assistant skeleton reused 5 times (threshold 4): v2master__midnight_tailor__candlelit_bath__praise__submissive__measured__affirming__v0811, v2master__silk_librarian__candlelit_bath__praise__dominant__comforting__controlled__v4793, v2master__silver_songbird__candlelit_bath__praise__aftercare__slow_burn__melodic__v1853, v2master__velvet_bouncer__candlelit_bath__praise__confessional__comforting__attentive__v1462 :: i watch you for a beat before i spend any words with warm tile under bare feet around us the nape of your neck"
+    ],
+    "stats": {
+      "conversations": 5000,
+      "assistant_lines_unique": 20000,
+      "assistant_skeletons_unique": 7390,
+      "conversation_shapes_unique": 4977,
+      "errors": 0,
+      "warnings": 2
+    }
+  }
+}

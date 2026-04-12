@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import copy
 import json
 import re
 from collections import Counter, defaultdict
@@ -20,6 +21,16 @@ REQUIRED_REVIEW_FIELDS = [
     "content",
     "tags",
     "status",
+    "rewrite_notes",
+]
+
+SLIM_REVIEW_FIELDS = [
+    "conversation_id",
+    "turn_index",
+    "role",
+    "content",
+    "status",
+    "keep",
     "rewrite_notes",
 ]
 
@@ -71,6 +82,14 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
             handle.write(json.dumps(row, ensure_ascii=True) + "\n")
 
 
+def to_minimal_chat_rows(rows: list[dict]) -> list[dict]:
+    minimal_rows: list[dict] = []
+    for index, row in enumerate(rows, start=1):
+        validate_conversation(row, index)
+        minimal_rows.append({"messages": row["messages"]})
+    return minimal_rows
+
+
 def _delimiter_for_path(path: Path) -> str:
     return "\t" if path.suffix.lower() == ".tsv" else ","
 
@@ -80,15 +99,16 @@ def read_review_table(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle, delimiter=delimiter)
         fieldnames = [name.strip() for name in (reader.fieldnames or []) if name and name.strip()]
-        missing_columns = [field for field in REQUIRED_REVIEW_FIELDS if field not in fieldnames]
-        if missing_columns:
-            raise ValueError(f"{path}: missing required columns: {', '.join(missing_columns)}")
+        table_mode = detect_review_table_mode(fieldnames)
         rows = []
         for index, row in enumerate(reader, start=1):
             if row is None:
                 continue
             normalized = {key: (value or "").strip() for key, value in row.items() if key}
-            _validate_review_row(normalized, path=path, row_number=index + 1)
+            if table_mode == "full":
+                _validate_review_row(normalized, path=path, row_number=index + 1)
+            else:
+                _validate_slim_review_row(normalized, path=path, row_number=index + 1)
             rows.append(normalized)
     return rows
 
@@ -129,7 +149,7 @@ def _normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
-def _text_skeleton(text: str, *, width: int = 12) -> str:
+def _text_skeleton(text: str, *, width: int = 24) -> str:
     tokens = _normalize_text(text).split()
     return " ".join(tokens[:width])
 
@@ -140,6 +160,20 @@ def _is_truthy(value: Any) -> bool:
     if value is None:
         return False
     return str(value).strip().lower() in TRUTHY_VALUES
+
+
+def detect_review_table_mode(fieldnames: list[str]) -> str:
+    if all(field in fieldnames for field in REQUIRED_REVIEW_FIELDS):
+        return "full"
+    if all(field in fieldnames for field in SLIM_REVIEW_FIELDS):
+        return "slim"
+    missing_full = [field for field in REQUIRED_REVIEW_FIELDS if field not in fieldnames]
+    missing_slim = [field for field in SLIM_REVIEW_FIELDS if field not in fieldnames]
+    raise ValueError(
+        "review table columns do not match a supported format; "
+        f"missing full columns: {', '.join(missing_full) or 'none'}; "
+        f"missing slim columns: {', '.join(missing_slim) or 'none'}"
+    )
 
 
 def _validate_review_row(row: dict[str, str], *, path: Path, row_number: int) -> None:
@@ -156,6 +190,19 @@ def _validate_review_row(row: dict[str, str], *, path: Path, row_number: int) ->
     ]
     for field in required_values:
         if not row.get(field, "").strip():
+            raise ValueError(f"{path}:{row_number}: missing required value for {field}")
+    try:
+        int(row["turn_index"])
+    except ValueError as exc:
+        raise ValueError(f"{path}:{row_number}: turn_index must be an integer") from exc
+    if row["role"] not in SUPPORTED_ROLES:
+        raise ValueError(f"{path}:{row_number}: invalid role {row['role']!r}")
+
+
+def _validate_slim_review_row(row: dict[str, str], *, path: Path, row_number: int) -> None:
+    required_values = ["conversation_id", "turn_index", "role", "content", "status", "keep", "rewrite_notes"]
+    for field in required_values:
+        if field not in row or row.get(field, "") is None:
             raise ValueError(f"{path}:{row_number}: missing required value for {field}")
     try:
         int(row["turn_index"])
@@ -249,6 +296,24 @@ def conversation_to_review_rows(conversation: dict, *, default_status: str = "ge
     return rows
 
 
+def conversation_to_slim_review_rows(conversation: dict, *, default_status: str = "generated") -> list[dict[str, str]]:
+    validate_conversation(conversation, 1)
+    rows: list[dict[str, str]] = []
+    for turn_index, message in enumerate(conversation["messages"]):
+        rows.append(
+            {
+                "conversation_id": conversation["id"],
+                "turn_index": str(turn_index),
+                "role": message["role"],
+                "content": message["content"],
+                "status": str(conversation.get("status") or default_status),
+                "keep": "1",
+                "rewrite_notes": "",
+            }
+        )
+    return rows
+
+
 def review_rows_to_conversations(
     rows: list[dict[str, str]],
     *,
@@ -306,6 +371,51 @@ def review_rows_to_conversations(
     }
 
 
+def slim_review_rows_to_conversations(
+    rows: list[dict[str, str]],
+    *,
+    source_conversations: list[dict],
+    approved_only: bool = True,
+) -> tuple[list[dict], dict[str, int]]:
+    source_by_id = {row["id"]: row for row in source_conversations}
+    grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in rows:
+        grouped[row["conversation_id"]].append(row)
+
+    conversations: list[dict] = []
+    skipped_unapproved = 0
+    skipped_keep = 0
+    for conversation_id, conversation_rows in sorted(grouped.items()):
+        if conversation_id not in source_by_id:
+            raise ValueError(f"missing source conversation for {conversation_id}")
+        ordered = sorted(conversation_rows, key=lambda item: int(item.get("turn_index", "0") or "0"))
+        statuses = {row.get("status", "").strip().lower() for row in ordered}
+        keep_values = {_is_truthy(row.get("keep", "1")) for row in ordered}
+        if approved_only and not statuses.issubset(APPROVED_STATUSES):
+            skipped_unapproved += 1
+            continue
+        if False in keep_values:
+            skipped_keep += 1
+            continue
+
+        source = copy.deepcopy(source_by_id[conversation_id])
+        if len(source["messages"]) != len(ordered):
+            raise ValueError(f"{conversation_id}: turn count mismatch between source JSONL and slim review table")
+        for row, message in zip(ordered, source["messages"], strict=True):
+            if message["role"] != row["role"]:
+                raise ValueError(f"{conversation_id}: role mismatch at turn {row['turn_index']}")
+            message["content"] = row["content"]
+        source["status"] = ordered[0].get("status", source.get("status", "approved"))
+        source["source_stage"] = "approved_jsonl"
+        validate_conversation(source, len(conversations) + 1)
+        conversations.append(source)
+
+    return conversations, {
+        "skipped_unapproved_conversations": skipped_unapproved,
+        "skipped_keep_false_conversations": skipped_keep,
+    }
+
+
 def load_conversations(path: Path, *, approved_only: bool = True) -> list[dict]:
     if path.is_dir():
         rows: list[dict] = []
@@ -349,6 +459,8 @@ def lint_conversations(
         move_plan = conversation.get("variation", {}).get("assistant_move_plan", [])
         shape = json.dumps(
             {
+                "persona_id": conversation.get("persona_id", ""),
+                "scene_id": conversation.get("scene_id", ""),
                 "lane": conversation.get("lane", ""),
                 "tension_level": conversation.get("variation", {}).get("tension_level", ""),
                 "pacing": conversation.get("variation", {}).get("pacing", ""),

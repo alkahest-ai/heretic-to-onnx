@@ -11,7 +11,9 @@ import yaml
 
 from roleplay_dataset_v2 import (
     ROLEPLAY_V2_DIR,
+    SLIM_REVIEW_FIELDS,
     conversation_to_review_rows,
+    conversation_to_slim_review_rows,
     lint_conversations,
     write_jsonl,
     write_review_table,
@@ -837,7 +839,7 @@ def weighted_choice(rng: random.Random, values: list[str]) -> str:
 
 def assistant_skeleton(text: str) -> str:
     cleaned = re.sub(r"[^a-z0-9\s]", " ", text.lower())
-    return " ".join(re.sub(r"\s+", " ", cleaned).strip().split()[:12])
+    return " ".join(re.sub(r"\s+", " ", cleaned).strip().split()[:24])
 
 
 def choose_combo(rng: random.Random, personas: list[dict], scenes: list[dict]) -> tuple[dict, dict, str]:
@@ -1046,11 +1048,22 @@ def main() -> int:
         default=str(ROLEPLAY_V2_DIR / "review_table" / "batch-0001.tsv"),
         help="Optional review table output path",
     )
+    parser.add_argument(
+        "--review-format",
+        choices=("slim", "full"),
+        default="slim",
+        help="Review table format; slim keeps only the columns humans actually edit",
+    )
     parser.add_argument("--count", type=int, default=300, help="Conversations to write")
     parser.add_argument("--seed", type=int, default=111, help="Random seed")
     parser.add_argument("--id-prefix", default="v2b001", help="Conversation id prefix")
     parser.add_argument("--batch-id", default="batch-0001", help="Batch label")
-    parser.add_argument("--max-attempts", type=int, default=6000, help="Maximum generation attempts")
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=0,
+        help="Maximum generation attempts; default scales with --count",
+    )
     parser.add_argument(
         "--assistant-line-threshold",
         type=int,
@@ -1079,6 +1092,7 @@ def main() -> int:
 
     output_path = Path(args.output).expanduser().resolve()
     review_output_path = Path(args.review_output).expanduser().resolve()
+    max_attempts = args.max_attempts if args.max_attempts > 0 else max(6000, args.count * 12)
 
     assistant_line_counts: Counter[str] = Counter()
     assistant_skeleton_counts: Counter[str] = Counter()
@@ -1088,7 +1102,7 @@ def main() -> int:
     rows: list[dict] = []
 
     attempts = 0
-    while len(rows) < args.count and attempts < args.max_attempts:
+    while len(rows) < args.count and attempts < max_attempts:
         attempts += 1
         persona, scene, lane = choose_combo(rng, personas, scenes)
         variation = choose_variation(rng, persona, scene, axes)
@@ -1112,6 +1126,8 @@ def main() -> int:
 
         shape = json.dumps(
             {
+                "persona_id": persona["id"],
+                "scene_id": scene["id"],
                 "lane": lane,
                 "tension_level": variation["tension_level"],
                 "pacing": variation["pacing"],
@@ -1154,7 +1170,7 @@ def main() -> int:
             assistant_skeleton_counts[skeleton] += 1
 
     if len(rows) < args.count:
-        raise ValueError(f"generated only {len(rows)} conversations after {attempts} attempts")
+        raise ValueError(f"generated only {len(rows)} conversations after {attempts} attempts (max_attempts={max_attempts})")
 
     lint_report = lint_conversations(
         rows,
@@ -1169,14 +1185,20 @@ def main() -> int:
     if not args.no_review_table:
         review_rows = []
         for row in rows:
-            review_rows.extend(conversation_to_review_rows(row))
-        write_review_table(review_output_path, review_rows)
+            if args.review_format == "slim":
+                review_rows.extend(conversation_to_slim_review_rows(row))
+            else:
+                review_rows.extend(conversation_to_review_rows(row))
+        fieldnames = SLIM_REVIEW_FIELDS if args.review_format == "slim" else None
+        write_review_table(review_output_path, review_rows, fieldnames=fieldnames)
 
     manifest = {
         "output": str(output_path),
         "review_output": None if args.no_review_table else str(review_output_path),
+        "review_format": None if args.no_review_table else args.review_format,
         "conversations_written": len(rows),
         "attempts": attempts,
+        "max_attempts": max_attempts,
         "rejections": dict(rejection_counts),
         "lint": lint_report,
     }

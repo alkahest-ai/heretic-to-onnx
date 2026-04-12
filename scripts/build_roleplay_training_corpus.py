@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, lint_conversations, load_conversations, write_jsonl
+from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, lint_conversations, load_conversations, to_minimal_chat_rows, write_jsonl
 
 
 def _collect_jsonl_rows(directory: Path) -> list[dict]:
@@ -62,11 +62,13 @@ def main() -> int:
         raise ValueError("dataset lint failed:\n- " + "\n- ".join(lint_report["errors"]))
 
     write_jsonl(output_path, deduped)
+    write_jsonl(output_path.with_suffix(".minimal.jsonl"), to_minimal_chat_rows(deduped))
     manifest = {
         "source_version": args.source_version,
         "gold_dir": str(gold_dir),
         "approved_dir": str(approved_dir),
         "output": str(output_path),
+        "minimal_output": str(output_path.with_suffix(".minimal.jsonl")),
         "rows_gold": gold_count,
         "rows_approved": len(approved_rows),
         "rows_total": len(deduped),

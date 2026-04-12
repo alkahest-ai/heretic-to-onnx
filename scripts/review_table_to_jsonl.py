@@ -4,7 +4,15 @@ import argparse
 import json
 from pathlib import Path
 
-from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, read_review_table, review_rows_to_conversations, write_jsonl
+from roleplay_dataset_v2 import (
+    ROLEPLAY_V2_DIR,
+    detect_review_table_mode,
+    load_conversations,
+    read_review_table,
+    review_rows_to_conversations,
+    slim_review_rows_to_conversations,
+    write_jsonl,
+)
 
 
 def main() -> int:
@@ -20,6 +28,11 @@ def main() -> int:
         help="Output approved JSONL path",
     )
     parser.add_argument(
+        "--source-jsonl",
+        default="",
+        help="Required when compiling a slim review table; points at the source raw JSONL used to create the sheet",
+    )
+    parser.add_argument(
         "--include-non-approved",
         action="store_true",
         help="Compile rows regardless of status instead of requiring approved rows",
@@ -30,7 +43,19 @@ def main() -> int:
     output_path = Path(args.output).expanduser().resolve()
 
     review_rows = read_review_table(input_path)
-    conversations, skipped = review_rows_to_conversations(review_rows, approved_only=not args.include_non_approved)
+    table_mode = detect_review_table_mode(list(review_rows[0].keys())) if review_rows else "full"
+    if table_mode == "slim":
+        if not args.source_jsonl:
+            raise ValueError("--source-jsonl is required when compiling a slim review table")
+        source_path = Path(args.source_jsonl).expanduser().resolve()
+        source_conversations = load_conversations(source_path, approved_only=False)
+        conversations, skipped = slim_review_rows_to_conversations(
+            review_rows,
+            source_conversations=source_conversations,
+            approved_only=not args.include_non_approved,
+        )
+    else:
+        conversations, skipped = review_rows_to_conversations(review_rows, approved_only=not args.include_non_approved)
     if not conversations:
         raise ValueError("no conversations qualified for export")
 
@@ -38,6 +63,8 @@ def main() -> int:
     manifest = {
         "input": str(input_path),
         "output": str(output_path),
+        "table_mode": table_mode,
+        "source_jsonl": str(Path(args.source_jsonl).expanduser().resolve()) if args.source_jsonl else "",
         "conversations_written": len(conversations),
         **skipped,
     }

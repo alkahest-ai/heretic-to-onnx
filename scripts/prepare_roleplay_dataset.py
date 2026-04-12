@@ -5,7 +5,7 @@ import json
 import random
 from pathlib import Path
 
-from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, lint_conversations, load_conversations, write_jsonl
+from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, lint_conversations, load_conversations, to_minimal_chat_rows, write_jsonl
 
 
 def main() -> int:
@@ -67,6 +67,8 @@ def main() -> int:
 
     write_jsonl(output_dir / "train.jsonl", train_rows)
     write_jsonl(output_dir / "val.jsonl", val_rows)
+    write_jsonl(output_dir / "train.minimal.jsonl", to_minimal_chat_rows(train_rows))
+    write_jsonl(output_dir / "val.minimal.jsonl", to_minimal_chat_rows(val_rows))
     corpus_manifest = None
     if corpus_manifest_path.exists():
         corpus_manifest = json.loads(corpus_manifest_path.read_text(encoding="utf-8"))
@@ -76,6 +78,8 @@ def main() -> int:
         "rows_total": len(rows),
         "rows_train": len(train_rows),
         "rows_val": len(val_rows),
+        "train_minimal_path": str(output_dir / "train.minimal.jsonl"),
+        "val_minimal_path": str(output_dir / "val.minimal.jsonl"),
         "source_version": (corpus_manifest or {}).get("source_version", "roleplay_v2"),
         "corpus_manifest_path": str(corpus_manifest_path),
         "corpus_manifest": corpus_manifest,
