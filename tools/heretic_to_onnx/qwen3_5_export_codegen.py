@@ -205,7 +205,7 @@ def render_qwen3_5_export_runner(
     report_path: str,
     opset_version: int,
 ) -> str:
-    contract_json = json.dumps(contract.to_dict(), indent=2, sort_keys=True)
+    contract_literal = repr(contract.to_dict())
     default_source_path = json.dumps(str(Path(source_path).expanduser().resolve()))
     default_base_path = json.dumps(str(Path(base_path).expanduser().resolve()))
     default_output_dir = json.dumps(str(Path(output_dir).expanduser().resolve()))
@@ -550,4 +550,4 @@ def render_qwen3_5_export_runner(
             raise SystemExit(main())
         """
     )
-    return template.replace("__CONTRACT_JSON__", contract_json)
+    return template.replace("__CONTRACT_JSON__", contract_literal)
