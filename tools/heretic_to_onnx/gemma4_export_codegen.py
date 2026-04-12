@@ -233,7 +233,7 @@ def render_gemma4_export_runner(
         import numpy as np
         import onnx
         import torch
-        from transformers import AutoProcessor, Gemma4ForConditionalGeneration
+        from transformers import AutoFeatureExtractor, AutoImageProcessor, Gemma4ForConditionalGeneration
 
         CONTRACT = __CONTRACT_JSON__
 
@@ -250,19 +250,35 @@ def render_gemma4_export_runner(
             return {{}}
 
 
-        def _load_processor(source_path: Path, base_path: Path):
+        def _load_image_processor(source_path: Path, base_path: Path):
             last_error = None
             for root in (source_path, base_path):
                 candidate = root / "processor_config.json"
                 if not candidate.exists():
                     continue
                 try:
-                    return AutoProcessor.from_pretrained(str(root), trust_remote_code=False)
+                    return AutoImageProcessor.from_pretrained(str(root), trust_remote_code=False)
                 except Exception as exc:
                     last_error = exc
             if last_error is not None:
-                raise RuntimeError("failed to load Gemma 4 processor from source/base assets") from last_error
+                raise RuntimeError("failed to load Gemma 4 image processor from source/base assets") from last_error
             raise FileNotFoundError("processor_config.json was not found in the source or base model assets")
+
+
+        def _load_feature_extractor(source_path: Path, base_path: Path):
+            last_error = None
+            for root in (source_path, base_path):
+                candidate = root / "processor_config.json"
+                fallback = root / "preprocessor_config.json"
+                if not candidate.exists() and not fallback.exists():
+                    continue
+                try:
+                    return AutoFeatureExtractor.from_pretrained(str(root), trust_remote_code=False)
+                except Exception as exc:
+                    last_error = exc
+            if last_error is not None:
+                raise RuntimeError("failed to load Gemma 4 feature extractor from source/base assets") from last_error
+            raise FileNotFoundError("processor_config.json/preprocessor_config.json was not found in the source or base model assets")
 
 
         class FlatGemma4Cache:
@@ -422,7 +438,7 @@ def render_gemma4_export_runner(
             return model
 
 
-        def _build_sample_inputs(model, processor, processor_config: dict):
+        def _build_sample_inputs(model, image_processor, feature_extractor, processor_config: dict):
             text_config = model.config.text_config
             hidden_dtype = model.model.language_model.embed_tokens.weight.dtype
             device = next(model.parameters()).device
@@ -432,11 +448,10 @@ def render_gemma4_export_runner(
             pooling_kernel_size = int(model.model.vision_tower.config.pooling_kernel_size)
             image_height, image_width = _resolve_image_size(processor_config, patch_size, pooling_kernel_size)
             dummy_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
-            vision_batch = processor.image_processor(images=[dummy_image], return_tensors="pt")
+            vision_batch = image_processor(images=[dummy_image], return_tensors="pt")
             pixel_values = vision_batch["pixel_values"].to(device)
             pixel_position_ids = vision_batch["pixel_position_ids"].to(device)
 
-            feature_extractor = processor.feature_extractor
             sampling_rate = int(getattr(feature_extractor, "sampling_rate", 16000))
             dummy_audio = np.zeros(sampling_rate, dtype=np.float32)
             audio_batch = feature_extractor(
@@ -546,10 +561,11 @@ def render_gemma4_export_runner(
             if not CONTRACT["ok"]:
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
-            processor = _load_processor(source_path, base_path)
+            image_processor = _load_image_processor(source_path, base_path)
+            feature_extractor = _load_feature_extractor(source_path, base_path)
             processor_config = _resolve_processor_config(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)
-            sample_inputs = _build_sample_inputs(model, processor, processor_config)
+            sample_inputs = _build_sample_inputs(model, image_processor, feature_extractor, processor_config)
 
             wrappers = {{
                 "vision_encoder": Gemma4VisionEncoderWrapper(model),
