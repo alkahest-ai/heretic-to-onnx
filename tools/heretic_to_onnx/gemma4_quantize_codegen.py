@@ -14,7 +14,7 @@ def render_gemma4_quantize_runner(
     report_path: str,
     block_size: int,
 ) -> str:
-    contract_json = json.dumps(contract.to_dict(), indent=2, sort_keys=True)
+    contract_literal = repr(contract.to_dict())
     default_input_dir = json.dumps(str(Path(input_dir).expanduser().resolve()))
     default_output_dir = json.dumps(str(Path(output_dir).expanduser().resolve()))
     default_report_path = json.dumps(str(Path(report_path).expanduser().resolve()))
@@ -25,7 +25,7 @@ import argparse
 import json
 from pathlib import Path
 
-CONTRACT = {contract_json}
+CONTRACT = {contract_literal}
 
 
 def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
