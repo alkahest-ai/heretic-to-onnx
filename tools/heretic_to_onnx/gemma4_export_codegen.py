@@ -126,19 +126,6 @@ def build_gemma4_export_contract(
             notes=["Matches the Transformers.js Gemma 4 vision session input name `pixel_position_ids`."],
         ),
         SessionSpec(
-            name="audio_encoder",
-            raw_filename="audio_encoder.onnx",
-            package_filename=package_filenames.get("audio_encoder", "audio_encoder_q4f16.onnx"),
-            inputs=["input_features", "input_features_mask"],
-            outputs=["audio_features"],
-            dynamic_axes={
-                "input_features": {0: "audio_batch", 1: "audio_frames"},
-                "input_features_mask": {0: "audio_batch", 1: "audio_frames"},
-                "audio_features": {0: "audio_tokens"},
-            },
-            notes=["Audio padding is stripped in the wrapper so the output matches browser merge semantics."],
-        ),
-        SessionSpec(
             name="embed_tokens",
             raw_filename="embed_tokens.onnx",
             package_filename=package_filenames.get("embed_tokens", "embed_tokens_q4f16.onnx"),
@@ -152,6 +139,24 @@ def build_gemma4_export_contract(
             notes=["Multimodal placeholder token IDs are replaced with PAD before embedding, matching HF Gemma 4."],
         ),
     ]
+
+    if "audio_encoder" in package_filenames:
+        sessions.insert(
+            1,
+            SessionSpec(
+                name="audio_encoder",
+                raw_filename="audio_encoder.onnx",
+                package_filename=package_filenames["audio_encoder"],
+                inputs=["input_features", "input_features_mask"],
+                outputs=["audio_features"],
+                dynamic_axes={
+                    "input_features": {0: "audio_batch", 1: "audio_frames"},
+                    "input_features_mask": {0: "audio_batch", 1: "audio_frames"},
+                    "audio_features": {0: "audio_tokens"},
+                },
+                notes=["Audio padding is stripped in the wrapper so the output matches browser merge semantics."],
+            ),
+        )
 
     decoder_inputs = ["inputs_embeds", "per_layer_inputs", "attention_mask", "position_ids"]
     decoder_outputs = ["logits"]

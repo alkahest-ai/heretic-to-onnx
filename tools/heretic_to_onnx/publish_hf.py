@@ -26,24 +26,13 @@ class PublishHFReport:
 def _default_model_card(manifest: Manifest, repo_id: str) -> str:
     title = repo_id.split("/")[-1]
     architecture_label = manifest.expected_architecture
+    sessions = [f"- `{Path(path).name}`" for path in manifest.expected_onnx_files if path.endswith(".onnx")]
     if manifest.architecture == "gemma4_conditional_generation":
         summary = "Browser-oriented ONNX export of a Gemma 4 Heretic checkpoint packaged for WebGPU / Transformers.js."
-        sessions = [
-            "- `audio_encoder_q4f16.onnx`",
-            "- `vision_encoder_q4f16.onnx`",
-            "- `embed_tokens_q4f16.onnx`",
-            "- `decoder_model_merged_q4f16.onnx`",
-        ]
     elif manifest.architecture == "qwen3_5_conditional_generation":
         summary = "Browser-oriented ONNX export of a Qwen3.5 Heretic checkpoint packaged for WebGPU / Transformers.js."
-        sessions = [
-            "- `vision_encoder_q4f16.onnx`",
-            "- `embed_tokens_q4f16.onnx`",
-            "- `decoder_model_merged_q4f16.onnx`",
-        ]
     else:
         summary = "Browser-oriented ONNX export packaged for WebGPU / Transformers.js."
-        sessions = [f"- `{Path(path).name}`" for path in manifest.expected_onnx_files if path.endswith(".onnx")]
     return "\n".join(
         [
             f"# {title}",
