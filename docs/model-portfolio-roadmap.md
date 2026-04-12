@@ -18,6 +18,8 @@ Current naming decision:
 - `alkahest/rally-2b` = Gemma 4 E2B Heretic ONNX
 - `alkahest/rally-4b` = Gemma 4 E4B Heretic ONNX
 - `alkahest/sheena-4b` = Qwen 3.5 4B Heretic ONNX
+- `alkahest/sheena-2b` = Qwen 3.5 2B Heretic ONNX
+- `alkahest/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
 
 Direct provenance should still live in model cards and internal docs.
 
@@ -54,6 +56,8 @@ After direct conversions work, move to your own tuned checkpoints.
 - `alkahest/rally-2b-rp`
 - `alkahest/rally-4b-rp`
 - `alkahest/sheena-4b-rp`
+- `alkahest/sheena-2b-rp`
+- `alkahest/sheena-0.8b-rp`
 
 The direct conversion repos stay size-explicit, and the tuned repos also stay size-explicit so the portfolio stays operationally clear.
 
@@ -85,6 +89,18 @@ That keeps the deployment story consistent:
 - Goal: add a non-Gemma multimodal browser family to the Alkahest portfolio
 - Public name: `alkahest/sheena-4b`
 - Status: Qwen3.5 export scaffold is now present, but it is less proven than the Gemma 4 path
+
+### Qwen 3.5 2B Heretic
+
+- Source: `tvall43/Qwen3.5-2B-heretic-v3b`
+- Goal: smaller Sheena desktop/browser lane with better consumer feasibility than 4B
+- Public name: `alkahest/sheena-2b`
+
+### Qwen 3.5 0.8B Heretic
+
+- Source: `tvall43/Qwen3.5-0.8B-heretic-v3`
+- Goal: lowest-cost Sheena browser lane and best default candidate for broad free chat
+- Public name: `alkahest/sheena-0.8b`
 
 ## Roleplay Dataset Plan
 
@@ -119,7 +135,14 @@ If you fine-tune on text roleplay data:
 
 ### Qwen
 
-Qwen is useful for portfolio variance and now has a matching exporter scaffold in this repo, but Gemma should still be treated as the safer execution lane.
+Qwen is useful for portfolio variance and now has matching exporter scaffolds in this repo.
+
+Important distinction:
+
+- `rally` lanes are currently `text + image + audio`
+- `sheena` lanes are currently `text + image`
+
+So no, the full portfolio is not identical in modality coverage.
 
 ## Recommended H200 Work Order
 
@@ -128,9 +151,11 @@ For the first paid 24-hour GPU TEE window:
 1. convert Gemma 4 E2B Heretic
 2. convert Gemma 4 E4B Heretic
 3. convert Qwen3.5 4B Heretic
-4. begin roleplay fine-tune on E2B
-5. queue E4B roleplay fine-tune
-6. if time remains, queue Qwen3.5 roleplay fine-tune
+4. convert Qwen3.5 2B Heretic
+5. convert Qwen3.5 0.8B Heretic
+6. begin roleplay fine-tune on E2B
+7. queue E4B roleplay fine-tune
+8. queue Qwen3.5 2B and 0.8B roleplay fine-tunes before 4B if browser-first deployment is the priority
 
 That ordering minimizes the chance that the whole window disappears into training/debug overhead without any shipped model.
 

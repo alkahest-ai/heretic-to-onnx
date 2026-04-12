@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alkahest Browser Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Client-Side LLM</p>
+          <h1>Alkahest Browser Chat</h1>
+          <p class="hero-copy">
+            Free chat on the user’s device with Transformers.js, WebGPU, and ONNX model repos.
+          </p>
+        </div>
+        <div class="hero-note">
+          <p>Desktop-first.</p>
+          <p>Use public ONNX repos or self-hosted public model files.</p>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="control-panel">
+          <div class="panel-card">
+            <label class="field">
+              <span>Preset</span>
+              <select id="preset-model"></select>
+            </label>
+
+            <label class="field">
+              <span>Model ID</span>
+              <input
+                id="model-id"
+                type="text"
+                spellcheck="false"
+                value="onnx-community/Qwen3.5-0.8B-ONNX"
+              />
+            </label>
+
+            <label class="field">
+              <span>System Prompt</span>
+              <textarea
+                id="system-prompt"
+                rows="5"
+              >You are Alkahest. Reply directly, stay coherent across turns, and keep answers useful and concise.</textarea>
+            </label>
+
+            <div class="media-grid">
+              <label class="field">
+                <span>Image Input</span>
+                <input id="image-input" type="file" accept="image/*" />
+                <small id="image-status" class="field-hint">No image selected.</small>
+              </label>
+
+              <label class="field">
+                <span>Audio Input</span>
+                <input id="audio-input" type="file" accept="audio/*" />
+                <small id="audio-status" class="field-hint">
+                  Audio input is enabled only for Rally / Gemma presets.
+                </small>
+              </label>
+            </div>
+
+            <div class="parameter-grid">
+              <label class="field">
+                <span>Max Tokens</span>
+                <input id="max-tokens" type="number" min="32" max="512" step="16" value="160" />
+              </label>
+              <label class="field">
+                <span>Temperature</span>
+                <input id="temperature" type="number" min="0" max="1.5" step="0.05" value="0.85" />
+              </label>
+            </div>
+
+            <div class="action-row">
+              <button id="load-model" class="primary">Load Model</button>
+              <button id="clear-chat" class="secondary">Clear Chat</button>
+              <button id="clear-cache" class="secondary">Clear Browser Cache</button>
+            </div>
+
+            <div class="status-card">
+              <p class="status-label">Runtime</p>
+              <p id="runtime-status">Checking WebGPU support...</p>
+            </div>
+
+            <div class="status-card subtle">
+              <p class="status-label">Selected Model</p>
+              <p id="preset-note">
+                Qwen 3.5 0.8B ONNX | text + image | ~0.9-1.1 GB first load | Best default
+                consumer browser tier in this lineup.
+              </p>
+            </div>
+
+            <div class="status-card subtle">
+              <p class="status-label">Notes</p>
+              <ul class="note-list">
+                <li>First load can still be large and may take several minutes.</li>
+                <li>Private Hugging Face repos are not suitable for direct browser loading.</li>
+                <li>Best experience is desktop Safari or Chromium on modern hardware.</li>
+                <li>Audio input is supported only on Rally / Gemma presets.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="chat-panel">
+          <div id="messages" class="messages" aria-live="polite"></div>
+
+          <form id="chat-form" class="composer">
+            <textarea
+              id="prompt-input"
+              rows="4"
+              placeholder="Ask something. The model runs in the browser on the user’s device."
+            ></textarea>
+            <div class="composer-row">
+              <p class="composer-hint">Shift+Enter for a new line.</p>
+              <button id="send-message" class="primary" type="submit">Send</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

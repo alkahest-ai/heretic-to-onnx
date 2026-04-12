@@ -1,7 +1,7 @@
-source_model_id: tvall43/Qwen3.5-4B-heretic
-base_model_id: Qwen/Qwen3.5-4B
+source_model_id: tvall43/Qwen3.5-0.8B-heretic-v3
+base_model_id: Qwen/Qwen3.5-0.8B
 architecture: qwen3_5_conditional_generation
-target_repo_id: alkahest-ai/sheena-4b
+target_repo_id: alkahest-ai/sheena-0.8b
 target_dtype: q4f16
 target_device: webgpu
 modalities:
@@ -23,6 +23,6 @@ expected_onnx_files:
   - onnx/embed_tokens_q4f16.onnx
   - onnx/decoder_model_merged_q4f16.onnx
 validation:
-  smoke_prompt: Describe one scene in character as a private uncensored companion.
+  smoke_prompt: Describe one intimate but non-explicit scene in character as a private uncensored companion.
   browser_loader_class: Qwen3_5ForConditionalGeneration
   processor_class: AutoProcessor

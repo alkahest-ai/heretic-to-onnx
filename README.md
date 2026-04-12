@@ -54,33 +54,68 @@ Direct ONNX repos:
 - `alkahest/rally-2b`
 - `alkahest/rally-4b`
 - `alkahest/sheena-4b`
+- `alkahest/sheena-2b`
+- `alkahest/sheena-0.8b`
 
 Roleplay-tuned ONNX repos:
 
 - `alkahest/rally-2b-rp`
 - `alkahest/rally-4b-rp`
 - `alkahest/sheena-4b-rp`
+- `alkahest/sheena-2b-rp`
+- `alkahest/sheena-0.8b-rp`
 
 ## Dataset
 
-The seeded roleplay dataset lives in `data/roleplay_v1`.
+The active roleplay dataset lives in `data/roleplay_v2`.
 
-Current synthetic pass:
+Active workflow:
 
-- `6` personas
-- `10` scenes
-- `240` persona/scene/lane combinations
-- `25` variants per combination
-- `6,000` generated conversations in `data/roleplay_v1/generated/batch-0002.jsonl`
+- generate small raw batches into `data/roleplay_v2/generated_raw/`
+- review them in spreadsheet form from `data/roleplay_v2/review_table/`
+- compile approved rows into `data/roleplay_v2/approved_jsonl/`
+- build train/val splits only from approved rows plus the gold seed set
+- lint and round-trip check the workflow before tuning
+
+`data/roleplay_v1` is now prototype material and archive context.
 
 ## Main Docs
 
 - `docs/PRELAUNCH.md`: first paid H200 checklist
+- `docs/H200-LAUNCH-SEQUENCE.md`: single end-to-end launch sequence
+- `docs/browser-free-chat.md`: actual static browser chat app
 - `docs/phala-gpu-tee-oneclick.md`: fastest operator path
+- `docs/roleplay-data-flow.md`: spreadsheet-first `roleplay_v2` dataset flow
 - `docs/rally-end-to-end-runbook.md`: tune -> merge -> ONNX flow
 - `docs/model-execution-matrix.md`: source model to target repo mapping
 - `docs/phala-gpu-tee-h200-runbook.md`: GPU TEE product notes and launch guidance
 - `docs/colab-runbook.md`: fallback Colab flow
+
+## Browser Chat
+
+There is now a real static browser chat client in `browser-chat/`.
+
+It uses:
+
+- Transformers.js
+- WebGPU
+- a built-in model picker for Gemma and Qwen browser ONNX repos
+- image input for Gemma and Qwen, plus audio input for Rally / Gemma
+- `onnx-community/Qwen3.5-0.8B-ONNX` by default
+
+Run it locally from the repo root:
+
+```bash
+bash scripts/serve_browser_chat.sh
+```
+
+Then open:
+
+```text
+http://localhost:4173/browser-chat/
+```
+
+Read `docs/browser-free-chat.md` before wiring private or custom model hosting.
 
 ## Phala
 
@@ -91,18 +126,33 @@ Primary entrypoints:
 - `scripts/phala_gpu_tee_bootstrap.sh`
 - `scripts/phala_gpu_tee_oneclick.sh`
 - `scripts/phala_run_all_models.sh`
+- `scripts/synthesize_roleplay_batch.py`
+- `scripts/jsonl_to_review_table.py`
+- `scripts/review_table_to_jsonl.py`
+- `scripts/lint_roleplay_dataset.py`
 
 Per-model wrappers:
 
 - `scripts/phala_run_rally_2b_direct.sh`
 - `scripts/phala_run_rally_4b_direct.sh`
 - `scripts/phala_run_sheena_4b_direct.sh`
+- `scripts/phala_run_sheena_2b_direct.sh`
+- `scripts/phala_run_sheena_0_8b_direct.sh`
 - `scripts/phala_run_rally_2b_rp.sh`
 - `scripts/phala_run_rally_4b_rp.sh`
 - `scripts/phala_run_sheena_4b_rp.sh`
+- `scripts/phala_run_sheena_2b_rp.sh`
+- `scripts/phala_run_sheena_0_8b_rp.sh`
 
 Run the full H200 portfolio flow from the repo root with:
 
 ```bash
 bash scripts/phala_run_all_models.sh
+```
+
+Quick dataset verification:
+
+```bash
+python3 -m unittest tests.test_roleplay_dataset_v2
+python3 scripts/lint_roleplay_dataset.py --input data/roleplay_v2/approved_jsonl
 ```

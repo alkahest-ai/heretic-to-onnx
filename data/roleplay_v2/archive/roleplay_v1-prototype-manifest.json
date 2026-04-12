@@ -1,0 +1,12 @@
+{
+  "source_dataset": "roleplay_v1",
+  "archived_files": [
+    "/Users/area/heretic/data/roleplay_v1/generated/batch-0002.jsonl",
+    "/Users/area/heretic/data/roleplay_v1/generated/batch-0001.jsonl"
+  ],
+  "status": "prototype_not_training_backbone",
+  "notes": [
+    "This material can be sampled for salvage.",
+    "It should not be treated as the canonical roleplay_v2 corpus."
+  ]
+}

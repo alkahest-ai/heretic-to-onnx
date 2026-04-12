@@ -39,8 +39,13 @@ def _format_row(row: dict, tokenizer, *, enable_thinking: bool) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-name", default="p-e-w/gemma-4-E2B-it-heretic-ara")
-    parser.add_argument("--train-file", default=str(ROOT_DIR / "data/roleplay_v1/splits/train.jsonl"))
-    parser.add_argument("--val-file", default=str(ROOT_DIR / "data/roleplay_v1/splits/val.jsonl"))
+    parser.add_argument("--train-file", default=str(ROOT_DIR / "data/roleplay_v2/splits/train.jsonl"))
+    parser.add_argument("--val-file", default=str(ROOT_DIR / "data/roleplay_v2/splits/val.jsonl"))
+    parser.add_argument(
+        "--dataset-manifest",
+        default=str(ROOT_DIR / "data/roleplay_v2/splits/manifest.json"),
+        help="Manifest recording the roleplay dataset build used for training",
+    )
     parser.add_argument("--output-dir", default=str(ROOT_DIR / "build/unsloth/rally"))
     parser.add_argument("--merged-output-dir", default=str(ROOT_DIR / "build/unsloth/rally-merged"))
     parser.add_argument("--max-seq-length", type=int, default=2048)
@@ -142,10 +147,17 @@ def main() -> int:
         merged_dir.mkdir(parents=True, exist_ok=True)
         model.save_pretrained_merged(str(merged_dir), tokenizer, save_method="merged_16bit")
 
+    dataset_manifest_path = Path(args.dataset_manifest).expanduser().resolve()
+    dataset_manifest = None
+    if dataset_manifest_path.exists():
+        dataset_manifest = json.loads(dataset_manifest_path.read_text(encoding="utf-8"))
+
     metadata = {
         "model_name": args.model_name,
         "train_file": str(Path(args.train_file).expanduser().resolve()),
         "val_file": str(Path(args.val_file).expanduser().resolve()),
+        "dataset_manifest_path": str(dataset_manifest_path),
+        "dataset_manifest": dataset_manifest,
         "output_dir": str(output_dir),
         "merged_output_dir": str(Path(args.merged_output_dir).expanduser().resolve()),
         "max_seq_length": args.max_seq_length,

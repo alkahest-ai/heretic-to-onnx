@@ -1,7 +1,7 @@
 source_model_id: coder3101/gemma-4-E4B-it-heretic
 base_model_id: google/gemma-4-E4B-it
 architecture: gemma4_conditional_generation
-target_repo_id: alkahest/rally-4b
+target_repo_id: alkahest-ai/rally-4b
 target_dtype: q4f16
 target_device: webgpu
 modalities:

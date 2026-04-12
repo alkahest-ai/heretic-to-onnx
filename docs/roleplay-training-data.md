@@ -11,9 +11,9 @@ We are **not** using a single off-the-shelf public dataset as the canonical Alka
 The current plan is:
 
 1. ship the direct ONNX conversions first
-2. build an **Alkahest-owned roleplay dataset**
-3. use a small amount of public Apache-licensed roleplay data only as bootstrap material
-4. avoid non-commercial or gated datasets as the foundation of the branded line
+2. build an **Alkahest-owned original dataset**
+3. keep Hugging Face public datasets out of the foundation
+4. use a spreadsheet-first review workflow before any row reaches training
 
 ## Why
 
@@ -32,31 +32,25 @@ That means the dataset story has to be clean.
 
 The canonical roleplay dataset should be:
 
-- `alkahest/roleplay-v1` as an internal dataset first
+- `roleplay_v2` as the active internal dataset
 - made of **original characters, scenarios, voice patterns, and interaction formats**
 - structured for chat-style SFT
+- promoted from review tables into approved JSONL before training
 
 This is the dataset that should shape:
 
 - `alkahest/rally-2b-rp`
 - `alkahest/rally-4b-rp`
 - `alkahest/sheena-4b-rp`
+- `alkahest/sheena-2b-rp`
+- `alkahest/sheena-0.8b-rp`
 - later tuned portfolio variants
 
-### Bootstrap public data
+### Public data
 
-For initial experimentation, use only Apache-licensed public roleplay data.
+Public HF datasets are now optional reference material only.
 
-Best current bootstrap candidates:
-
-- `chimbiwide/NPC-Dialogue_v2`
-- `chimbiwide/NPC-Quest-Dialogue`
-
-Why these two:
-
-- both are explicitly marked `apache-2.0`
-- both are clearly intended for SFT
-- both are recent, structured, and easy to ingest
+They are not the foundation of the branded line.
 
 ## Datasets We Are Not Using As The Foundation
 
@@ -84,47 +78,20 @@ That does not mean they are impossible to experiment with privately, but they sh
 
 ## Recommended Data Strategy
 
-Use a two-part dataset.
+Build `roleplay_v2` from original Alkahest-authored material only.
 
-### Part A: Apache bootstrap set
-
-Start with:
-
-- `chimbiwide/NPC-Dialogue_v2`
-- `chimbiwide/NPC-Quest-Dialogue`
-
-But filter them before training:
-
-- remove rows with obvious franchise IP you do not want in the final model voice
-- remove malformed or excessively generic exchanges
-- normalize to a single chat format
-
-### Part B: Alkahest original set
-
-Create `roleplay-v1` with:
+Create it with:
 
 - original companion personas
 - original scenario prompts
-- flirt / intimacy / comfort / conflict lanes if desired
+- flirt / intimacy / comfort / praise / slow-burn lanes
 - desired reply style, pacing, and boundaries
 - examples of what “good Rally / Sheena behavior” actually looks like
-
-This original set should become the majority signal over time.
-
-## Recommended Training Split
-
-For the first tuned run:
-
-- `60-80%` Alkahest original data
-- `20-40%` Apache bootstrap data
-
-The point of the public data is to help conversational depth and pacing, not to define the identity of the line.
+- TSV review tables that let humans rewrite and approve rows before promotion
 
 ## Format
 
-Use multi-turn chat JSONL matching the structure already scaffolded in:
-
-- `/Users/area/heretic/examples/roleplay-dataset.example.jsonl`
+Use spreadsheet review tables as the editable source and compile them into multi-turn chat JSONL before training.
 
 Preferred pattern:
 
@@ -153,14 +120,18 @@ Ship these direct conversions first:
 - `alkahest/rally-2b`
 - `alkahest/rally-4b`
 - `alkahest/sheena-4b`
+- `alkahest/sheena-2b`
+- `alkahest/sheena-0.8b`
 
 ### Phase 2
 
-Build `roleplay-v1` and tune:
+Build `roleplay_v2` and tune:
 
 - `alkahest/rally-2b-rp`
 - `alkahest/rally-4b-rp`
 - `alkahest/sheena-4b-rp`
+- `alkahest/sheena-2b-rp`
+- `alkahest/sheena-0.8b-rp`
 
 ## Sources
 

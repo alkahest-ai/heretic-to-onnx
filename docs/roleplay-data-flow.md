@@ -1,77 +1,89 @@
 # Roleplay Data Flow
 
-Yes: the **actual training dataset** is supposed to be in chat messages.
+The final training data is still plain multi-turn chat JSONL with `system`, `user`, and `assistant` roles.
 
-This repo currently has **two layers** of data:
+What changed is the editing and promotion workflow.
 
-## 1. Training rows
+## Canonical Dataset
 
-These are the real SFT examples.
+The active dataset is `roleplay_v2`.
 
-They look like:
+Its stages are:
 
-```json
-{
-  "id": "seed-0001",
-  "tags": ["adult", "consensual", "flirt"],
-  "messages": [
-    {"role": "system", "content": "..."},
-    {"role": "user", "content": "..."},
-    {"role": "assistant", "content": "..."}
-  ]
-}
+1. `generated_raw/`
+2. `review_table/`
+3. `approved_jsonl/`
+4. `splits/`
+
+Only stage 3 and stage 4 feed training.
+
+## Editable Format
+
+Humans now edit a spreadsheet-style CSV/TSV review table, not the main JSONL corpus.
+
+Required columns:
+
+- `conversation_id`
+- `turn_index`
+- `role`
+- `persona_id`
+- `scene_id`
+- `lane`
+- `content`
+- `tags`
+- `status`
+- `rewrite_notes`
+
+Optional columns:
+
+- `keep`
+- `quality_score`
+- `repetition_flag`
+- `needs_rewrite`
+- `approved_by`
+
+## Actual Workflow
+
+1. generate a small raw batch
+2. export it to TSV
+3. review and rewrite in Sheets / Excel / Numbers
+4. mark approved rows
+5. compile approved rows back to JSONL
+6. lint the approved batch
+7. merge gold + approved rows into the corpus
+8. split train/val
+9. train Unsloth on that approved corpus
+
+## Quick Checks
+
+Use these before a real tune:
+
+```bash
+python3 -m unittest tests.test_roleplay_dataset_v2
+python3 scripts/lint_roleplay_dataset.py --input data/roleplay_v2/review_table/batch-0001.tsv --approved-only
+python3 scripts/lint_roleplay_dataset.py --input data/roleplay_v2/approved_jsonl
 ```
 
-Files in this category:
+## Primary Files
 
-- `/Users/area/heretic/data/roleplay_v1/seed_conversations.jsonl`
-- `/Users/area/heretic/data/roleplay_v1/generated/*.jsonl`
-- `/Users/area/heretic/data/roleplay_v1/corpus.jsonl`
-- `/Users/area/heretic/data/roleplay_v1/splits/train.jsonl`
-- `/Users/area/heretic/data/roleplay_v1/splits/val.jsonl`
+- `/Users/area/heretic/data/roleplay_v2/README.md`
+- `/Users/area/heretic/data/roleplay_v2/personas.yaml`
+- `/Users/area/heretic/data/roleplay_v2/scenes.yaml`
+- `/Users/area/heretic/data/roleplay_v2/variation_axes.yaml`
+- `/Users/area/heretic/data/roleplay_v2/gold/seed_conversations.jsonl`
 
-## 2. Generation scaffolding
+## Primary Scripts
 
-These are **not** the training rows themselves.
+- `/Users/area/heretic/scripts/synthesize_roleplay_batch.py`
+- `/Users/area/heretic/scripts/jsonl_to_review_table.py`
+- `/Users/area/heretic/scripts/review_table_to_jsonl.py`
+- `/Users/area/heretic/scripts/lint_roleplay_dataset.py`
+- `/Users/area/heretic/scripts/build_roleplay_training_corpus.py`
+- `/Users/area/heretic/scripts/prepare_roleplay_dataset.py`
+- `/Users/area/heretic/scripts/train_rally_unsloth.py`
 
-They exist to help generate more training rows.
+## `roleplay_v1`
 
-Files in this category:
+`roleplay_v1` is now prototype material and archive context.
 
-- `/Users/area/heretic/data/roleplay_v1/personas.yaml`
-- `/Users/area/heretic/data/roleplay_v1/scenes.yaml`
-- `/Users/area/heretic/data/roleplay_v1/style-rules.md`
-- `/Users/area/heretic/data/roleplay_v1/generator_prompt.md`
-- `/Users/area/heretic/data/roleplay_v1/prompt_pack.jsonl`
-
-`prompt_pack.jsonl` is just a list of prompt jobs to feed into another model or workflow to generate more conversations.
-
-## Intended Workflow
-
-1. write or generate more rows in message format
-2. save them into `generated/*.jsonl`
-3. merge everything into one corpus
-4. split train/val
-5. train Unsloth on the resulting message dataset
-
-## Current Synthetic Scale
-
-The current scaffold is intentionally set up to generate a full first-pass dataset instead of a toy batch:
-
-- `6` personas
-- `10` scenes
-- `240` persona/scene/lane combinations
-- `25` variants per combination
-- `6,000` generated rows in `batch-0002.jsonl`
-
-That is enough to get the corpus into the right order of magnitude before manual editing.
-
-## Scripts
-
-Use:
-
-- `/Users/area/heretic/scripts/render_roleplay_prompt_pack.py` to generate prompt jobs
-- `/Users/area/heretic/scripts/synthesize_roleplay_batch.py` to generate bulk message-format conversation rows
-- `/Users/area/heretic/scripts/build_roleplay_training_corpus.py` to merge real conversation files
-- `/Users/area/heretic/scripts/prepare_roleplay_dataset.py` to validate/split one message file
-- `/Users/area/heretic/scripts/train_rally_unsloth.py` to fine-tune `rally` or any other supported chat checkpoint by overriding `--model-name`
+It is still useful for salvage and comparison, but it is not the default RP training backbone anymore.

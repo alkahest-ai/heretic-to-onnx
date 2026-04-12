@@ -161,6 +161,8 @@ This gets you two direct portfolio assets before you risk the longer fine-tune l
 - `alkahest/rally-2b`
 - `alkahest/rally-4b`
 - `alkahest/sheena-4b`
+- `alkahest/sheena-2b`
+- `alkahest/sheena-0.8b`
 
 ### Wave 2: Alkahest fine-tuned Gemma variants
 
@@ -170,8 +172,16 @@ This gets you two direct portfolio assets before you risk the longer fine-tune l
 ### Wave 3: Qwen variance lane
 
 - `alkahest/sheena-4b-rp`
+- `alkahest/sheena-2b-rp`
+- `alkahest/sheena-0.8b-rp`
 
 Wave 3 is now scaffolded in this repo, but it is still the less proven export lane compared to Gemma 4.
+
+If browser-first consumer deployment is the main goal, prioritize:
+
+1. `sheena-0.8b`
+2. `sheena-2b`
+3. `sheena-4b`
 
 ## GPU TEE Launch Flow
 

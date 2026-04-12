@@ -4,51 +4,51 @@ import argparse
 import json
 from pathlib import Path
 
-from prepare_roleplay_dataset import load_jsonl, validate_row, write_jsonl
+from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, lint_conversations, load_conversations, write_jsonl
 
 
-def _collect_generated_rows(generated_dir: Path) -> list[dict]:
+def _collect_jsonl_rows(directory: Path) -> list[dict]:
     rows: list[dict] = []
-    if not generated_dir.exists():
+    if not directory.exists():
         return rows
-    for path in sorted(generated_dir.glob("*.jsonl")):
-        rows.extend(load_jsonl(path))
+    for path in sorted(directory.glob("*.jsonl")):
+        rows.extend(load_conversations(path))
     return rows
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--seed-file",
-        default="/Users/area/heretic/data/roleplay_v1/seed_conversations.jsonl",
-        help="Primary seed conversation JSONL",
+        "--gold-dir",
+        default=str(ROLEPLAY_V2_DIR / "gold"),
+        help="Directory containing curated gold conversation JSONL files",
     )
     parser.add_argument(
-        "--generated-dir",
-        default="/Users/area/heretic/data/roleplay_v1/generated",
-        help="Directory containing reviewed generated conversation JSONL files",
+        "--approved-dir",
+        default=str(ROLEPLAY_V2_DIR / "approved_jsonl"),
+        help="Directory containing approved conversation JSONL files",
     )
     parser.add_argument(
         "--output",
-        default="/Users/area/heretic/data/roleplay_v1/corpus.jsonl",
+        default=str(ROLEPLAY_V2_DIR / "corpus.jsonl"),
         help="Unified corpus output path",
     )
+    parser.add_argument("--source-version", default="roleplay_v2", help="Dataset version label to record")
     args = parser.parse_args()
 
-    seed_file = Path(args.seed_file).expanduser().resolve()
-    generated_dir = Path(args.generated_dir).expanduser().resolve()
+    gold_dir = Path(args.gold_dir).expanduser().resolve()
+    approved_dir = Path(args.approved_dir).expanduser().resolve()
     output_path = Path(args.output).expanduser().resolve()
 
-    rows = load_jsonl(seed_file)
-    rows.extend(_collect_generated_rows(generated_dir))
+    rows = _collect_jsonl_rows(gold_dir)
+    gold_count = len(rows)
+    approved_rows = _collect_jsonl_rows(approved_dir)
+    rows.extend(approved_rows)
 
     deduped: list[dict] = []
     seen_ids: set[str] = set()
-    for index, row in enumerate(rows, start=1):
-        validate_row(row, index)
-        row_id = row.get("id")
-        if not isinstance(row_id, str) or not row_id.strip():
-            raise ValueError(f"row {index}: missing id")
+    for row in rows:
+        row_id = row["id"]
         if row_id in seen_ids:
             continue
         seen_ids.add(row_id)
@@ -57,12 +57,20 @@ def main() -> int:
     if not deduped:
         raise ValueError("no valid rows were collected")
 
+    lint_report = lint_conversations(deduped)
+    if lint_report["errors"]:
+        raise ValueError("dataset lint failed:\n- " + "\n- ".join(lint_report["errors"]))
+
     write_jsonl(output_path, deduped)
     manifest = {
-        "seed_file": str(seed_file),
-        "generated_dir": str(generated_dir),
+        "source_version": args.source_version,
+        "gold_dir": str(gold_dir),
+        "approved_dir": str(approved_dir),
         "output": str(output_path),
+        "rows_gold": gold_count,
+        "rows_approved": len(approved_rows),
         "rows_total": len(deduped),
+        "lint": lint_report,
     }
     (output_path.parent / "corpus-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(manifest, indent=2))

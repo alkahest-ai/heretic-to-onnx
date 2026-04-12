@@ -10,29 +10,41 @@ MODEL_ROOT="${MODEL_ROOT:-$WORK_ROOT/models}"
 MANIFEST_ROOT="${MANIFEST_ROOT:-$WORK_ROOT/manifests}"
 PACKAGE_ROOT="${PACKAGE_ROOT:-$WORK_ROOT/packages}"
 
-DATASET_VARIANTS="${DATASET_VARIANTS:-25}"
+DATASET_COUNT="${DATASET_COUNT:-300}"
 DATASET_SEED="${DATASET_SEED:-111}"
-PROMPT_LIMIT="${PROMPT_LIMIT:-240}"
-DATASET_OUTPUT="${DATASET_OUTPUT:-$ROOT_DIR/data/roleplay_v1/generated/batch-0002.jsonl}"
-DATASET_ID_PREFIX="${DATASET_ID_PREFIX:-bulk25}"
+PROMPT_LIMIT="${PROMPT_LIMIT:-300}"
+DATASET_OUTPUT="${DATASET_OUTPUT:-$ROOT_DIR/data/roleplay_v2/generated_raw/batch-0001.jsonl}"
+REVIEW_OUTPUT="${REVIEW_OUTPUT:-$ROOT_DIR/data/roleplay_v2/review_table/batch-0001.tsv}"
+DATASET_ID_PREFIX="${DATASET_ID_PREFIX:-v2b001}"
+DATASET_BATCH_ID="${DATASET_BATCH_ID:-batch-0001}"
+MIN_APPROVED_ROWS="${MIN_APPROVED_ROWS:-5000}"
 
 HF_UPLOAD_WORKERS="${HF_UPLOAD_WORKERS:-8}"
 HF_PRIVATE="${HF_PRIVATE:-1}"
+HF_OWNER="${HF_OWNER:-alkahest-ai}"
 
 RALLY2_SOURCE_MODEL="${RALLY2_SOURCE_MODEL:-p-e-w/gemma-4-E2B-it-heretic-ara}"
 RALLY4_SOURCE_MODEL="${RALLY4_SOURCE_MODEL:-coder3101/gemma-4-E4B-it-heretic}"
-SHEENA_SOURCE_MODEL="${SHEENA_SOURCE_MODEL:-tvall43/Qwen3.5-4B-heretic}"
+SHEENA4_SOURCE_MODEL="${SHEENA4_SOURCE_MODEL:-tvall43/Qwen3.5-4B-heretic}"
+SHEENA2_SOURCE_MODEL="${SHEENA2_SOURCE_MODEL:-tvall43/Qwen3.5-2B-heretic-v3b}"
+SHEENA08_SOURCE_MODEL="${SHEENA08_SOURCE_MODEL:-tvall43/Qwen3.5-0.8B-heretic-v3}"
 
-RALLY2_DIRECT_REPO="${RALLY2_DIRECT_REPO:-alkahest/rally-2b}"
-RALLY4_DIRECT_REPO="${RALLY4_DIRECT_REPO:-alkahest/rally-4b}"
-SHEENA_DIRECT_REPO="${SHEENA_DIRECT_REPO:-alkahest/sheena-4b}"
-RALLY2_TUNED_REPO="${RALLY2_TUNED_REPO:-alkahest/rally-2b-rp}"
-RALLY4_TUNED_REPO="${RALLY4_TUNED_REPO:-alkahest/rally-4b-rp}"
-SHEENA_TUNED_REPO="${SHEENA_TUNED_REPO:-alkahest/sheena-4b-rp}"
+RALLY2_DIRECT_REPO="${RALLY2_DIRECT_REPO:-${HF_OWNER}/rally-2b}"
+RALLY4_DIRECT_REPO="${RALLY4_DIRECT_REPO:-${HF_OWNER}/rally-4b}"
+SHEENA4_DIRECT_REPO="${SHEENA4_DIRECT_REPO:-${HF_OWNER}/sheena-4b}"
+SHEENA2_DIRECT_REPO="${SHEENA2_DIRECT_REPO:-${HF_OWNER}/sheena-2b}"
+SHEENA08_DIRECT_REPO="${SHEENA08_DIRECT_REPO:-${HF_OWNER}/sheena-0.8b}"
+RALLY2_TUNED_REPO="${RALLY2_TUNED_REPO:-${HF_OWNER}/rally-2b-rp}"
+RALLY4_TUNED_REPO="${RALLY4_TUNED_REPO:-${HF_OWNER}/rally-4b-rp}"
+SHEENA4_TUNED_REPO="${SHEENA4_TUNED_REPO:-${HF_OWNER}/sheena-4b-rp}"
+SHEENA2_TUNED_REPO="${SHEENA2_TUNED_REPO:-${HF_OWNER}/sheena-2b-rp}"
+SHEENA08_TUNED_REPO="${SHEENA08_TUNED_REPO:-${HF_OWNER}/sheena-0.8b-rp}"
 
 RALLY_MAX_STEPS="${RALLY_MAX_STEPS:-300}"
 RALLY4_MAX_STEPS="${RALLY4_MAX_STEPS:-250}"
-SHEENA_MAX_STEPS="${SHEENA_MAX_STEPS:-300}"
+SHEENA4_MAX_STEPS="${SHEENA4_MAX_STEPS:-300}"
+SHEENA2_MAX_STEPS="${SHEENA2_MAX_STEPS:-325}"
+SHEENA08_MAX_STEPS="${SHEENA08_MAX_STEPS:-350}"
 
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
@@ -55,23 +67,45 @@ bootstrap_env() {
   bash "$ROOT_DIR/scripts/phala_gpu_tee_bootstrap.sh"
 }
 
-build_dataset() {
-  echo "[dataset] rendering prompt pack"
+generate_review_batch() {
+  echo "[dataset] rendering roleplay_v2 prompt pack"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/render_roleplay_prompt_pack.py" --limit "$PROMPT_LIMIT"
 
-  echo "[dataset] generating synthetic conversations"
+  echo "[dataset] generating reviewed-batch candidate conversations"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/synthesize_roleplay_batch.py" \
-    --variants "$DATASET_VARIANTS" \
+    --count "$DATASET_COUNT" \
     --seed "$DATASET_SEED" \
     --id-prefix "$DATASET_ID_PREFIX" \
-    --output "$DATASET_OUTPUT"
+    --batch-id "$DATASET_BATCH_ID" \
+    --output "$DATASET_OUTPUT" \
+    --review-output "$REVIEW_OUTPUT"
+}
 
-  echo "[dataset] merging corpus"
+compile_approved_dataset() {
+  local approved_dir="$ROOT_DIR/data/roleplay_v2/approved_jsonl"
+  local approved_files
+  local approved_rows
+
+  approved_files="$(find "$approved_dir" -maxdepth 1 -name '*.jsonl' | wc -l | tr -d ' ')"
+  if [[ "$approved_files" == "0" ]]; then
+    echo "[dataset] no approved roleplay_v2 JSONL files found in $approved_dir" >&2
+    echo "[dataset] generate and review a batch first, then compile it with review_table_to_jsonl.py" >&2
+    exit 1
+  fi
+
+  approved_rows="$(find "$approved_dir" -maxdepth 1 -name '*.jsonl' -exec cat {} + | wc -l | tr -d ' ')"
+  if [[ "$approved_rows" -lt "$MIN_APPROVED_ROWS" ]]; then
+    echo "[dataset] approved corpus has $approved_rows conversations; MIN_APPROVED_ROWS is $MIN_APPROVED_ROWS" >&2
+    echo "[dataset] lower MIN_APPROVED_ROWS only if you intentionally want a smoke-test tune" >&2
+    exit 1
+  fi
+
+  echo "[dataset] merging approved roleplay_v2 corpus"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/build_roleplay_training_corpus.py"
 
-  echo "[dataset] validating and splitting corpus"
+  echo "[dataset] validating and splitting approved corpus"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/prepare_roleplay_dataset.py" \
-    --input "$ROOT_DIR/data/roleplay_v1/corpus.jsonl"
+    --input "$ROOT_DIR/data/roleplay_v2/corpus.jsonl"
 }
 
 convert_direct() {
@@ -121,8 +155,9 @@ train_model() {
   echo "[train] $label"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/train_rally_unsloth.py" \
     --model-name "$model_name" \
-    --train-file "$ROOT_DIR/data/roleplay_v1/splits/train.jsonl" \
-    --val-file "$ROOT_DIR/data/roleplay_v1/splits/val.jsonl" \
+    --train-file "$ROOT_DIR/data/roleplay_v2/splits/train.jsonl" \
+    --val-file "$ROOT_DIR/data/roleplay_v2/splits/val.jsonl" \
+    --dataset-manifest "$ROOT_DIR/data/roleplay_v2/splits/manifest.json" \
     --output-dir "$output_dir" \
     --merged-output-dir "$merged_dir" \
     --max-steps "$max_steps" \
@@ -188,15 +223,37 @@ run_rally4() {
     "$RALLY4_TUNED_REPO"
 }
 
-run_sheena() {
+run_sheena4() {
   local output_dir="$MODEL_ROOT/sheena-4b-rp"
   local merged_dir="$MODEL_ROOT/sheena-4b-rp-merged"
-  train_model "sheena-4b-rp" "$SHEENA_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA_MAX_STEPS"
+  train_model "sheena-4b-rp" "$SHEENA4_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA4_MAX_STEPS"
   convert_tuned_model \
     "sheena-4b-rp" \
     "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" \
     "$merged_dir" \
-    "$SHEENA_TUNED_REPO"
+    "$SHEENA4_TUNED_REPO"
+}
+
+run_sheena2() {
+  local output_dir="$MODEL_ROOT/sheena-2b-rp"
+  local merged_dir="$MODEL_ROOT/sheena-2b-rp-merged"
+  train_model "sheena-2b-rp" "$SHEENA2_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA2_MAX_STEPS"
+  convert_tuned_model \
+    "sheena-2b-rp" \
+    "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" \
+    "$merged_dir" \
+    "$SHEENA2_TUNED_REPO"
+}
+
+run_sheena08() {
+  local output_dir="$MODEL_ROOT/sheena-0.8b-rp"
+  local merged_dir="$MODEL_ROOT/sheena-0.8b-rp-merged"
+  train_model "sheena-0.8b-rp" "$SHEENA08_SOURCE_MODEL" "$output_dir" "$merged_dir" "$SHEENA08_MAX_STEPS"
+  convert_tuned_model \
+    "sheena-0.8b-rp" \
+    "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" \
+    "$merged_dir" \
+    "$SHEENA08_TUNED_REPO"
 }
 
 usage() {
@@ -206,13 +263,20 @@ usage: bash scripts/phala_gpu_tee_oneclick.sh <mode>
 modes:
   bootstrap
   dataset
+  dataset-batch
+  dataset-compile
   rally-2b-direct
   rally-4b-direct
   sheena-4b-direct
+  sheena-2b-direct
+  sheena-0.8b-direct
   rally
   rally-4b
-  sheena
+  sheena-4b
+  sheena-2b
+  sheena-0.8b
   all-gemma
+  all-qwen
   all
 EOF
 }
@@ -222,7 +286,13 @@ case "$MODE" in
     bootstrap_env
     ;;
   dataset)
-    build_dataset
+    generate_review_batch
+    ;;
+  dataset-batch)
+    generate_review_batch
+    ;;
+  dataset-compile)
+    compile_approved_dataset
     ;;
   rally-2b-direct)
     convert_direct "rally-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" "$RALLY2_DIRECT_REPO"
@@ -231,37 +301,65 @@ case "$MODE" in
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
     ;;
   sheena-4b-direct)
-    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA_DIRECT_REPO"
+    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA4_DIRECT_REPO"
+    ;;
+  sheena-2b-direct)
+    convert_direct "sheena-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$SHEENA2_DIRECT_REPO"
+    ;;
+  sheena-0.8b-direct)
+    convert_direct "sheena-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$SHEENA08_DIRECT_REPO"
     ;;
   rally)
-    build_dataset
+    compile_approved_dataset
     run_rally
     ;;
   rally-4b)
-    build_dataset
+    compile_approved_dataset
     run_rally4
     ;;
-  sheena)
-    build_dataset
-    run_sheena
+  sheena-4b|sheena)
+    compile_approved_dataset
+    run_sheena4
+    ;;
+  sheena-2b)
+    compile_approved_dataset
+    run_sheena2
+    ;;
+  sheena-0.8b)
+    compile_approved_dataset
+    run_sheena08
     ;;
   all-gemma)
     bootstrap_env
-    build_dataset
     convert_direct "rally-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" "$RALLY2_DIRECT_REPO"
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
+    compile_approved_dataset
     run_rally
     run_rally4
     ;;
+  all-qwen)
+    bootstrap_env
+    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA4_DIRECT_REPO"
+    convert_direct "sheena-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$SHEENA2_DIRECT_REPO"
+    convert_direct "sheena-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$SHEENA08_DIRECT_REPO"
+    compile_approved_dataset
+    run_sheena4
+    run_sheena2
+    run_sheena08
+    ;;
   all)
     bootstrap_env
-    build_dataset
     convert_direct "rally-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" "$RALLY2_DIRECT_REPO"
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
-    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA_DIRECT_REPO"
+    convert_direct "sheena-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml" "$SHEENA4_DIRECT_REPO"
+    convert_direct "sheena-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" "$SHEENA2_DIRECT_REPO"
+    convert_direct "sheena-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$SHEENA08_DIRECT_REPO"
+    compile_approved_dataset
     run_rally
     run_rally4
-    run_sheena
+    run_sheena4
+    run_sheena2
+    run_sheena08
     ;;
   *)
     usage

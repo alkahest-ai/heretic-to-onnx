@@ -37,8 +37,8 @@ That is large enough to materially move style and behavior, but small enough to 
 
 First practical target:
 
-- `2,000` to `4,000` synthetic original Alkahest conversations
-- `1,000` to `3,000` cleaned Apache bootstrap conversations
+- `5,000+` approved original Alkahest conversations
+- a small gold seed set anchoring tone and boundaries
 - a small hand-reviewed validation set, around `200` to `500` rows
 
 The first paid GPU window should **not** be spent generating a perfect final corpus. It should be spent proving the loop:
@@ -69,74 +69,54 @@ It should **not** rely on:
 
 ## Current Scaffold
 
-The dataset scaffold now lives in:
+The active dataset scaffold now lives in:
 
-- `/Users/area/heretic/data/roleplay_v1/README.md`
-- `/Users/area/heretic/data/roleplay_v1/personas.yaml`
-- `/Users/area/heretic/data/roleplay_v1/scenes.yaml`
-- `/Users/area/heretic/data/roleplay_v1/style-rules.md`
-- `/Users/area/heretic/data/roleplay_v1/seed_conversations.jsonl`
-- `/Users/area/heretic/data/roleplay_v1/generator_prompt.md`
-- `/Users/area/heretic/data/roleplay_v1/generated/README.md`
+- `/Users/area/heretic/data/roleplay_v2/README.md`
+- `/Users/area/heretic/data/roleplay_v2/personas.yaml`
+- `/Users/area/heretic/data/roleplay_v2/scenes.yaml`
+- `/Users/area/heretic/data/roleplay_v2/variation_axes.yaml`
+- `/Users/area/heretic/data/roleplay_v2/gold/seed_conversations.jsonl`
+- `/Users/area/heretic/data/roleplay_v2/review_table/README.md`
 - `/Users/area/heretic/scripts/prepare_roleplay_dataset.py`
 - `/Users/area/heretic/scripts/render_roleplay_prompt_pack.py`
 - `/Users/area/heretic/scripts/synthesize_roleplay_batch.py`
 - `/Users/area/heretic/scripts/build_roleplay_training_corpus.py`
+- `/Users/area/heretic/scripts/jsonl_to_review_table.py`
+- `/Users/area/heretic/scripts/review_table_to_jsonl.py`
 - `/Users/area/heretic/scripts/train_rally_unsloth.py`
 
-The current synthetic geometry is:
+The current workflow is:
 
-- `6` personas
-- `10` scenes
-- `240` persona/scene/lane combinations
-- `25` variants per combination
-- `6,000` generated rows in the first large batch
+- generate small raw batches, usually `200-500` conversations
+- review them in TSV form
+- compile only approved rows into the corpus
 
 ## Immediate Local Prep
 
-Split the seed set:
-
-```bash
-python3 /Users/area/heretic/scripts/prepare_roleplay_dataset.py
-```
-
-That will write:
-
-- `/Users/area/heretic/data/roleplay_v1/splits/train.jsonl`
-- `/Users/area/heretic/data/roleplay_v1/splits/val.jsonl`
-
-Render a synthetic prompt pack:
-
-```bash
-python3 /Users/area/heretic/scripts/render_roleplay_prompt_pack.py --limit 240
-```
-
-That writes:
-
-- `/Users/area/heretic/data/roleplay_v1/prompt_pack.jsonl`
-
-Build the unified training corpus after you have reviewed generated rows:
+Build from the approved corpus:
 
 ```bash
 python3 /Users/area/heretic/scripts/build_roleplay_training_corpus.py
 python3 /Users/area/heretic/scripts/prepare_roleplay_dataset.py \
-  --input /Users/area/heretic/data/roleplay_v1/corpus.jsonl
+  --input /Users/area/heretic/data/roleplay_v2/corpus.jsonl
+```
+
+Generate a new review batch:
+
+```bash
+python3 /Users/area/heretic/scripts/synthesize_roleplay_batch.py \
+  --count 300 \
+  --seed 111 \
+  --id-prefix v2b001 \
+  --batch-id batch-0001 \
+  --output /Users/area/heretic/data/roleplay_v2/generated_raw/batch-0001.jsonl \
+  --review-output /Users/area/heretic/data/roleplay_v2/review_table/batch-0001.tsv
 ```
 
 Train with Unsloth:
 
 ```bash
 python3 /Users/area/heretic/scripts/train_rally_unsloth.py --save-merged
-```
-
-For the first full synthetic pass:
-
-```bash
-python3 /Users/area/heretic/scripts/synthesize_roleplay_batch.py \
-  --variants 25 \
-  --seed 111 \
-  --id-prefix bulk25 \
-  --output /Users/area/heretic/data/roleplay_v1/generated/batch-0002.jsonl
 ```
 
 ## H200 Work Sequence
@@ -146,7 +126,7 @@ Recommended order for the first paid window:
 1. run direct conversion for `rally-2b`
 2. run direct conversion for `rally-4b`
 3. run direct conversion for `sheena-4b`
-4. expand `roleplay_v1`
+4. compile approved `roleplay_v2`
 5. fine-tune `rally-2b-rp`
 6. merge the tuned checkpoint
 7. convert the tuned checkpoint to ONNX

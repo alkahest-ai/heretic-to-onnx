@@ -1,33 +1,27 @@
 # roleplay_v1
 
-This folder is the scaffold for the first Alkahest-owned roleplay dataset.
+This folder is the archived first-pass scaffold for the roleplay dataset.
 
-Goals:
+Status:
 
-- adult-only
-- consensual
-- flirty / intimate / romantic / sexy without relying on copyrighted characters
-- structured for chat-style SFT
-- suitable for later open-source publication after review
+- archived prototype
+- still useful for salvage and comparison
+- no longer the canonical RP training backbone
 
-Contents:
+Use `data/roleplay_v2/` for the active spreadsheet-first review flow.
 
-- `personas.yaml`: original companion archetypes
-- `scenes.yaml`: original scenario seeds
-- `style-rules.md`: writing rules for synthetic generation
-- `seed_conversations.jsonl`: hand-authored seed records
-- `generator_prompt.md`: reusable synthetic generation prompt
-- `prompt_pack.jsonl`: generated prompt jobs
-- `splits/`: generated train/val files
+Do not generate new training batches from `roleplay_v1`.
 
-Current generation geometry:
+Use it only for:
 
-- `6` personas
-- `10` scenes
-- `24` lane groups across the personas
-- `240` persona/scene/lane combinations
-- `25` variants per combination = `6,000` synthetic conversations in one batch
+- salvage
+- comparison
+- prototype archaeology
 
-Use `python3 scripts/prepare_roleplay_dataset.py` to validate and split the dataset.
-Use `python3 scripts/render_roleplay_prompt_pack.py` to generate prompt jobs for larger synthetic batches.
-Use `python3 scripts/synthesize_roleplay_batch.py --variants 25 --id-prefix bulk25 --output data/roleplay_v1/generated/batch-0002.jsonl` to produce the first real `6k` synthetic pass.
+The active commands now live on the `roleplay_v2` path:
+
+- `python3 scripts/synthesize_roleplay_batch.py`
+- `python3 scripts/jsonl_to_review_table.py`
+- `python3 scripts/review_table_to_jsonl.py`
+- `python3 scripts/build_roleplay_training_corpus.py`
+- `python3 scripts/prepare_roleplay_dataset.py`

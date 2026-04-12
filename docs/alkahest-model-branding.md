@@ -51,12 +51,16 @@ Current line:
 - `alkahest/rally-2b` = Gemma 4 E2B Heretic ONNX
 - `alkahest/rally-4b` = Gemma 4 E4B Heretic ONNX
 - `alkahest/sheena-4b` = Qwen 3.5 4B Heretic ONNX
+- `alkahest/sheena-2b` = Qwen 3.5 2B Heretic ONNX
+- `alkahest/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
 
 Future tuned line:
 
 - `alkahest/rally-2b-rp`
 - `alkahest/rally-4b-rp`
 - `alkahest/sheena-4b-rp`
+- `alkahest/sheena-2b-rp`
+- `alkahest/sheena-0.8b-rp`
 
 This is cleaner than repeating `alkahest` in every slug.
 
@@ -99,10 +103,14 @@ Recommended pattern:
   - `alkahest/rally-2b`
   - `alkahest/rally-4b`
   - `alkahest/sheena-4b`
+  - `alkahest/sheena-2b`
+  - `alkahest/sheena-0.8b`
 - tuned family:
   - `alkahest/rally-2b-rp`
   - `alkahest/rally-4b-rp`
   - `alkahest/sheena-4b-rp`
+  - `alkahest/sheena-2b-rp`
+  - `alkahest/sheena-0.8b-rp`
 
 ## Provenance Pattern
 

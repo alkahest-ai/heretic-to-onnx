@@ -46,36 +46,42 @@ Or use the repo bootstrap helper:
 bash scripts/phala_gpu_tee_bootstrap.sh
 ```
 
-## 3. Generate And Review Dataset Rows
+## 3. Generate A Review Batch
 
-Render prompt jobs:
+Render prompt jobs if you want a companion prompt file:
 
 ```bash
-python3 scripts/render_roleplay_prompt_pack.py --limit 240
+python3 scripts/render_roleplay_prompt_pack.py --limit 300
 ```
 
-Bulk-generate actual message rows:
+Generate a raw `roleplay_v2` batch plus its editable review TSV:
 
 ```bash
 python3 scripts/synthesize_roleplay_batch.py \
-  --variants 25 \
+  --count 300 \
   --seed 111 \
-  --id-prefix bulk25 \
-  --output data/roleplay_v1/generated/batch-0002.jsonl
+  --id-prefix v2b001 \
+  --batch-id batch-0001 \
+  --output data/roleplay_v2/generated_raw/batch-0001.jsonl \
+  --review-output data/roleplay_v2/review_table/batch-0001.tsv
 ```
 
-This writes:
+Review `data/roleplay_v2/review_table/batch-0001.tsv` in a spreadsheet editor.
 
-- `data/roleplay_v1/generated/batch-0002.jsonl`
+## 4. Compile Approved Rows And Build The Corpus
 
-Review that file and edit any rows that are too weak, repetitive, or off-tone.
+After review:
 
-## 4. Build The Training Corpus
+```bash
+python3 scripts/review_table_to_jsonl.py \
+  --input data/roleplay_v2/review_table/batch-0001.tsv \
+  --output data/roleplay_v2/approved_jsonl/batch-0001.jsonl
+```
 
 ```bash
 python3 scripts/build_roleplay_training_corpus.py
 python3 scripts/prepare_roleplay_dataset.py \
-  --input data/roleplay_v1/corpus.jsonl
+  --input data/roleplay_v2/corpus.jsonl
 ```
 
 This produces:
@@ -148,7 +154,7 @@ bash scripts/phala_gpu_tee_oneclick.sh all-gemma
 That path will:
 
 1. install dependencies
-2. build the `6k` synthetic dataset pass
+2. use the approved `roleplay_v2` corpus
 3. convert `rally-2b`
 4. convert `rally-4b`
 5. fine-tune E2B into tuned `rally-2b-rp`
@@ -162,4 +168,4 @@ If you also want the Qwen training pass in the same window:
 bash scripts/phala_gpu_tee_oneclick.sh all
 ```
 
-That final step also converts direct `sheena-4b`, fine-tunes `sheena-4b-rp`, and exports tuned `sheena-4b-rp` to ONNX.
+That final step also converts direct `sheena-4b`, `sheena-2b`, and `sheena-0.8b`, then fine-tunes and exports `sheena-4b-rp`, `sheena-2b-rp`, and `sheena-0.8b-rp`.

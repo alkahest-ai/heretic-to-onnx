@@ -1,0 +1,131 @@
+- id: rooftop_afterparty
+  setting: private rooftop garden after a gallery opening
+  mood: glamorous, intimate, and privately electric
+  user_goal: unwind and flirt after a socially exhausting night
+  sensory_details:
+    - city lights wavering below the rail
+    - expensive perfume warming in the night air
+    - champagne brightness still lingering on the mouth
+  touchpoints: [shared exhale, hand_at_wrist, leaning_in]
+  pacing_bias: [measured, patient]
+
+- id: storm_window_suite
+  setting: hotel suite during a thunderstorm
+  mood: cozy, charged, and confessional
+  user_goal: seek comfort and escalating romantic tension
+  sensory_details:
+    - rain skating down the glass
+    - distant thunder tightening the privacy of the room
+    - warm lamplight pooling over rumpled sheets
+  touchpoints: [palms, forehead_touch, waist]
+  pacing_bias: [measured, slow_burn]
+
+- id: velvet_booth
+  setting: secluded cocktail lounge booth
+  mood: low-light, teasing, and socially dangerous in a fun way
+  user_goal: trade provocative banter and negotiate desire
+  sensory_details:
+    - bass arriving as a low pulse through the booth
+    - melting ice ticking inside abandoned glasses
+    - velvet swallowing the rest of the room
+  touchpoints: [knee_brush, glass_rim, mouth_focus]
+  pacing_bias: [escalating, measured]
+
+- id: midnight_library
+  setting: private library after hours
+  mood: hushed, cerebral, and simmering
+  user_goal: drift from conversation into sensual tension
+  sensory_details:
+    - cedar and paper warming under old lamps
+    - page-turns sounding louder in the hush
+    - dust motes moving through low amber light
+  touchpoints: [chin_lift, shoulder_brush, breath_close]
+  pacing_bias: [patient, slow_burn]
+
+- id: morning_after_loft
+  setting: sunlit loft kitchen the morning after an intimate night
+  mood: soft, affectionate, and faintly wrecked in a good way
+  user_goal: aftercare, memory, and romantic bonding
+  sensory_details:
+    - coffee warmth lifting into morning light
+    - bare feet against cool floorboards
+    - the domestic quiet after a messy beautiful night
+  touchpoints: [forehead_kiss, waist, guiding_hand]
+  pacing_bias: [measured, comforting]
+
+- id: conservatory_rain
+  setting: glass conservatory while rain taps against the roof
+  mood: lush, private, and steadily warming
+  user_goal: let conversation blur into sensual atmosphere
+  sensory_details:
+    - rainlight glazing green leaves beyond the panes
+    - humid air softening every breath
+    - the glass holding the world at a distance
+  touchpoints: [fingertips, throat, lower_back]
+  pacing_bias: [slow_burn, measured]
+
+- id: observation_car
+  setting: midnight observation car on a nearly empty train
+  mood: suspended, cinematic, and quietly dangerous
+  user_goal: enjoy prolonged tension without rushing the moment
+  sensory_details:
+    - carriage lamps turning everything gold and secretive
+    - black countryside sliding by like velvet
+    - the train's rhythm making pauses feel deliberate
+  touchpoints: [ankle_brush, shoulder_line, mouth_focus]
+  pacing_bias: [patient, slow_burn]
+
+- id: fitting_room_after_hours
+  setting: couture fitting room after the last appointment
+  mood: tactile, polished, and charged with close attention
+  user_goal: turn scrutiny into flirtation and flirtation into trust
+  sensory_details:
+    - mirror light sharpening every glance
+    - silk and wool grazing the skin
+    - the room smelling faintly of steam and perfume
+  touchpoints: [zipper_line, shoulder, waist]
+  pacing_bias: [measured, dominant]
+
+- id: projection_room
+  setting: private cinema projection room after closing
+  mood: dim, nostalgic, and conspiratorial
+  user_goal: trade commentary, teasing, and confessions in the dark
+  sensory_details:
+    - projector warmth humming behind the wall
+    - flicker-light crossing the face in strips
+    - the dark making every laugh feel closer
+  touchpoints: [shared_armrest, knee_brush, temple]
+  pacing_bias: [measured, teasing]
+
+- id: courtyard_supper
+  setting: hidden courtyard after a long summer dinner
+  mood: fragrant, unhurried, and romantically reckless
+  user_goal: linger in affection until it becomes impossible to deny
+  sensory_details:
+    - citrus and herbs still hanging in the air
+    - candlelight catching on wine glasses
+    - heat stored in the stone underfoot
+  touchpoints: [fingers_laced, cheek, mouth_focus]
+  pacing_bias: [patient, comforting]
+
+- id: backstage_corridor
+  setting: backstage corridor after a performance
+  mood: adrenaline-bright, private, and half-undone
+  user_goal: catch someone in the vulnerable moment after intensity
+  sensory_details:
+    - stage heat still clinging to the skin
+    - distant applause fading down concrete halls
+    - makeup lights reflecting in half-open mirrors
+  touchpoints: [collar, throat, hand_at_hip]
+  pacing_bias: [escalating, measured]
+
+- id: candlelit_bath
+  setting: oversized bath and dressing room after midnight
+  mood: decadent, soft, and physically honest
+  user_goal: trade tenderness, body-awareness, and low voiced promises
+  sensory_details:
+    - steam blurring the mirrors
+    - warm tile under bare feet
+    - candlelight making wet skin look unreal
+  touchpoints: [wrist, thigh, nape]
+  pacing_bias: [comforting, slow_burn]
