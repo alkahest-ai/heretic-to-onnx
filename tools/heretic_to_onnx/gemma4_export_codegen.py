@@ -258,57 +258,122 @@ def render_gemma4_export_runner(
                 return
 
             original_sdpa_mask = getattr(masking_utils, "sdpa_mask", None)
-            compatible_sdpa_mask = getattr(masking_utils, "sdpa_mask_older_torch", None) or original_sdpa_mask
-            if compatible_sdpa_mask is None or getattr(compatible_sdpa_mask, "__name__", "") == "_patched_sdpa_mask":
+            if original_sdpa_mask is None or getattr(original_sdpa_mask, "__name__", "") == "_patched_sdpa_mask":
                 return
 
             try:
-                compatible_parameters = inspect.signature(compatible_sdpa_mask).parameters
+                original_signature = inspect.signature(original_sdpa_mask)
             except (TypeError, ValueError):
-                compatible_parameters = {{}}
+                original_signature = None
 
-            accepts_var_kwargs = any(
-                parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in compatible_parameters.values()
-            )
-
-            def _patched_sdpa_mask(*args, **kwargs):
-                q_length = kwargs.get("q_length")
-                q_offset = kwargs.get("q_offset", 0)
-                attention_mask = kwargs.get("attention_mask")
-
+            def _normalize_cache_position(q_length, q_offset, attention_mask):
                 device = torch.device("cpu")
                 if torch.is_tensor(q_length):
                     device = q_length.device
                 elif torch.is_tensor(attention_mask):
                     device = attention_mask.device
 
-                q_positions = q_length
-                if q_length is not None:
-                    if torch.is_tensor(q_length) and q_length.ndim == 0:
-                        q_positions = torch.arange(int(q_length.item()), device=device, dtype=torch.long)
-                    elif isinstance(q_length, int):
-                        q_positions = torch.arange(q_length, device=device, dtype=torch.long)
+                if q_length is None:
+                    return None
+                if torch.is_tensor(q_length):
+                    if q_length.ndim == 0:
+                        cache_position = torch.arange(int(q_length.item()), device=device, dtype=torch.long)
+                    else:
+                        cache_position = q_length.to(device=device, dtype=torch.long)
+                else:
+                    cache_position = torch.arange(int(q_length), device=device, dtype=torch.long)
 
-                    if torch.is_tensor(q_positions) and torch.is_tensor(q_offset):
-                        q_positions = q_positions + q_offset.to(device=device, dtype=torch.long)
-                    elif torch.is_tensor(q_positions) and q_offset:
-                        q_positions = q_positions + int(q_offset)
+                if torch.is_tensor(q_offset):
+                    cache_position = cache_position + q_offset.to(device=device, dtype=torch.long)
+                elif q_offset:
+                    cache_position = cache_position + int(q_offset)
+                return cache_position
 
-                translated_kwargs = dict(kwargs)
-                if "cache_position" in compatible_parameters:
-                    if q_positions is not None:
-                        translated_kwargs["cache_position"] = q_positions
-                    translated_kwargs.pop("q_length", None)
-                    translated_kwargs.pop("q_offset", None)
-                elif q_positions is not None:
-                    translated_kwargs["q_length"] = q_positions
+            def _patched_sdpa_mask(*args, **kwargs):
+                if original_signature is not None:
+                    bound = original_signature.bind_partial(*args, **kwargs)
+                    arguments = dict(bound.arguments)
+                else:
+                    arguments = dict(kwargs)
 
-                if not accepts_var_kwargs:
-                    translated_kwargs = {{
-                        key: value for key, value in translated_kwargs.items() if key in compatible_parameters
-                    }}
+                attention_mask = arguments.get("attention_mask")
+                q_offset = arguments.get("q_offset", 0)
+                cache_position = arguments.get("cache_position")
+                if cache_position is None:
+                    cache_position = _normalize_cache_position(arguments.get("q_length"), q_offset, attention_mask)
 
-                return compatible_sdpa_mask(*args, **translated_kwargs)
+                if cache_position is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                if not torch.is_tensor(cache_position):
+                    cache_position = torch.as_tensor(cache_position, dtype=torch.long)
+                cache_position = cache_position.to(dtype=torch.long)
+                if cache_position.ndim == 0:
+                    cache_position = torch.arange(int(cache_position.item()), device=cache_position.device, dtype=torch.long)
+
+                batch_size = arguments.get("batch_size")
+                if batch_size is None:
+                    if torch.is_tensor(attention_mask):
+                        batch_size = attention_mask.shape[0]
+                    else:
+                        batch_size = 1
+
+                kv_length = arguments.get("kv_length")
+                if kv_length is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                kv_offset = arguments.get("kv_offset", 0)
+                mask_function = arguments.get("mask_function")
+                if mask_function is None:
+                    mask_function = getattr(masking_utils, "causal_mask_function", None)
+                if mask_function is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                local_size = arguments.get("local_size")
+                allow_is_causal_skip = bool(arguments.get("allow_is_causal_skip", True))
+                allow_torch_fix = bool(arguments.get("allow_torch_fix", True))
+
+                padding_mask = attention_mask
+                if padding_mask is not None:
+                    required_length = kv_length + (int(kv_offset.item()) if torch.is_tensor(kv_offset) else int(kv_offset))
+                    if padding_mask.shape[-1] < required_length:
+                        padding_mask = torch.nn.functional.pad(padding_mask, (0, required_length - padding_mask.shape[-1]))
+
+                    mask_indices = torch.arange(kv_length, device=padding_mask.device)
+                    if torch.is_tensor(kv_offset):
+                        mask_indices = mask_indices + kv_offset.to(device=padding_mask.device, dtype=mask_indices.dtype)
+                    elif kv_offset:
+                        mask_indices = mask_indices + int(kv_offset)
+                    padding_mask = padding_mask[:, mask_indices].to(dtype=torch.bool)
+
+                if allow_is_causal_skip:
+                    query_length = cache_position.shape[0]
+                    can_skip = query_length == 1 or kv_length == query_length
+                    if local_size is not None:
+                        can_skip = can_skip and kv_length < local_size
+                    if can_skip and (padding_mask is None or padding_mask.all()):
+                        return None
+
+                vmap_for_bhqkv = getattr(masking_utils, "_vmap_for_bhqkv", None)
+                if vmap_for_bhqkv is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                kv_arange = torch.arange(kv_length, device=cache_position.device)
+                if torch.is_tensor(kv_offset):
+                    kv_arange = kv_arange + kv_offset.to(device=cache_position.device, dtype=kv_arange.dtype)
+                elif kv_offset:
+                    kv_arange = kv_arange + int(kv_offset)
+
+                mask = vmap_for_bhqkv(mask_function, bh_indices=False)(None, None, cache_position, kv_arange)
+                mask = mask[None, None, :, :].expand(batch_size, -1, -1, -1)
+
+                if padding_mask is not None:
+                    mask = mask & padding_mask[:, None, None, :]
+
+                if allow_torch_fix and not getattr(masking_utils, "_is_torch_greater_or_equal_than_2_5", True):
+                    mask = mask | torch.all(~mask, dim=-1, keepdim=True)
+
+                return mask
 
             _patched_sdpa_mask.__name__ = "_patched_sdpa_mask"
             masking_utils.sdpa_mask = _patched_sdpa_mask
