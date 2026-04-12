@@ -221,6 +221,10 @@ def render_qwen3_5_export_runner(
         import types
         from pathlib import Path
 
+        import onnx
+        import torch
+        from transformers import Qwen3_5ForConditionalGeneration
+
         CONTRACT = __CONTRACT_JSON__
 
 
@@ -543,10 +547,6 @@ def render_qwen3_5_export_runner(
 
 
         if __name__ == "__main__":
-            import onnx
-            import torch
-            from transformers import Qwen3_5ForConditionalGeneration
-
             raise SystemExit(main())
         """
     )
