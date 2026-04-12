@@ -1,0 +1,4 @@
+{
+  "do_convert_rgb": true,
+  "image_processor_type": "Gemma4ImageProcessor"
+}

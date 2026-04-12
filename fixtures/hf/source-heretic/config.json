@@ -1,0 +1,62 @@
+{
+  "architectures": [
+    "Gemma4ForConditionalGeneration"
+  ],
+  "audio_token_id": 258881,
+  "bos_token_id": 2,
+  "eos_token_id": [
+    1,
+    106
+  ],
+  "image_token_id": 258880,
+  "model_type": "gemma4",
+  "video_token_id": 258882,
+  "text_config": {
+    "global_head_dim": 512,
+    "head_dim": 256,
+    "hidden_size": 1536,
+    "hidden_size_per_layer_input": 256,
+    "layer_types": [
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention"
+    ],
+    "num_attention_heads": 8,
+    "num_hidden_layers": 35,
+    "num_key_value_heads": 1,
+    "num_kv_shared_layers": 20,
+    "pad_token_id": 0
+  }
+}

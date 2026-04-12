@@ -1,0 +1,7 @@
+{
+  "input_path": "/Users/area/heretic/data/roleplay_v1/corpus.jsonl",
+  "output_dir": "/Users/area/heretic/data/roleplay_v1/splits",
+  "rows_total": 6166,
+  "rows_train": 5242,
+  "rows_val": 924
+}

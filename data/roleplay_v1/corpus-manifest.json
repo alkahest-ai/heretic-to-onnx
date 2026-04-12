@@ -1,0 +1,6 @@
+{
+  "seed_file": "/Users/area/heretic/data/roleplay_v1/seed_conversations.jsonl",
+  "generated_dir": "/Users/area/heretic/data/roleplay_v1/generated",
+  "output": "/Users/area/heretic/data/roleplay_v1/corpus.jsonl",
+  "rows_total": 6166
+}

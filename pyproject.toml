@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heretic-to-onnx"
+version = "0.1.0"
+description = "Scaffolded Gemma 4 Heretic to ONNX packaging toolchain"
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+heretic-to-onnx = "tools.heretic_to_onnx.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tools*"]
+

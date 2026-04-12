@@ -1,0 +1,5 @@
+{% for message in messages %}
+<start_of_turn>{{ message['role'] }}
+{{ message['content'] }}<end_of_turn>
+{% endfor %}
+

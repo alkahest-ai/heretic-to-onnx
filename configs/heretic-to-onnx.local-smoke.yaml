@@ -1,0 +1,35 @@
+source_model_id: fixtures/hf/source-heretic
+base_model_id: fixtures/hf/base-gemma4
+architecture: gemma4_conditional_generation
+target_repo_id: local/gemma-4-E2B-it-heretic-ara-ONNX
+target_dtype: q4f16
+target_device: webgpu
+modalities:
+  - text
+  - image
+  - audio
+inherit_assets:
+  from_source:
+    - config.json
+    - generation_config.json
+    - tokenizer.json
+    - tokenizer_config.json
+    - chat_template.jinja
+  from_base_if_missing:
+    - processor_config.json
+    - preprocessor_config.json
+expected_architecture: Gemma4ForConditionalGeneration
+expected_onnx_files:
+  - onnx/audio_encoder_q4f16.onnx
+  - onnx/audio_encoder_q4f16.onnx_data
+  - onnx/vision_encoder_q4f16.onnx
+  - onnx/vision_encoder_q4f16.onnx_data
+  - onnx/embed_tokens_q4f16.onnx
+  - onnx/embed_tokens_q4f16.onnx_data
+  - onnx/decoder_model_merged_q4f16.onnx
+  - onnx/decoder_model_merged_q4f16.onnx_data
+validation:
+  smoke_prompt: Write one short paragraph in character as Heretic.
+  browser_loader_class: Gemma4ForConditionalGeneration
+  processor_class: AutoProcessor
+

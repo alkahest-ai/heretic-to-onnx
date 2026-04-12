@@ -1,0 +1,23 @@
+services:
+  heretic-to-onnx:
+    image: ${PHALA_IMAGE}
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - SOURCE_MODEL_ID=${SOURCE_MODEL_ID}
+      - BASE_MODEL_ID=${BASE_MODEL_ID}
+      - TARGET_REPO_ID=${TARGET_REPO_ID}
+      - WORK_DIR=/data/work
+      - OUTPUT_DIR=/data/output
+      - EXPORT_MODE=execute
+      - QUANTIZE_MODE=execute
+      - STRICT_ONNX=1
+      - UPLOAD_TO_HF=1
+      - HF_UPLOAD_PRIVATE=0
+      - HF_UPLOAD_NUM_WORKERS=8
+      - MIN_GPU_MEMORY_MB=70000
+    volumes:
+      - heretic-data:/data
+    restart: "no"
+
+volumes:
+  heretic-data:

@@ -1,0 +1,5 @@
+{
+  "model_max_length": 131072,
+  "tokenizer_class": "GemmaTokenizerFast"
+}
+

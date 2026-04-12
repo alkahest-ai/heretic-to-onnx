@@ -1,0 +1,35 @@
+FROM python:3.11-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/data/.cache/huggingface \
+    TRANSFORMERS_CACHE=/data/.cache/huggingface/hub
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    git-lfs \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY docker/requirements-phala.txt /tmp/requirements-phala.txt
+
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install \
+      --index-url https://download.pytorch.org/whl/cu124 \
+      torch==2.6.0 \
+      torchvision==0.21.0 \
+      torchaudio==2.6.0 && \
+    python -m pip install -r /tmp/requirements-phala.txt
+
+COPY . /app
+
+RUN git lfs install --system && \
+    python -m pip install -e . && \
+    chmod +x /app/docker/phala-entrypoint.sh
+
+ENTRYPOINT ["/app/docker/phala-entrypoint.sh"]
