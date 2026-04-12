@@ -57,10 +57,41 @@ def _default_model_card(manifest: Manifest, repo_id: str) -> str:
     )
 
 
+def _model_card_metadata(manifest: Manifest, repo_id: str) -> str:
+    architecture_tags = {
+        "gemma4_conditional_generation": ["gemma4"],
+        "qwen3_5_conditional_generation": ["qwen3.5-vl"],
+    }
+    tags = [
+        "onnx",
+        "webgpu",
+        "transformers",
+        "transformers.js",
+        "quantized",
+        *architecture_tags.get(manifest.architecture, []),
+    ]
+    lines = [
+        "---",
+        "library_name: transformers",
+        f"base_model: {manifest.source_model_id}",
+        "tags:",
+        *[f"- {tag}" for tag in tags],
+        "---",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def _ensure_model_card(manifest: Manifest, package_dir: Path, repo_id: str) -> Path:
     model_card_path = package_dir / "README.md"
+    metadata = _model_card_metadata(manifest, repo_id)
     if not model_card_path.exists():
-        model_card_path.write_text(_default_model_card(manifest, repo_id), encoding="utf-8")
+        model_card_path.write_text(metadata + _default_model_card(manifest, repo_id), encoding="utf-8")
+        return model_card_path
+
+    existing = model_card_path.read_text(encoding="utf-8")
+    if not existing.lstrip().startswith("---"):
+        model_card_path.write_text(metadata + existing.lstrip(), encoding="utf-8")
     return model_card_path
 
 
