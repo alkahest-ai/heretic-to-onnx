@@ -468,16 +468,21 @@ def render_qwen3_5_export_runner(
 
         def _export_onnx(module, sample_inputs, session_spec: dict, output_path: Path, opset_version: int):
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            dynamic_axes = session_spec["dynamic_axes"]
+            if session_spec["name"] == "vision_encoder":
+                # The vision encoder trace is more reliable with fixed shapes here.
+                dynamic_axes = None
             export_kwargs = {{
                 "args": sample_inputs,
                 "f": str(output_path),
                 "input_names": session_spec["inputs"],
                 "output_names": session_spec["outputs"],
-                "dynamic_axes": session_spec["dynamic_axes"],
                 "opset_version": opset_version,
                 "do_constant_folding": True,
                 "dynamo": False,
             }}
+            if dynamic_axes is not None:
+                export_kwargs["dynamic_axes"] = dynamic_axes
             try:
                 torch.onnx.export(module, **export_kwargs, external_data=True)
             except TypeError:

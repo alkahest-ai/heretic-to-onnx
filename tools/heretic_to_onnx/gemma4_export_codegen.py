@@ -119,7 +119,7 @@ def build_gemma4_export_contract(
             inputs=["pixel_values", "pixel_position_ids"],
             outputs=["image_features"],
             dynamic_axes={
-                "pixel_values": {0: "image_batch", 1: "image_patches"},
+                "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
                 "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
                 "image_features": {0: "image_tokens"},
             },
@@ -364,12 +364,36 @@ def render_gemma4_export_runner(
             return getattr(torch, name)
 
 
-        def _position_grid(num_patches: int):
-            side = max(int(math.ceil(math.sqrt(num_patches))), 1)
-            indices = torch.arange(num_patches, dtype=torch.long)
-            x_coords = indices % side
-            y_coords = indices // side
-            return torch.stack([x_coords, y_coords], dim=-1).unsqueeze(0)
+        def _position_grid(height_patches: int, width_patches: int):
+            y_coords = torch.arange(height_patches, dtype=torch.long)
+            x_coords = torch.arange(width_patches, dtype=torch.long)
+            grid_y, grid_x = torch.meshgrid(y_coords, x_coords, indexing="ij")
+            return torch.stack([grid_x.reshape(-1), grid_y.reshape(-1)], dim=-1).unsqueeze(0)
+
+
+        def _resolve_image_size(processor_config: dict, patch_size: int, pooling_kernel_size: int):
+            image_processor = processor_config.get("image_processor", processor_config)
+            size = image_processor.get("size") if isinstance(image_processor, dict) else None
+            multiple = max(patch_size * pooling_kernel_size, 1)
+
+            def _normalize(value):
+                if not isinstance(value, int) or value <= 0:
+                    return multiple
+                return max(((value + multiple - 1) // multiple) * multiple, multiple)
+
+            if isinstance(size, dict):
+                height = size.get("height")
+                width = size.get("width")
+                if not isinstance(height, int):
+                    fallback = size.get("shortest_edge") or size.get("longest_edge")
+                    height = fallback if isinstance(fallback, int) else None
+                if not isinstance(width, int):
+                    width = height
+                return _normalize(height), _normalize(width)
+            if isinstance(size, int):
+                normalized = _normalize(size)
+                return normalized, normalized
+            return multiple, multiple
 
 
         def _load_model(source_path: Path, dtype_name: str, device: str):
@@ -388,17 +412,21 @@ def render_gemma4_export_runner(
             hidden_dtype = model.model.language_model.embed_tokens.weight.dtype
             device = next(model.parameters()).device
 
-            vision_input_dim = model.model.vision_tower.patch_embedder.input_proj.in_features
+            vision_config = model.model.vision_tower.config
+            patch_size = int(getattr(vision_config, "patch_size", 16))
             pooling_kernel_size = int(model.model.vision_tower.config.pooling_kernel_size)
-            num_image_patches = max(pooling_kernel_size * pooling_kernel_size, 1)
-            pixel_values = torch.zeros((1, num_image_patches, vision_input_dim), dtype=hidden_dtype, device=device)
-            pixel_position_ids = _position_grid(num_image_patches).to(device)
+            image_height, image_width = _resolve_image_size(processor_config, patch_size, pooling_kernel_size)
+            num_channels = int(getattr(model.model.vision_tower.patch_embedder.input_proj, "in_channels", 3))
+            pixel_values = torch.zeros((1, num_channels, image_height, image_width), dtype=torch.float32, device=device)
+            height_patches = max(image_height // patch_size, 1)
+            width_patches = max(image_width // patch_size, 1)
+            pixel_position_ids = _position_grid(height_patches, width_patches).to(device)
 
             feature_size = 128
             feature_extractor = processor_config.get("feature_extractor")
             if isinstance(feature_extractor, dict):
                 feature_size = int(feature_extractor.get("feature_size", feature_size))
-            input_features = torch.zeros((1, 16, feature_size), dtype=hidden_dtype, device=device)
+            input_features = torch.zeros((1, 16, feature_size), dtype=torch.float32, device=device)
             input_features_mask = torch.ones((1, 16), dtype=torch.bool, device=device)
 
             input_ids = torch.tensor([[1, 2, 3, 4]], dtype=torch.long, device=device)
@@ -449,16 +477,22 @@ def render_gemma4_export_runner(
 
         def _export_onnx(module, sample_inputs, session_spec: dict, output_path: Path, opset_version: int):
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            dynamic_axes = session_spec["dynamic_axes"]
+            if session_spec["name"] in {{"vision_encoder", "audio_encoder"}}:
+                # The multimodal encoder traces become unstable with symbolic sequence axes
+                # under current torch/transformers versions, so export them with fixed shapes.
+                dynamic_axes = None
             export_kwargs = {{
                 "args": sample_inputs,
                 "f": str(output_path),
                 "input_names": session_spec["inputs"],
                 "output_names": session_spec["outputs"],
-                "dynamic_axes": session_spec["dynamic_axes"],
                 "opset_version": opset_version,
                 "do_constant_folding": True,
                 "dynamo": False,
             }}
+            if dynamic_axes is not None:
+                export_kwargs["dynamic_axes"] = dynamic_axes
             try:
                 torch.onnx.export(module, **export_kwargs, external_data=True)
             except TypeError:
