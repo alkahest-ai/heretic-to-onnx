@@ -429,7 +429,12 @@ def render_gemma4_export_runner(
 
         def _load_model(source_path: Path, dtype_name: str, device: str):
             torch_dtype = _parse_dtype(dtype_name)
-            model_kwargs = {{"trust_remote_code": False}}
+            model_kwargs = {{
+                "trust_remote_code": False,
+                # Eager attention avoids the traced SDPA mask path that currently fails
+                # for Gemma 4 multimodal encoder export under this torch/transformers stack.
+                "attn_implementation": "eager",
+            }}
             if torch_dtype != "auto":
                 model_kwargs["torch_dtype"] = torch_dtype
             model = Gemma4ForConditionalGeneration.from_pretrained(str(source_path), **model_kwargs)
