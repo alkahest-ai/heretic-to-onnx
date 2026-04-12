@@ -17,9 +17,9 @@ Use custom container configuration later if you want a hardened repeatable pipel
 
 ## Target
 
-- public name: `alkahest/rally-2b-rp`
+- public name: `alkahest-ai/rally-2b-rp`
 - base checkpoint for the first tune: `p-e-w/gemma-4-E2B-it-heretic-ara`
-- direct conversion artifact before tuning: `alkahest/rally-2b`
+- direct conversion artifact before tuning: `alkahest-ai/rally-2b`
 
 ## Dataset Size Recommendation
 

@@ -39,11 +39,11 @@ The canonical roleplay dataset should be:
 
 This is the dataset that should shape:
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 - later tuned portfolio variants
 
 ### Public data
@@ -117,21 +117,21 @@ So yes, the fine-tuned model can still become an ONNX/WebGPU model. The ONNX tar
 
 Ship these direct conversions first:
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
-- `alkahest/sheena-2b`
-- `alkahest/sheena-0.8b`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
+- `alkahest-ai/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
 
 ### Phase 2
 
 Build `roleplay_v2` and tune:
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 ## Sources
 

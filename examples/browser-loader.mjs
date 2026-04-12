@@ -27,7 +27,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Sheena 0.8B",
-    modelId: "alkahest/sheena-0.8b",
+    modelId: "alkahest-ai/sheena-0.8b",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~0.9-1.1 GB",
@@ -36,7 +36,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Sheena 0.8B RP",
-    modelId: "alkahest/sheena-0.8b-rp",
+    modelId: "alkahest-ai/sheena-0.8b-rp",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~0.9-1.1 GB",
@@ -54,7 +54,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Sheena 2B",
-    modelId: "alkahest/sheena-2b",
+    modelId: "alkahest-ai/sheena-2b",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~1.5-1.8 GB",
@@ -63,7 +63,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Sheena 2B RP",
-    modelId: "alkahest/sheena-2b-rp",
+    modelId: "alkahest-ai/sheena-2b-rp",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~1.5-1.8 GB",
@@ -81,7 +81,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Rally 2B",
-    modelId: "alkahest/rally-2b",
+    modelId: "alkahest-ai/rally-2b",
     family: "gemma4",
     modalities: "text + image + audio",
     approxDownload: "~3.4-3.5 GB",
@@ -90,7 +90,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Rally 2B RP",
-    modelId: "alkahest/rally-2b-rp",
+    modelId: "alkahest-ai/rally-2b-rp",
     family: "gemma4",
     modalities: "text + image + audio",
     approxDownload: "~3.4-3.5 GB",
@@ -108,7 +108,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Sheena 4B",
-    modelId: "alkahest/sheena-4b",
+    modelId: "alkahest-ai/sheena-4b",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~3.1 GB",
@@ -117,7 +117,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Sheena 4B RP",
-    modelId: "alkahest/sheena-4b-rp",
+    modelId: "alkahest-ai/sheena-4b-rp",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~3.1 GB",
@@ -126,7 +126,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Rally 4B",
-    modelId: "alkahest/rally-4b",
+    modelId: "alkahest-ai/rally-4b",
     family: "gemma4",
     modalities: "text + image + audio",
     approxDownload: "~5.2 GB",
@@ -135,7 +135,7 @@ export const DEFAULT_MODEL_PRESETS = [
   },
   {
     label: "Alkahest Rally 4B RP",
-    modelId: "alkahest/rally-4b-rp",
+    modelId: "alkahest-ai/rally-4b-rp",
     family: "gemma4",
     modalities: "text + image + audio",
     approxDownload: "~5.2 GB",

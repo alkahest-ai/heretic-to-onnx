@@ -110,7 +110,7 @@ python3 -m tools.heretic_to_onnx render-manifest \
   --template configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml \
   --output build/rally-tuned.yaml \
   --source-model-id build/unsloth/rally-merged \
-  --target-repo-id alkahest/rally-2b-rp
+  --target-repo-id alkahest-ai/rally-2b-rp
 ```
 
 ## 7. Convert Tuned Rally To ONNX
@@ -132,7 +132,7 @@ python3 -m tools.heretic_to_onnx convert \
 python3 -m tools.heretic_to_onnx publish-hf \
   --config build/rally-tuned.yaml \
   --package-dir build/out/rally-tuned \
-  --repo-id alkahest/rally-2b-rp
+  --repo-id alkahest-ai/rally-2b-rp
 ```
 
 ## 9. Browser Validation

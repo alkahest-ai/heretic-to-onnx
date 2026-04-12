@@ -15,11 +15,11 @@ Build an **Alkahest** model portfolio that is:
 
 Current naming decision:
 
-- `alkahest/rally-2b` = Gemma 4 E2B Heretic ONNX
-- `alkahest/rally-4b` = Gemma 4 E4B Heretic ONNX
-- `alkahest/sheena-4b` = Qwen 3.5 4B Heretic ONNX
-- `alkahest/sheena-2b` = Qwen 3.5 2B Heretic ONNX
-- `alkahest/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
+- `alkahest-ai/rally-2b` = Gemma 4 E2B Heretic ONNX
+- `alkahest-ai/rally-4b` = Gemma 4 E4B Heretic ONNX
+- `alkahest-ai/sheena-4b` = Qwen 3.5 4B Heretic ONNX
+- `alkahest-ai/sheena-2b` = Qwen 3.5 2B Heretic ONNX
+- `alkahest-ai/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
 
 Direct provenance should still live in model cards and internal docs.
 
@@ -31,14 +31,14 @@ These are the fastest wins because they avoid training in the first pass.
 
 - Source: `p-e-w/gemma-4-E2B-it-heretic-ara`
 - Goal: convert to browser/WebGPU ONNX
-- Public name: `alkahest/rally-2b`
+- Public name: `alkahest-ai/rally-2b`
 - Status: current primary converter target
 
 ### Gemma 4 E4B
 
 - Source: `coder3101/gemma-4-E4B-it-heretic`
 - Goal: convert to browser/WebGPU ONNX
-- Public name: `alkahest/rally-4b`
+- Public name: `alkahest-ai/rally-4b`
 - Status: next Gemma 4 target
 
 Reason to do these first:
@@ -53,11 +53,11 @@ After direct conversions work, move to your own tuned checkpoints.
 
 ### Target variants
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 The direct conversion repos stay size-explicit, and the tuned repos also stay size-explicit so the portfolio stays operationally clear.
 
@@ -87,20 +87,20 @@ That keeps the deployment story consistent:
 
 - Source: `tvall43/Qwen3.5-4B-heretic`
 - Goal: add a non-Gemma multimodal browser family to the Alkahest portfolio
-- Public name: `alkahest/sheena-4b`
+- Public name: `alkahest-ai/sheena-4b`
 - Status: Qwen3.5 export scaffold is now present, but it is less proven than the Gemma 4 path
 
 ### Qwen 3.5 2B Heretic
 
 - Source: `tvall43/Qwen3.5-2B-heretic-v3b`
 - Goal: smaller Sheena desktop/browser lane with better consumer feasibility than 4B
-- Public name: `alkahest/sheena-2b`
+- Public name: `alkahest-ai/sheena-2b`
 
 ### Qwen 3.5 0.8B Heretic
 
 - Source: `tvall43/Qwen3.5-0.8B-heretic-v3`
 - Goal: lowest-cost Sheena browser lane and best default candidate for broad free chat
-- Public name: `alkahest/sheena-0.8b`
+- Public name: `alkahest-ai/sheena-0.8b`
 
 ## Roleplay Dataset Plan
 

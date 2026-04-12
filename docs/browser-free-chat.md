@@ -69,23 +69,23 @@ You can override the model from the URL:
 
 - `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-0.8B-ONNX`
 - `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-2B-ONNX`
-- `http://localhost:4173/browser-chat/?model=alkahest/rally-2b`
-- `http://localhost:4173/browser-chat/?model=alkahest/sheena-0.8b`
+- `http://localhost:4173/browser-chat/?model=alkahest-ai/rally-2b`
+- `http://localhost:4173/browser-chat/?model=alkahest-ai/sheena-0.8b`
 
 ## Recommended Deployment Shape
 
 For the first real deployment:
 
 1. ship the static app
-2. point the default at `onnx-community/Qwen3.5-0.8B-ONNX` or `alkahest/sheena-0.8b`
-3. keep `alkahest/sheena-2b` as the next desktop-quality step up
-4. offer `alkahest/rally-2b` and `alkahest/sheena-4b` as heavier desktop tiers
-5. keep `alkahest/rally-4b` as an explicit high-memory option, not the default
+2. point the default at `onnx-community/Qwen3.5-0.8B-ONNX` or `alkahest-ai/sheena-0.8b`
+3. keep `alkahest-ai/sheena-2b` as the next desktop-quality step up
+4. offer `alkahest-ai/rally-2b` and `alkahest-ai/sheena-4b` as heavier desktop tiers
+5. keep `alkahest-ai/rally-4b` as an explicit high-memory option, not the default
 
 If you want a broader consumer browser tier, prioritize:
 
-- `alkahest/sheena-0.8b`
-- `alkahest/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/sheena-2b`
 
 Those are better default browser-chat candidates than the larger Gemma and Qwen 4B lanes.
 

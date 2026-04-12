@@ -51,19 +51,19 @@ python3 -m tools.heretic_to_onnx convert \
 
 Direct ONNX repos:
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
-- `alkahest/sheena-2b`
-- `alkahest/sheena-0.8b`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
+- `alkahest-ai/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
 
 Roleplay-tuned ONNX repos:
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 ## Dataset
 

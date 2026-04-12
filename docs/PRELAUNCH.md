@@ -27,16 +27,16 @@ Before launch, make sure the account behind `HF_TOKEN` has:
    - `Qwen/Qwen3.5-2B`
    - `Qwen/Qwen3.5-0.8B`
 2. write access to:
-   - `alkahest/rally-2b`
-   - `alkahest/rally-4b`
-   - `alkahest/sheena-4b`
-   - `alkahest/sheena-2b`
-   - `alkahest/sheena-0.8b`
-   - `alkahest/rally-2b-rp`
-   - `alkahest/rally-4b-rp`
-   - `alkahest/sheena-4b-rp`
-   - `alkahest/sheena-2b-rp`
-   - `alkahest/sheena-0.8b-rp`
+   - `alkahest-ai/rally-2b`
+   - `alkahest-ai/rally-4b`
+   - `alkahest-ai/sheena-4b`
+   - `alkahest-ai/sheena-2b`
+   - `alkahest-ai/sheena-0.8b`
+   - `alkahest-ai/rally-2b-rp`
+   - `alkahest-ai/rally-4b-rp`
+   - `alkahest-ai/sheena-4b-rp`
+   - `alkahest-ai/sheena-2b-rp`
+   - `alkahest-ai/sheena-0.8b-rp`
 
 ## Dataset
 
@@ -99,19 +99,19 @@ That now assumes an approved `roleplay_v2` corpus already exists.
 
 Direct browser ONNX repos:
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
-- `alkahest/sheena-2b`
-- `alkahest/sheena-0.8b`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
+- `alkahest-ai/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
 
 Roleplay-tuned browser ONNX repos:
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 ## Reality Check
 

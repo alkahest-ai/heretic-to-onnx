@@ -48,19 +48,19 @@ Use the companion names directly.
 
 Current line:
 
-- `alkahest/rally-2b` = Gemma 4 E2B Heretic ONNX
-- `alkahest/rally-4b` = Gemma 4 E4B Heretic ONNX
-- `alkahest/sheena-4b` = Qwen 3.5 4B Heretic ONNX
-- `alkahest/sheena-2b` = Qwen 3.5 2B Heretic ONNX
-- `alkahest/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
+- `alkahest-ai/rally-2b` = Gemma 4 E2B Heretic ONNX
+- `alkahest-ai/rally-4b` = Gemma 4 E4B Heretic ONNX
+- `alkahest-ai/sheena-4b` = Qwen 3.5 4B Heretic ONNX
+- `alkahest-ai/sheena-2b` = Qwen 3.5 2B Heretic ONNX
+- `alkahest-ai/sheena-0.8b` = Qwen 3.5 0.8B Heretic ONNX
 
 Future tuned line:
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 This is cleaner than repeating `alkahest` in every slug.
 
@@ -75,9 +75,9 @@ Use **two separate naming modes**:
 
 These should stay size-explicit so operators know what they are:
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
 
 ### 2. Alkahest-tuned family repos
 
@@ -100,17 +100,17 @@ The cleanest compromise is:
 Recommended pattern:
 
 - direct conversion:
-  - `alkahest/rally-2b`
-  - `alkahest/rally-4b`
-  - `alkahest/sheena-4b`
-  - `alkahest/sheena-2b`
-  - `alkahest/sheena-0.8b`
+  - `alkahest-ai/rally-2b`
+  - `alkahest-ai/rally-4b`
+  - `alkahest-ai/sheena-4b`
+  - `alkahest-ai/sheena-2b`
+  - `alkahest-ai/sheena-0.8b`
 - tuned family:
-  - `alkahest/rally-2b-rp`
-  - `alkahest/rally-4b-rp`
-  - `alkahest/sheena-4b-rp`
-  - `alkahest/sheena-2b-rp`
-  - `alkahest/sheena-0.8b-rp`
+  - `alkahest-ai/rally-2b-rp`
+  - `alkahest-ai/rally-4b-rp`
+  - `alkahest-ai/sheena-4b-rp`
+  - `alkahest-ai/sheena-2b-rp`
+  - `alkahest-ai/sheena-0.8b-rp`
 
 ## Provenance Pattern
 
@@ -135,7 +135,7 @@ Use a split between brand and technical artifact.
 
 Examples:
 
-- Hugging Face repo: `alkahest/rally-2b`
+- Hugging Face repo: `alkahest-ai/rally-2b`
 - model card title: `Rally 2B`
 - provenance section:
   - source model: `p-e-w/gemma-4-E2B-it-heretic-ara`

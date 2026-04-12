@@ -158,22 +158,22 @@ This gets you two direct portfolio assets before you risk the longer fine-tune l
 
 ### Wave 1: direct ONNX compatibility
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
-- `alkahest/sheena-2b`
-- `alkahest/sheena-0.8b`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
+- `alkahest-ai/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
 
 ### Wave 2: Alkahest fine-tuned Gemma variants
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
 
 ### Wave 3: Qwen variance lane
 
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 Wave 3 is now scaffolded in this repo, but it is still the less proven export lane compared to Gemma 4.
 

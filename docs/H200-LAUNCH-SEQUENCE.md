@@ -8,19 +8,19 @@ At the end of this run, you want these ten model repos on Hugging Face:
 
 Direct ONNX repos:
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
-- `alkahest/sheena-2b`
-- `alkahest/sheena-0.8b`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
+- `alkahest-ai/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
 
 Roleplay-tuned ONNX repos:
 
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 ## Reality Check
 
@@ -90,16 +90,16 @@ Read access to source/base models:
 
 Write access to target repos:
 
-- `alkahest/rally-2b`
-- `alkahest/rally-4b`
-- `alkahest/sheena-4b`
-- `alkahest/sheena-2b`
-- `alkahest/sheena-0.8b`
-- `alkahest/rally-2b-rp`
-- `alkahest/rally-4b-rp`
-- `alkahest/sheena-4b-rp`
-- `alkahest/sheena-2b-rp`
-- `alkahest/sheena-0.8b-rp`
+- `alkahest-ai/rally-2b`
+- `alkahest-ai/rally-4b`
+- `alkahest-ai/sheena-4b`
+- `alkahest-ai/sheena-2b`
+- `alkahest-ai/sheena-0.8b`
+- `alkahest-ai/rally-2b-rp`
+- `alkahest-ai/rally-4b-rp`
+- `alkahest-ai/sheena-4b-rp`
+- `alkahest-ai/sheena-2b-rp`
+- `alkahest-ai/sheena-0.8b-rp`
 
 Notes:
 
@@ -269,10 +269,10 @@ http://localhost:4173/browser-chat/
 Validation order:
 
 1. `onnx-community/Qwen3.5-0.8B-ONNX`
-2. `alkahest/sheena-0.8b`
-3. `alkahest/sheena-0.8b-rp`
-4. `alkahest/rally-2b`
-5. `alkahest/rally-2b-rp`
+2. `alkahest-ai/sheena-0.8b`
+3. `alkahest-ai/sheena-0.8b-rp`
+4. `alkahest-ai/rally-2b`
+5. `alkahest-ai/rally-2b-rp`
 
 Smoke tests to run:
 
@@ -291,9 +291,9 @@ For your other browser/WebGPU apps:
 
 Recommended product defaults:
 
-- default browser tier: `alkahest/sheena-0.8b` or `alkahest/sheena-0.8b-rp`
-- stronger desktop tier: `alkahest/sheena-2b` or `alkahest/sheena-2b-rp`
-- premium desktop-only tier: `alkahest/rally-2b` or `alkahest/rally-2b-rp`
+- default browser tier: `alkahest-ai/sheena-0.8b` or `alkahest-ai/sheena-0.8b-rp`
+- stronger desktop tier: `alkahest-ai/sheena-2b` or `alkahest-ai/sheena-2b-rp`
+- premium desktop-only tier: `alkahest-ai/rally-2b` or `alkahest-ai/rally-2b-rp`
 - do not make `rally-4b` the default consumer browser model
 
 ## Phase 12: What To Do If Something Fails
