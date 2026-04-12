@@ -521,7 +521,7 @@ def render_gemma4_export_runner(
                 for index in range(0, len(past_key_values), 2):
                     cache_entries.append((past_key_values[index], past_key_values[index + 1]))
                 flat_cache = FlatGemma4Cache(cache_entries)
-                outputs = self.model(
+                outputs = self.model.model.language_model(
                     inputs_embeds=inputs_embeds,
                     per_layer_inputs=per_layer_inputs,
                     attention_mask=attention_mask,
@@ -530,7 +530,18 @@ def render_gemma4_export_runner(
                     use_cache=True,
                     return_dict=True,
                 )
-                return (outputs.logits, *flat_cache.flatten())
+                hidden_states = outputs.last_hidden_state
+                logits = self.model.lm_head(hidden_states)
+
+                final_logit_softcapping = getattr(self.model.config.text_config, "final_logit_softcapping", None)
+                if final_logit_softcapping is None:
+                    final_logit_softcapping = getattr(self.model.config, "final_logit_softcapping", None)
+                if final_logit_softcapping:
+                    logits = logits / final_logit_softcapping
+                    logits = torch.tanh(logits)
+                    logits = logits * final_logit_softcapping
+
+                return (logits, *flat_cache.flatten())
 
 
         def _parse_dtype(name: str):
