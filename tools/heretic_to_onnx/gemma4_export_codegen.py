@@ -227,6 +227,7 @@ def render_gemma4_export_runner(
         from __future__ import annotations
 
         import argparse
+        import inspect
         import json
         from pathlib import Path
 
@@ -250,40 +251,64 @@ def render_gemma4_export_runner(
             return {{}}
 
 
-        def _patch_masking_utils_for_scalar_q_length():
+        def _patch_masking_utils_for_onnx_export():
             try:
                 from transformers import masking_utils
             except Exception:
                 return
 
             original_sdpa_mask = getattr(masking_utils, "sdpa_mask", None)
-            if original_sdpa_mask is None or getattr(original_sdpa_mask, "__name__", "") == "_patched_sdpa_mask":
+            compatible_sdpa_mask = getattr(masking_utils, "sdpa_mask_older_torch", None) or original_sdpa_mask
+            if compatible_sdpa_mask is None or getattr(compatible_sdpa_mask, "__name__", "") == "_patched_sdpa_mask":
                 return
+
+            try:
+                compatible_parameters = inspect.signature(compatible_sdpa_mask).parameters
+            except (TypeError, ValueError):
+                compatible_parameters = {{}}
+
+            accepts_var_kwargs = any(
+                parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in compatible_parameters.values()
+            )
 
             def _patched_sdpa_mask(*args, **kwargs):
                 q_length = kwargs.get("q_length")
+                q_offset = kwargs.get("q_offset", 0)
+                attention_mask = kwargs.get("attention_mask")
+
+                device = torch.device("cpu")
+                if torch.is_tensor(q_length):
+                    device = q_length.device
+                elif torch.is_tensor(attention_mask):
+                    device = attention_mask.device
+
+                q_positions = q_length
                 if q_length is not None:
-                    attention_mask = kwargs.get("attention_mask")
-                    q_offset = kwargs.get("q_offset", 0)
-                    device = torch.device("cpu")
-                    if torch.is_tensor(q_length):
-                        device = q_length.device
-                    elif torch.is_tensor(attention_mask):
-                        device = attention_mask.device
-
                     if torch.is_tensor(q_length) and q_length.ndim == 0:
-                        q_length = torch.arange(int(q_length.item()), device=device, dtype=torch.long)
+                        q_positions = torch.arange(int(q_length.item()), device=device, dtype=torch.long)
                     elif isinstance(q_length, int):
-                        q_length = torch.arange(q_length, device=device, dtype=torch.long)
+                        q_positions = torch.arange(q_length, device=device, dtype=torch.long)
 
-                    if torch.is_tensor(q_length) and torch.is_tensor(q_offset):
-                        q_length = q_length + q_offset.to(device=device, dtype=torch.long)
-                    elif torch.is_tensor(q_length) and q_offset:
-                        q_length = q_length + int(q_offset)
+                    if torch.is_tensor(q_positions) and torch.is_tensor(q_offset):
+                        q_positions = q_positions + q_offset.to(device=device, dtype=torch.long)
+                    elif torch.is_tensor(q_positions) and q_offset:
+                        q_positions = q_positions + int(q_offset)
 
-                    kwargs["q_length"] = q_length
+                translated_kwargs = dict(kwargs)
+                if "cache_position" in compatible_parameters:
+                    if q_positions is not None:
+                        translated_kwargs["cache_position"] = q_positions
+                    translated_kwargs.pop("q_length", None)
+                    translated_kwargs.pop("q_offset", None)
+                elif q_positions is not None:
+                    translated_kwargs["q_length"] = q_positions
 
-                return original_sdpa_mask(*args, **kwargs)
+                if not accepts_var_kwargs:
+                    translated_kwargs = {{
+                        key: value for key, value in translated_kwargs.items() if key in compatible_parameters
+                    }}
+
+                return compatible_sdpa_mask(*args, **translated_kwargs)
 
             _patched_sdpa_mask.__name__ = "_patched_sdpa_mask"
             masking_utils.sdpa_mask = _patched_sdpa_mask
@@ -612,7 +637,7 @@ def render_gemma4_export_runner(
             if not CONTRACT["ok"]:
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
-            _patch_masking_utils_for_scalar_q_length()
+            _patch_masking_utils_for_onnx_export()
             image_processor = _load_image_processor(source_path, base_path)
             feature_extractor = _load_feature_extractor(source_path, base_path)
             processor_config = _resolve_processor_config(source_path, base_path)
