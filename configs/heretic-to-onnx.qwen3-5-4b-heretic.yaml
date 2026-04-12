@@ -15,7 +15,6 @@ inherit_assets:
     - tokenizer_config.json
     - chat_template.jinja
   from_base_if_missing:
-    - processor_config.json
     - preprocessor_config.json
 expected_architecture: Qwen3_5ForConditionalGeneration
 expected_onnx_files:

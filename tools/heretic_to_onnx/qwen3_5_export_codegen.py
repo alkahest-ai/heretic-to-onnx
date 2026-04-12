@@ -234,9 +234,10 @@ def render_qwen3_5_export_runner(
 
         def _resolve_processor_config(source_path: Path, base_path: Path) -> dict:
             for root in (source_path, base_path):
-                candidate = root / "processor_config.json"
-                if candidate.exists():
-                    return _load_json(candidate)
+                for filename in ("processor_config.json", "preprocessor_config.json"):
+                    candidate = root / filename
+                    if candidate.exists():
+                        return _load_json(candidate)
             return {{}}
 
 

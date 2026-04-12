@@ -28,15 +28,10 @@ def validate_package(
     package_path = Path(package_dir).expanduser().resolve()
     report = ValidationReport(ok=True, package_dir=str(package_path))
 
-    required_files = [
-        "config.json",
-        "generation_config.json",
-        "tokenizer.json",
-        "tokenizer_config.json",
-        "chat_template.jinja",
-        "processor_config.json",
-        "preprocessor_config.json",
-    ]
+    required_files = list(dict.fromkeys([
+        *manifest.inherit_assets.from_source,
+        *manifest.inherit_assets.from_base_if_missing,
+    ]))
     for relative_path in required_files:
         if not (package_path / relative_path).exists():
             report.ok = False
@@ -79,4 +74,3 @@ def validate_package(
             report.warnings.extend(f"missing ONNX artifact: {relative_path}" for relative_path in missing_onnx)
 
     return report
-
