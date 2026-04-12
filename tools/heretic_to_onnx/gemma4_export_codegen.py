@@ -228,12 +228,12 @@ def render_gemma4_export_runner(
 
         import argparse
         import json
-        import math
         from pathlib import Path
 
+        import numpy as np
         import onnx
         import torch
-        from transformers import Gemma4ForConditionalGeneration
+        from transformers import AutoProcessor, Gemma4ForConditionalGeneration
 
         CONTRACT = __CONTRACT_JSON__
 
@@ -248,6 +248,21 @@ def render_gemma4_export_runner(
                 if candidate.exists():
                     return _load_json(candidate)
             return {{}}
+
+
+        def _load_processor(source_path: Path, base_path: Path):
+            last_error = None
+            for root in (source_path, base_path):
+                candidate = root / "processor_config.json"
+                if not candidate.exists():
+                    continue
+                try:
+                    return AutoProcessor.from_pretrained(str(root), trust_remote_code=False)
+                except Exception as exc:
+                    last_error = exc
+            if last_error is not None:
+                raise RuntimeError("failed to load Gemma 4 processor from source/base assets") from last_error
+            raise FileNotFoundError("processor_config.json was not found in the source or base model assets")
 
 
         class FlatGemma4Cache:
@@ -407,7 +422,7 @@ def render_gemma4_export_runner(
             return model
 
 
-        def _build_sample_inputs(model, processor_config: dict):
+        def _build_sample_inputs(model, processor, processor_config: dict):
             text_config = model.config.text_config
             hidden_dtype = model.model.language_model.embed_tokens.weight.dtype
             device = next(model.parameters()).device
@@ -416,18 +431,24 @@ def render_gemma4_export_runner(
             patch_size = int(getattr(vision_config, "patch_size", 16))
             pooling_kernel_size = int(model.model.vision_tower.config.pooling_kernel_size)
             image_height, image_width = _resolve_image_size(processor_config, patch_size, pooling_kernel_size)
-            num_channels = int(getattr(model.model.vision_tower.patch_embedder.input_proj, "in_channels", 3))
-            pixel_values = torch.zeros((1, num_channels, image_height, image_width), dtype=torch.float32, device=device)
-            height_patches = max(image_height // patch_size, 1)
-            width_patches = max(image_width // patch_size, 1)
-            pixel_position_ids = _position_grid(height_patches, width_patches).to(device)
+            dummy_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
+            vision_batch = processor.image_processor(images=[dummy_image], return_tensors="pt")
+            pixel_values = vision_batch["pixel_values"].to(device)
+            pixel_position_ids = vision_batch["pixel_position_ids"].to(device)
 
-            feature_size = 128
-            feature_extractor = processor_config.get("feature_extractor")
-            if isinstance(feature_extractor, dict):
-                feature_size = int(feature_extractor.get("feature_size", feature_size))
-            input_features = torch.zeros((1, 16, feature_size), dtype=torch.float32, device=device)
-            input_features_mask = torch.ones((1, 16), dtype=torch.bool, device=device)
+            feature_extractor = processor.feature_extractor
+            sampling_rate = int(getattr(feature_extractor, "sampling_rate", 16000))
+            dummy_audio = np.zeros(sampling_rate, dtype=np.float32)
+            audio_batch = feature_extractor(
+                [dummy_audio],
+                sampling_rate=sampling_rate,
+                return_tensors="pt",
+            )
+            input_features = audio_batch["input_features"].to(device)
+            input_features_mask = audio_batch.get("input_features_mask", audio_batch.get("attention_mask"))
+            if input_features_mask is None:
+                raise RuntimeError("Gemma 4 feature extractor did not return an audio mask")
+            input_features_mask = input_features_mask.to(device=device, dtype=torch.bool)
 
             input_ids = torch.tensor([[1, 2, 3, 4]], dtype=torch.long, device=device)
             inputs_embeds = torch.zeros((1, 1, text_config.hidden_size), dtype=hidden_dtype, device=device)
@@ -525,9 +546,10 @@ def render_gemma4_export_runner(
             if not CONTRACT["ok"]:
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
+            processor = _load_processor(source_path, base_path)
             processor_config = _resolve_processor_config(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)
-            sample_inputs = _build_sample_inputs(model, processor_config)
+            sample_inputs = _build_sample_inputs(model, processor, processor_config)
 
             wrappers = {{
                 "vision_encoder": Gemma4VisionEncoderWrapper(model),
