@@ -75,6 +75,7 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
     source_config = _load_source_config(source_path)
     text_config = source_config.get("text_config", {})
     package_filenames = _session_filename_map(manifest)
+    layer_types = text_config.get("layer_types", [])
 
     architecture = ""
     architectures = source_config.get("architectures")
@@ -107,6 +108,17 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         warnings.append("Qwen3.5 export currently expects head_dim > 0")
     if image_token_id is None:
         warnings.append("config.json does not define image_token_id; sample multimodal trace may be incomplete")
+    if isinstance(layer_types, list):
+        linear_attention_layers = sum(1 for layer_type in layer_types if layer_type == "linear_attention")
+    else:
+        linear_attention_layers = 0
+    if linear_attention_layers > 0:
+        ok = False
+        warnings.append(
+            "current Qwen browser export contract only models flat attention KV caches, but this checkpoint "
+            f"contains {linear_attention_layers} linear_attention layer(s) that require additional recurrent "
+            "state (for example conv/linear-attention cache state) in the decoder session contract"
+        )
 
     sessions = [
         SessionSpec(

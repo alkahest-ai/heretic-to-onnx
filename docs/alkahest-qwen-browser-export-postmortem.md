@@ -307,6 +307,36 @@ One subtle nuance is that the current Qwen linear-attention path can call:
 
 So the shim has to accept the optional layer index argument as part of the current cache helper contract.
 
+### 13. The deeper blocker is the session contract, not one more missing helper
+
+At this point the repeated Qwen failures stop looking like isolated omissions and start revealing the real structural problem.
+
+The official Qwen 3.5 0.8B config includes:
+
+- many `linear_attention` layers
+- `linear_conv_kernel_dim`
+- separate linear-attention key/value head settings
+
+Source: [Qwen/Qwen3.5-0.8B config.json](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/config.json)
+
+The browser export contract in this repo currently models the decoder cache as only:
+
+- flat `past_key_values.*.key`
+- flat `past_key_values.*.value`
+
+But the current Qwen runtime is explicitly asking for extra linear-attention state helpers like:
+
+- `update_conv_state(...)`
+- `has_previous_state(layer_idx)`
+
+That means the current browser decoder contract is structurally incomplete for Qwen 3.5.
+
+The practical conclusion is:
+
+- continuing to patch one helper at a time is unlikely to yield a correct browser decoder
+- a real Qwen v2 lane needs additional recurrent-state inputs/outputs for the linear-attention layers
+- until that contract exists, the current direct Qwen browser export should fail fast instead of pretending it is almost done
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -354,6 +384,7 @@ What is true right now:
 - the direct Qwen export lane is still blocked, but the blocker is now in narrow compatibility shims around the merged decoder export path
 - the direct Qwen export lane is still blocked, but the remaining blockers are now narrow compatibility shims around the merged decoder and masking helper paths
 - the direct Qwen export lane is still blocked, but the remaining blockers are now narrow cache and masking compatibility shims around the merged decoder path
+- the direct Qwen export lane is now understood to be blocked by a deeper decoder-state contract mismatch for linear-attention layers
 
 What is likely true next:
 
@@ -373,4 +404,5 @@ It is:
 - keep the flat KV cache shim aligned with the current Transformers masking helper interface
 - patch the newer Transformers SDPA masking helper for ONNX export just like the Gemma lane already does
 - keep the flat KV cache shim aligned with helper methods like `has_previous_state()`
+- redesign the Qwen decoder session contract to carry the extra recurrent state required by linear-attention layers
 - then resume ONNX export from there
