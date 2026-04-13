@@ -18,6 +18,13 @@ REVIEW_OUTPUT="${REVIEW_OUTPUT:-$ROOT_DIR/data/roleplay_v2/review_table/batch-00
 DATASET_ID_PREFIX="${DATASET_ID_PREFIX:-v2b001}"
 DATASET_BATCH_ID="${DATASET_BATCH_ID:-batch-0001}"
 MIN_APPROVED_ROWS="${MIN_APPROVED_ROWS:-5000}"
+SFT_DATASET_KIND="${SFT_DATASET_KIND:-roleplay_v2}"
+SFT_DATASET_ID="${SFT_DATASET_ID:-Maxx0/Texting_sex}"
+SFT_DATASET_SPLIT="${SFT_DATASET_SPLIT:-train}"
+SFT_DATASET_OUTPUT_DIR="${SFT_DATASET_OUTPUT_DIR:-$ROOT_DIR/data/external_text_sft/texting_sex}"
+SFT_DATASET_VAL_FRACTION="${SFT_DATASET_VAL_FRACTION:-0.02}"
+SFT_DATASET_MAX_ROWS="${SFT_DATASET_MAX_ROWS:-0}"
+SFT_DATASET_MIN_MESSAGE_CHARS="${SFT_DATASET_MIN_MESSAGE_CHARS:-80}"
 
 HF_UPLOAD_WORKERS="${HF_UPLOAD_WORKERS:-8}"
 HF_PRIVATE="${HF_PRIVATE:-1}"
@@ -55,6 +62,10 @@ export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
 
 mkdir -p "$WORK_ROOT" "$MODEL_ROOT" "$MANIFEST_ROOT" "$PACKAGE_ROOT"
+
+TRAIN_FILE="${ROOT_DIR}/data/roleplay_v2/splits/train.jsonl"
+VAL_FILE="${ROOT_DIR}/data/roleplay_v2/splits/val.jsonl"
+DATASET_MANIFEST_PATH="${ROOT_DIR}/data/roleplay_v2/splits/manifest.json"
 
 private_args=()
 if [[ "$HF_PRIVATE" == "1" ]]; then
@@ -111,6 +122,34 @@ compile_approved_dataset() {
   echo "[dataset] validating and splitting approved corpus"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/prepare_roleplay_dataset.py" \
     --input "$ROOT_DIR/data/roleplay_v2/corpus.jsonl"
+}
+
+prepare_training_dataset() {
+  case "$SFT_DATASET_KIND" in
+    roleplay_v2)
+      compile_approved_dataset
+      TRAIN_FILE="$ROOT_DIR/data/roleplay_v2/splits/train.jsonl"
+      VAL_FILE="$ROOT_DIR/data/roleplay_v2/splits/val.jsonl"
+      DATASET_MANIFEST_PATH="$ROOT_DIR/data/roleplay_v2/splits/manifest.json"
+      ;;
+    hf_texting_sex)
+      echo "[dataset] preparing external chat SFT dataset from $SFT_DATASET_ID"
+      "$PYTHON_BIN" "$ROOT_DIR/scripts/prepare_texting_sex_dataset.py" \
+        --dataset-id "$SFT_DATASET_ID" \
+        --split "$SFT_DATASET_SPLIT" \
+        --output-dir "$SFT_DATASET_OUTPUT_DIR" \
+        --val-fraction "$SFT_DATASET_VAL_FRACTION" \
+        --max-rows "$SFT_DATASET_MAX_ROWS" \
+        --min-message-chars "$SFT_DATASET_MIN_MESSAGE_CHARS"
+      TRAIN_FILE="$SFT_DATASET_OUTPUT_DIR/train.jsonl"
+      VAL_FILE="$SFT_DATASET_OUTPUT_DIR/val.jsonl"
+      DATASET_MANIFEST_PATH="$SFT_DATASET_OUTPUT_DIR/manifest.json"
+      ;;
+    *)
+      echo "[error] unsupported SFT_DATASET_KIND: $SFT_DATASET_KIND" >&2
+      exit 1
+      ;;
+  esac
 }
 
 convert_direct() {
@@ -176,9 +215,9 @@ train_model() {
   echo "[train] $label"
   "$PYTHON_BIN" "$ROOT_DIR/scripts/train_rally_unsloth.py" \
     --model-name "$model_name" \
-    --train-file "$ROOT_DIR/data/roleplay_v2/splits/train.jsonl" \
-    --val-file "$ROOT_DIR/data/roleplay_v2/splits/val.jsonl" \
-    --dataset-manifest "$ROOT_DIR/data/roleplay_v2/splits/manifest.json" \
+    --train-file "$TRAIN_FILE" \
+    --val-file "$VAL_FILE" \
+    --dataset-manifest "$DATASET_MANIFEST_PATH" \
     --output-dir "$output_dir" \
     --merged-output-dir "$merged_dir" \
     --max-steps "$max_steps" \
@@ -228,7 +267,7 @@ run_rally() {
   train_model "rally-2b-rp" "$RALLY2_SOURCE_MODEL" "$output_dir" "$merged_dir" "$RALLY_MAX_STEPS"
   convert_tuned_model \
     "rally-2b-rp" \
-    "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" \
+    "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara-v2.yaml" \
     "$merged_dir" \
     "$RALLY2_TUNED_REPO"
 }
@@ -261,7 +300,7 @@ run_alkahest2() {
   train_model "alkahest-2b-rp" "$ALKAHEST2_SOURCE_MODEL" "$output_dir" "$merged_dir" "$ALKAHEST2_MAX_STEPS"
   convert_tuned_model \
     "alkahest-2b-rp" \
-    "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml" \
+    "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic-v2.yaml" \
     "$merged_dir" \
     "$ALKAHEST2_TUNED_REPO"
 }
@@ -351,7 +390,7 @@ case "$MODE" in
     convert_direct "alkahest-0.8b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic-v2.yaml" "$ALKAHEST08_V2_DIRECT_REPO"
     ;;
   rally)
-    compile_approved_dataset
+    prepare_training_dataset
     run_rally
     ;;
   rally-4b)
@@ -363,7 +402,7 @@ case "$MODE" in
     run_alkahest4
     ;;
   alkahest-2b)
-    compile_approved_dataset
+    prepare_training_dataset
     run_alkahest2
     ;;
   alkahest-0.8b)
