@@ -5,9 +5,9 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+from unsloth import FastLanguageModel
 from datasets import DatasetDict, load_dataset
 from trl import SFTConfig, SFTTrainer
-from unsloth import FastLanguageModel
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
