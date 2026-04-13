@@ -181,6 +181,18 @@ The practical implication is:
 
 That is a model-export compatibility problem, not evidence that Qwen image understanding is impossible.
 
+### 6. Qwen `shortest_edge` / `longest_edge` are pixel budgets, not literal dimensions
+
+The next issue was subtler and more operational:
+
+- the official Qwen processor config uses `size["shortest_edge"]` and `size["longest_edge"]` as `min_pixels` / `max_pixels`
+- the exporter initially treated those values as literal image edge lengths
+- for Qwen 3.5 0.8B, that meant a synthetic export image sized from `65536`, which exploded the traced vision sequence and got the export process killed with exit code `-9`
+
+The fix is to keep using the official processor, but override it with a small export-only visual token budget before tracing ONNX.
+
+This matters because Qwen's public processor semantics are unusual if you expect `size` to mean `height` / `width`.
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -229,12 +241,13 @@ What is true right now:
 What is likely true next:
 
 - direct Qwen browser export is still feasible
-- but it needs both a faithful processor-driven sample path and an ONNX-safe attention path for the visual tower
+- but it needs a faithful processor-driven sample path, a sane export-only image budget, and an ONNX-safe attention path for the visual tower
 
 The next debug target is not the decoder and not quantization.
 
 It is:
 
 - build a vision sample that exactly matches the upstream Qwen processor/model expectation
+- keep the Qwen export trace on a bounded image-token budget instead of inheriting the full processor pixel range
 - patch or bypass the Qwen vision SDPA/GQA path so ONNX export can lower it safely
 - then resume ONNX export from there

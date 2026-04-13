@@ -456,18 +456,40 @@ def render_qwen3_5_export_runner(
             return model
 
 
-        def _resolve_image_size(processor_config: dict):
+        def _resolve_export_image_budget(processor_config: dict):
             image_processor = processor_config.get("image_processor", processor_config)
-            size = image_processor.get("size", 448) if isinstance(image_processor, dict) else 448
+            patch_size = int(image_processor.get("patch_size", 16)) if isinstance(image_processor, dict) else 16
+            merge_size = int(image_processor.get("merge_size", 2)) if isinstance(image_processor, dict) else 2
+            spatial_compression = max(patch_size * merge_size, 1)
+
+            # Qwen's shortest/longest_edge values are pixel budgets, not literal dimensions.
+            # Use a small fixed token budget for export so the ONNX trace stays bounded.
+            target_visual_tokens = 256
+            target_pixels = target_visual_tokens * spatial_compression * spatial_compression
+
+            if not isinstance(image_processor, dict):
+                return target_pixels
+
+            size = image_processor.get("size")
             if isinstance(size, dict):
-                for key in ("height", "shortest_edge", "longest_edge", "width"):
-                    value = size.get(key)
-                    if isinstance(value, int):
-                        return value
-                return 448
-            if isinstance(size, int):
-                return size
-            return 448
+                min_pixels = size.get("shortest_edge")
+                max_pixels = size.get("longest_edge")
+                if isinstance(min_pixels, int):
+                    target_pixels = max(target_pixels, min_pixels)
+                if isinstance(max_pixels, int):
+                    target_pixels = min(target_pixels, max_pixels)
+            return target_pixels
+
+
+        def _resolve_export_image_size(processor_config: dict):
+            image_processor = processor_config.get("image_processor", processor_config)
+            patch_size = int(image_processor.get("patch_size", 16)) if isinstance(image_processor, dict) else 16
+            merge_size = int(image_processor.get("merge_size", 2)) if isinstance(image_processor, dict) else 2
+            multiple = max(patch_size * merge_size, 1)
+            target_pixels = _resolve_export_image_budget(processor_config)
+            image_size = max(int(math.sqrt(target_pixels)), multiple)
+            image_size = max((image_size // multiple) * multiple, multiple)
+            return image_size
 
 
         def _build_sample_inputs(model, processor_config: dict, image_processor):
@@ -475,8 +497,14 @@ def render_qwen3_5_export_runner(
             hidden_dtype = model.get_input_embeddings().weight.dtype
             device = next(model.parameters()).device
 
-            image_size = _resolve_image_size(processor_config)
+            image_size = _resolve_export_image_size(processor_config)
             if image_processor is not None:
+                if hasattr(image_processor, "size"):
+                    export_budget = _resolve_export_image_budget(processor_config)
+                    image_processor.size = {{
+                        "shortest_edge": export_budget,
+                        "longest_edge": export_budget,
+                    }}
                 blank_image = Image.new("RGB", (image_size, image_size), color=0)
                 processed = image_processor(images=blank_image, return_tensors="pt")
                 pixel_values = processed["pixel_values"].to(device=device, dtype=hidden_dtype)
