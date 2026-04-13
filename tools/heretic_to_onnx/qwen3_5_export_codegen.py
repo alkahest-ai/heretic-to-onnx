@@ -223,7 +223,8 @@ def render_qwen3_5_export_runner(
 
         import onnx
         import torch
-        from transformers import Qwen3_5ForConditionalGeneration
+        from PIL import Image
+        from transformers import AutoImageProcessor, Qwen3_5ForConditionalGeneration
 
         CONTRACT = __CONTRACT_JSON__
 
@@ -239,6 +240,15 @@ def render_qwen3_5_export_runner(
                     if candidate.exists():
                         return _load_json(candidate)
             return {{}}
+
+
+        def _load_image_processor(source_path: Path, base_path: Path):
+            for root in (source_path, base_path):
+                try:
+                    return AutoImageProcessor.from_pretrained(str(root), trust_remote_code=False)
+                except Exception:
+                    continue
+            return None
 
 
         class AttrDict(dict):
@@ -405,20 +415,23 @@ def render_qwen3_5_export_runner(
             return 448
 
 
-        def _build_sample_inputs(model, processor_config: dict):
+        def _build_sample_inputs(model, processor_config: dict, image_processor):
             config = model.config
-            text_config = config.text_config
-            vision_config = config.vision_config
             hidden_dtype = model.get_input_embeddings().weight.dtype
             device = next(model.parameters()).device
 
             image_size = _resolve_image_size(processor_config)
-            patch_size = int(getattr(vision_config, "patch_size", 16))
-            spatial_merge_size = int(getattr(vision_config, "spatial_merge_size", 1))
-            grid_size = max(image_size // patch_size // spatial_merge_size, 1)
-
-            pixel_values = torch.zeros((1, 3, image_size, image_size), dtype=hidden_dtype, device=device)
-            image_grid_thw = torch.tensor([[1, grid_size, grid_size]], dtype=torch.long, device=device)
+            if image_processor is not None:
+                blank_image = Image.new("RGB", (image_size, image_size), color=0)
+                processed = image_processor(images=blank_image, return_tensors="pt")
+                pixel_values = processed["pixel_values"].to(device=device, dtype=hidden_dtype)
+                image_grid_thw = processed["image_grid_thw"].to(device=device, dtype=torch.long)
+            else:
+                vision_config = config.vision_config
+                patch_size = int(getattr(vision_config, "patch_size", 16))
+                grid_size = max(image_size // patch_size, 1)
+                pixel_values = torch.zeros((1, 3, image_size, image_size), dtype=hidden_dtype, device=device)
+                image_grid_thw = torch.tensor([[1, grid_size, grid_size]], dtype=torch.long, device=device)
 
             input_ids = torch.full((1, 16), config.pad_token_id, dtype=torch.long, device=device)
             if getattr(config, "image_token_id", None) is not None:
@@ -517,8 +530,9 @@ def render_qwen3_5_export_runner(
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
             processor_config = _resolve_processor_config(source_path, base_path)
+            image_processor = _load_image_processor(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)
-            sample_inputs = _build_sample_inputs(model, processor_config)
+            sample_inputs = _build_sample_inputs(model, processor_config, image_processor)
 
             wrappers = {{
                 "vision_encoder": Qwen35VisionEncoderWrapper(model),
