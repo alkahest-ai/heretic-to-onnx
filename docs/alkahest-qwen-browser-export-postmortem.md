@@ -4,7 +4,7 @@ Date context: April 12, 2026.
 
 This is the running write-up for the direct `alkahest-*` browser export lane built from the Qwen 3.5 Heretic family.
 
-Unlike the Rally 2B postmortem, this one documents an export lane that is **not fully shipped yet**. The point is to record what is true upstream, what the current browser package actually exposes, and what is still blocking a successful direct Qwen browser export.
+This started as a bring-up postmortem for a lane that was not fully shipped yet. As of April 12, 2026, the direct `alkahest-0.8b` lane now completes export, quantization, packaging, validation, and publish successfully. The point of this document is to record what was true during bring-up, what actually fixed it, and what to carry forward to the larger Qwen checkpoints.
 
 ## Current Status
 
@@ -17,9 +17,13 @@ Current practical status:
 
 - the Qwen ONNX packaging lane exists in this repo
 - the current intended shipped browser surface is **text + image**
-- direct `alkahest-0.8b` export is now past the unbounded vision sample issue, but is still blocked during merged decoder export tracing
+- direct `alkahest-0.8b` now completes successfully end-to-end
+- the next direct checkpoints to validate are `alkahest-2b` and `alkahest-4b`
 
-So this is not a published success case yet. It is a bring-up postmortem.
+So this is now both:
+
+- a bring-up record for the bugs that had to be fixed
+- a handoff document for scaling the same lane to larger Qwen checkpoints
 
 ## Upstream Capability vs Shipped Browser Capability
 
@@ -337,6 +341,90 @@ The practical conclusion is:
 - a real Qwen v2 lane needs additional recurrent-state inputs/outputs for the linear-attention layers
 - until that contract exists, the current direct Qwen browser export should fail fast instead of pretending it is almost done
 
+### 14. The actual fix was a typed decoder cache contract
+
+The final successful fix was to replace the Qwen decoder cache contract from:
+
+- two flat KV tensors per layer
+
+to:
+
+- typed per-layer cache entries derived from `text_config.layer_types`
+
+That means:
+
+- `full_attention` layers still expose `past_key_values.{i}.key/value` and `present.{i}.key/value`
+- `linear_attention` layers expose `past_key_values.{i}.conv_state/recurrent_state` and `present.{i}.conv_state/recurrent_state`
+
+The generated export runner also had to grow a typed cache shim that matches the current Hugging Face Qwen helper interface:
+
+- `get_seq_length(...)`
+- `get_mask_sizes(...)`
+- `has_previous_state(...)`
+- `update(...)`
+- `update_conv_state(...)`
+- `update_recurrent_state(...)`
+- `flatten()`
+
+That was the real unlock.
+
+The earlier masking, SDPA, processor, and image-budget fixes were still necessary, but they were not sufficient without the decoder-state contract redesign.
+
+### 15. 0.8B direct now succeeds end-to-end
+
+The direct `alkahest-0.8b` lane now completes:
+
+- raw ONNX export
+- q4f16 quantization
+- package assembly
+- package validation
+- Hugging Face publish
+
+The successful one-click path is:
+
+- `bash scripts/phala_run_alkahest_0_8b_direct.sh`
+
+Two practical notes:
+
+- the convert summary can still include `export runner produced stderr output` and `quantize runner produced stderr output`
+- in the successful run those warnings were non-fatal exporter / tracer stderr, not actual pipeline failure
+
+The real success signal is:
+
+- `export.ok = true`
+- `quantize.ok = true`
+- `package.ok = true`
+- `validate.ok = true`
+- `publish.ok = true`
+
+### 16. The same contract should now be exercised on 2B and 4B
+
+The direct next checkpoints in this repo are:
+
+- `alkahest-2b-direct`
+- `alkahest-4b-direct`
+
+They already have direct scripts and manifests:
+
+- `scripts/phala_run_alkahest_2b_direct.sh`
+- `scripts/phala_run_alkahest_4b_direct.sh`
+- `configs/heretic-to-onnx.qwen3-5-2b-heretic.yaml`
+- `configs/heretic-to-onnx.qwen3-5-4b-heretic.yaml`
+
+Configured source/base pairs today are:
+
+- 2B:
+  - source `tvall43/Qwen3.5-2B-heretic-v3b`
+  - base `Qwen/Qwen3.5-2B`
+- 4B:
+  - source `tvall43/Qwen3.5-4B-heretic`
+  - base `Qwen/Qwen3.5-4B`
+
+The expected direct repo targets are:
+
+- `{{HF_OWNER}}/alkahest-2b`
+- `{{HF_OWNER}}/alkahest-4b`
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -380,20 +468,18 @@ What is true right now:
 - Qwen video understanding exists upstream
 - Qwen image understanding exists upstream
 - current `alkahest-*` browser export is intended to ship only `text + image`
-- the direct Qwen export lane is still blocked, but the blocker has moved from synthetic vision sample sizing into the merged decoder export shim
-- the direct Qwen export lane is still blocked, but the blocker is now in narrow compatibility shims around the merged decoder export path
-- the direct Qwen export lane is still blocked, but the remaining blockers are now narrow compatibility shims around the merged decoder and masking helper paths
-- the direct Qwen export lane is still blocked, but the remaining blockers are now narrow cache and masking compatibility shims around the merged decoder path
-- the direct Qwen export lane is now understood to be blocked by a deeper decoder-state contract mismatch for linear-attention layers
+- direct `alkahest-0.8b` now succeeds end-to-end
+- the critical Qwen-specific unlock was the typed decoder cache contract for mixed `full_attention` and `linear_attention` layers
+- the next validation targets are `alkahest-2b-direct` and `alkahest-4b-direct`
 
 What is likely true next:
 
-- direct Qwen browser export is still feasible
-- but it needs a faithful processor-driven sample path, a sane export-only image budget, an ONNX-safe attention path for the visual tower, and a merged decoder shim that explicitly matches Qwen's merged visual token count
+- the same Qwen decoder contract should transfer to 2B and 4B
+- larger checkpoints may still expose scale-sensitive export or quantization issues even if the interface-level blocker is now fixed
 
-The next debug target is not quantization.
+The next work is not re-litigating the Qwen decoder contract.
 
-It is the merged decoder export shim around the decoder.
+It is validating that the same contract and runner logic hold at 2B and 4B scale.
 
 It is:
 
@@ -403,6 +489,6 @@ It is:
 - merge image features back into `inputs_embeds` directly from `mm_token_type_ids`
 - keep the flat KV cache shim aligned with the current Transformers masking helper interface
 - patch the newer Transformers SDPA masking helper for ONNX export just like the Gemma lane already does
-- keep the flat KV cache shim aligned with helper methods like `has_previous_state()`
-- redesign the Qwen decoder session contract to carry the extra recurrent state required by linear-attention layers
-- then resume ONNX export from there
+- keep the typed cache shim aligned with helper methods like `has_previous_state()`, `update_conv_state()`, and `update_recurrent_state()`
+- validate 2B direct
+- then validate 4B direct
