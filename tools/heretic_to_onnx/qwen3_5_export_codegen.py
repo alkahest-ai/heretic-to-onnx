@@ -216,9 +216,9 @@ def render_qwen3_5_export_runner(
         from __future__ import annotations
 
         import argparse
+        import inspect
         import json
         import math
-        import types
         from pathlib import Path
 
         import onnx
@@ -336,14 +336,30 @@ def render_qwen3_5_export_runner(
                 return tuple(values)
 
 
+        def _merge_visual_tensors(value):
+            if torch.is_tensor(value):
+                return value
+            if isinstance(value, (list, tuple)) and value and all(torch.is_tensor(item) for item in value):
+                if len(value) == 1:
+                    return value[0]
+                return torch.cat(tuple(value), dim=0)
+            return None
+
+
         def _extract_visual_tensor(outputs):
             if torch.is_tensor(outputs):
                 return outputs
+            pooled = _merge_visual_tensors(getattr(outputs, "pooler_output", None))
+            if pooled is not None:
+                return pooled
             if hasattr(outputs, "image_features") and torch.is_tensor(outputs.image_features):
                 return outputs.image_features
             if hasattr(outputs, "last_hidden_state") and torch.is_tensor(outputs.last_hidden_state):
                 return outputs.last_hidden_state
             if isinstance(outputs, dict):
+                pooled = _merge_visual_tensors(outputs.get("pooler_output"))
+                if pooled is not None:
+                    return pooled
                 if "image_features" in outputs and torch.is_tensor(outputs["image_features"]):
                     return outputs["image_features"]
                 if "last_hidden_state" in outputs and torch.is_tensor(outputs["last_hidden_state"]):
@@ -354,11 +370,15 @@ def render_qwen3_5_export_runner(
             raise TypeError(f"unsupported get_image_features output type: {{type(outputs)!r}}")
 
 
-        def _pack_visual_outputs(image_features):
-            return AttrDict({{
-                "image_features": image_features,
-                "last_hidden_state": image_features,
-            }})
+        def _attach_tensor_dependency(tensor, dependency):
+            if dependency is None:
+                return tensor
+            if not torch.is_tensor(dependency):
+                dependency = torch.as_tensor(dependency, device=tensor.device)
+            if dependency.numel() == 0:
+                return tensor
+            marker = dependency.reshape(-1).sum().to(device=tensor.device, dtype=tensor.dtype)
+            return tensor + marker * 0
 
 
         class Qwen35VisionEncoderWrapper(torch.nn.Module):
@@ -411,28 +431,33 @@ def render_qwen3_5_export_runner(
                     cache_entries.append((past_key_values[index], past_key_values[index + 1]))
                 flat_cache = FlatQwen35Cache(cache_entries)
 
-                owner = self.model.model
-                original_get_image_features = owner.get_image_features
-
-                def patched_get_image_features(_self, pixel_values=None, image_grid_thw=None, **kwargs):
-                    return _pack_visual_outputs(image_features)
-
-                owner.get_image_features = types.MethodType(patched_get_image_features, owner)
-                dummy_pixel_values = torch.zeros((1,), dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-                try:
-                    outputs = self.model(
-                        inputs_embeds=inputs_embeds,
-                        attention_mask=attention_mask,
-                        position_ids=position_ids,
-                        past_key_values=flat_cache,
-                        pixel_values=dummy_pixel_values,
-                        image_grid_thw=image_grid_thw,
-                        mm_token_type_ids=mm_token_type_ids,
-                        use_cache=True,
-                        return_dict=True,
+                merged_inputs_embeds = inputs_embeds.clone()
+                image_mask = mm_token_type_ids == 1
+                if image_mask.any():
+                    merged_image_features = _attach_tensor_dependency(image_features, image_grid_thw)
+                    merged_image_features = merged_image_features.reshape(-1, merged_inputs_embeds.shape[-1])
+                    slot_mask = image_mask.unsqueeze(-1).expand_as(merged_inputs_embeds)
+                    if merged_inputs_embeds[slot_mask].numel() != merged_image_features.numel():
+                        raise RuntimeError(
+                            "image features and image token slots do not match when building the "
+                            "Qwen merged decoder export sample"
+                        )
+                    merged_inputs_embeds = merged_inputs_embeds.masked_scatter(
+                        slot_mask,
+                        merged_image_features.reshape(-1).to(
+                            device=merged_inputs_embeds.device,
+                            dtype=merged_inputs_embeds.dtype,
+                        ),
                     )
-                finally:
-                    owner.get_image_features = original_get_image_features
+
+                outputs = self.model(
+                    inputs_embeds=merged_inputs_embeds,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_values=flat_cache,
+                    use_cache=True,
+                    return_dict=True,
+                )
 
                 return (outputs.logits, *flat_cache.flatten())
 
@@ -516,18 +541,28 @@ def render_qwen3_5_export_runner(
                 pixel_values = torch.zeros((1, 3, image_size, image_size), dtype=hidden_dtype, device=device)
                 image_grid_thw = torch.tensor([[1, grid_size, grid_size]], dtype=torch.long, device=device)
 
-            input_ids = torch.full((1, 16), config.pad_token_id, dtype=torch.long, device=device)
-            if getattr(config, "image_token_id", None) is not None:
-                input_ids[:, 1] = config.image_token_id
-            mm_token_type_ids = torch.zeros((1, 16), dtype=torch.int32, device=device)
-            mm_token_type_ids[:, 1] = 1
-            attention_mask = torch.ones((1, 16), dtype=torch.bool, device=device)
-            position_ids = torch.arange(16, dtype=torch.long, device=device).unsqueeze(0)
-
             embed_wrapper = Qwen35EmbedTokensWrapper(model).to(device)
             vision_wrapper = Qwen35VisionEncoderWrapper(model).to(device)
-            inputs_embeds = embed_wrapper(input_ids)
             image_features = vision_wrapper(pixel_values, image_grid_thw)
+
+            if image_features.ndim == 3:
+                image_token_slots = int(image_features.shape[1])
+            elif image_features.ndim == 2:
+                image_token_slots = int(image_features.shape[0])
+            else:
+                raise ValueError(f"unsupported image_features rank: {{image_features.ndim}}")
+
+            total_sequence = max(image_token_slots + 8, 16)
+            input_ids = torch.full((1, total_sequence), config.pad_token_id, dtype=torch.long, device=device)
+            mm_token_type_ids = torch.zeros((1, total_sequence), dtype=torch.int32, device=device)
+            if getattr(config, "image_token_id", None) is not None:
+                start = 1
+                end = start + image_token_slots
+                input_ids[:, start:end] = config.image_token_id
+                mm_token_type_ids[:, start:end] = 1
+            attention_mask = torch.ones((1, total_sequence), dtype=torch.bool, device=device)
+            position_ids = torch.arange(total_sequence, dtype=torch.long, device=device).unsqueeze(0)
+            inputs_embeds = embed_wrapper(input_ids)
 
             cache_tensors = []
             for _ in range(CONTRACT["num_hidden_layers"]):
@@ -563,6 +598,38 @@ def render_qwen3_5_export_runner(
             )
 
 
+        def _supports_onnx_export_kwarg(name: str):
+            try:
+                return name in inspect.signature(torch.onnx.export).parameters
+            except (TypeError, ValueError):
+                return False
+
+
+        def _run_torch_onnx_export(module, export_kwargs):
+            attempt_kwargs = dict(export_kwargs)
+            for _ in range(3):
+                try:
+                    with _PatchedScaledDotProductAttention():
+                        torch.onnx.export(module, **attempt_kwargs)
+                    return
+                except TypeError as exc:
+                    message = str(exc)
+                    unexpected_kwarg = next(
+                        (
+                            name
+                            for name in ("dynamo", "external_data", "use_external_data_format")
+                            if f"unexpected keyword argument '{{name}}'" in message and name in attempt_kwargs
+                        ),
+                        None,
+                    )
+                    if unexpected_kwarg is None:
+                        raise
+                    attempt_kwargs.pop(unexpected_kwarg, None)
+
+            with _PatchedScaledDotProductAttention():
+                torch.onnx.export(module, **attempt_kwargs)
+
+
         def _export_onnx(module, sample_inputs, session_spec: dict, output_path: Path, opset_version: int):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             dynamic_axes = session_spec["dynamic_axes"]
@@ -576,21 +643,16 @@ def render_qwen3_5_export_runner(
                 "output_names": session_spec["outputs"],
                 "opset_version": opset_version,
                 "do_constant_folding": True,
-                "dynamo": False,
             }}
+            if _supports_onnx_export_kwarg("dynamo"):
+                export_kwargs["dynamo"] = False
+            if _supports_onnx_export_kwarg("external_data"):
+                export_kwargs["external_data"] = True
+            elif _supports_onnx_export_kwarg("use_external_data_format"):
+                export_kwargs["use_external_data_format"] = True
             if dynamic_axes is not None:
                 export_kwargs["dynamic_axes"] = dynamic_axes
-            try:
-                with _PatchedScaledDotProductAttention():
-                    torch.onnx.export(module, **export_kwargs, external_data=True)
-            except TypeError:
-                export_kwargs.pop("dynamo", None)
-                try:
-                    with _PatchedScaledDotProductAttention():
-                        torch.onnx.export(module, **export_kwargs, external_data=True)
-                except TypeError:
-                    with _PatchedScaledDotProductAttention():
-                        torch.onnx.export(module, **export_kwargs, use_external_data_format=True)
+            _run_torch_onnx_export(module, export_kwargs)
             _normalize_external_data(output_path)
 
 

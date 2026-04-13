@@ -17,7 +17,7 @@ Current practical status:
 
 - the Qwen ONNX packaging lane exists in this repo
 - the current intended shipped browser surface is **text + image**
-- direct `alkahest-0.8b` export is still blocked during the vision sample/export step
+- direct `alkahest-0.8b` export is now past the unbounded vision sample issue, but is still blocked during merged decoder export tracing
 
 So this is not a published success case yet. It is a bring-up postmortem.
 
@@ -193,6 +193,66 @@ The fix is to keep using the official processor, but override it with a small ex
 
 This matters because Qwen's public processor semantics are unusual if you expect `size` to mean `height` / `width`.
 
+### 7. The merged decoder export path patched the right idea with the wrong Qwen contract
+
+After bounding the export image budget, the next traceback moved further forward into the merged decoder trace itself.
+
+The failing error was:
+
+- `TypeError: cat() received an invalid combination of arguments - got (NoneType, dim=int)`
+
+The useful interpretation is:
+
+- the export wrapper did successfully reach the multimodal reinjection path in Qwen
+- but the export-only patch was returning the wrong structure from the temporary `get_image_features` hook
+- current Qwen expects a `pooler_output` list that it later concatenates with `torch.cat(...)`
+- the export shim was returning `image_features` / `last_hidden_state`, so Qwen saw `pooler_output=None` and failed
+
+There was a second, related issue in the same area:
+
+- the merged decoder export uses `inputs_embeds`, not raw `input_ids`
+- the embed session intentionally masks image placeholder IDs to PAD before embedding
+- current Qwen reconstructs the placeholder mask from `input_ids`, or from literal image-token embeddings when `input_ids` are absent
+- that means the export wrapper also has to reconstruct the multimodal placeholder mask from `mm_token_type_ids` during tracing, otherwise Qwen cannot find the image slots to refill
+
+So this blocker is not about the visual tower anymore.
+
+It is about matching the current Hugging Face Qwen multimodal forward contract closely enough during the merged decoder export shim.
+
+### 8. The ONNX export retry path was masking the real traceback
+
+The same run also exposed an exporter-control bug in our generated runner.
+
+The runner originally treated any `TypeError` raised during `torch.onnx.export(...)` as if it meant:
+
+- an ONNX exporter keyword was unsupported
+
+That was too broad.
+
+In this case, the real `TypeError` came from inside the traced Qwen forward path, but the runner caught it and retried export with older keyword variants. That produced a misleading final error:
+
+- `TypeError: export() got an unexpected keyword argument 'use_external_data_format'`
+
+The practical fix is:
+
+- detect supported `torch.onnx.export` kwargs up front
+- retry only for true unexpected-keyword cases
+- let model-forward `TypeError`s surface directly so the traceback stays useful
+
+### 9. The decoder export sample needs one placeholder slot per merged image feature
+
+The next refinement was in the decoder export sample itself.
+
+Even after the export image budget was fixed, the synthetic decoder sample still only reserved one image placeholder token.
+
+That is not how the Qwen multimodal path behaves in practice:
+
+- one image can expand into many merged visual feature tokens
+- so the decoder export sample must reserve that many image placeholder slots
+- and the export wrapper should merge `image_features` back into `inputs_embeds` directly using `mm_token_type_ids`
+
+That is more stable than depending on private Hugging Face reinjection hooks during ONNX export.
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -236,18 +296,21 @@ What is true right now:
 - Qwen video understanding exists upstream
 - Qwen image understanding exists upstream
 - current `alkahest-*` browser export is intended to ship only `text + image`
-- the direct Qwen export lane is still blocked in the vision sample step
+- the direct Qwen export lane is still blocked, but the blocker has moved from synthetic vision sample sizing into the merged decoder export shim
 
 What is likely true next:
 
 - direct Qwen browser export is still feasible
-- but it needs a faithful processor-driven sample path, a sane export-only image budget, and an ONNX-safe attention path for the visual tower
+- but it needs a faithful processor-driven sample path, a sane export-only image budget, an ONNX-safe attention path for the visual tower, and a merged decoder shim that explicitly matches Qwen's merged visual token count
 
-The next debug target is not the decoder and not quantization.
+The next debug target is not quantization.
+
+It is the merged decoder export shim around the decoder.
 
 It is:
 
-- build a vision sample that exactly matches the upstream Qwen processor/model expectation
 - keep the Qwen export trace on a bounded image-token budget instead of inheriting the full processor pixel range
 - patch or bypass the Qwen vision SDPA/GQA path so ONNX export can lower it safely
+- reserve one image placeholder slot per merged image feature token
+- merge image features back into `inputs_embeds` directly from `mm_token_type_ids`
 - then resume ONNX export from there
