@@ -251,6 +251,146 @@ def render_qwen3_5_export_runner(
             return None
 
 
+        def _patch_masking_utils_for_onnx_export():
+            try:
+                from transformers import masking_utils
+            except Exception:
+                return
+
+            original_sdpa_mask = getattr(masking_utils, "sdpa_mask", None)
+            if original_sdpa_mask is None or getattr(original_sdpa_mask, "__name__", "") == "_patched_sdpa_mask":
+                return
+
+            try:
+                original_signature = inspect.signature(original_sdpa_mask)
+            except (TypeError, ValueError):
+                original_signature = None
+
+            def _normalize_cache_position(q_length, q_offset, attention_mask):
+                device = torch.device("cpu")
+                if torch.is_tensor(q_length):
+                    device = q_length.device
+                elif torch.is_tensor(attention_mask):
+                    device = attention_mask.device
+
+                if q_length is None:
+                    return None
+                if torch.is_tensor(q_length):
+                    if q_length.ndim == 0:
+                        cache_position = torch.arange(int(q_length.item()), device=device, dtype=torch.long)
+                    else:
+                        cache_position = q_length.to(device=device, dtype=torch.long)
+                else:
+                    cache_position = torch.arange(int(q_length), device=device, dtype=torch.long)
+
+                if torch.is_tensor(q_offset):
+                    cache_position = cache_position + q_offset.to(device=device, dtype=torch.long)
+                elif q_offset:
+                    cache_position = cache_position + int(q_offset)
+                return cache_position
+
+            def _materialize_mask(mask_function, batch_size, cache_position, kv_arange):
+                batch_idx = torch.arange(batch_size, device=cache_position.device, dtype=torch.long).view(batch_size, 1, 1)
+                head_idx = torch.zeros(1, device=cache_position.device, dtype=torch.long).view(1, 1, 1)
+                q_idx = cache_position.view(1, -1, 1)
+                kv_idx = kv_arange.view(1, 1, -1)
+                return mask_function(batch_idx, head_idx, q_idx, kv_idx).to(dtype=torch.bool)
+
+            def _patched_sdpa_mask(*args, **kwargs):
+                if original_signature is not None:
+                    bound = original_signature.bind_partial(*args, **kwargs)
+                    arguments = dict(bound.arguments)
+                else:
+                    arguments = dict(kwargs)
+
+                attention_mask = arguments.get("attention_mask")
+                q_offset = arguments.get("q_offset", 0)
+                cache_position = arguments.get("cache_position")
+                if cache_position is None:
+                    cache_position = _normalize_cache_position(arguments.get("q_length"), q_offset, attention_mask)
+
+                if cache_position is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                if not torch.is_tensor(cache_position):
+                    cache_position = torch.as_tensor(cache_position, dtype=torch.long)
+                cache_position = cache_position.to(dtype=torch.long)
+                if cache_position.ndim == 0:
+                    cache_position = torch.arange(int(cache_position.item()), device=cache_position.device, dtype=torch.long)
+
+                batch_size = arguments.get("batch_size")
+                if batch_size is None:
+                    if torch.is_tensor(attention_mask):
+                        batch_size = attention_mask.shape[0]
+                    else:
+                        batch_size = 1
+
+                kv_length = arguments.get("kv_length")
+                if kv_length is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                kv_offset = arguments.get("kv_offset", 0)
+                mask_function = arguments.get("mask_function")
+                if mask_function is None:
+                    mask_function = getattr(masking_utils, "causal_mask_function", None)
+                if mask_function is None:
+                    return original_sdpa_mask(*args, **kwargs)
+
+                local_size = arguments.get("local_size")
+                allow_is_causal_skip = bool(arguments.get("allow_is_causal_skip", True))
+                allow_torch_fix = bool(arguments.get("allow_torch_fix", True))
+
+                padding_mask = attention_mask
+                if padding_mask is not None:
+                    required_length = kv_length + (int(kv_offset.item()) if torch.is_tensor(kv_offset) else int(kv_offset))
+                    if padding_mask.shape[-1] < required_length:
+                        padding_mask = torch.nn.functional.pad(padding_mask, (0, required_length - padding_mask.shape[-1]))
+
+                    mask_indices = torch.arange(kv_length, device=padding_mask.device)
+                    if torch.is_tensor(kv_offset):
+                        mask_indices = mask_indices + kv_offset.to(device=padding_mask.device, dtype=mask_indices.dtype)
+                    elif kv_offset:
+                        mask_indices = mask_indices + int(kv_offset)
+                    padding_mask = padding_mask[:, mask_indices].to(dtype=torch.bool)
+
+                if allow_is_causal_skip:
+                    query_length = cache_position.shape[0]
+                    can_skip = query_length == 1 or kv_length == query_length
+                    if local_size is not None:
+                        can_skip = can_skip and kv_length < local_size
+                    if can_skip and (padding_mask is None or padding_mask.all()):
+                        return None
+
+                kv_arange = torch.arange(kv_length, device=cache_position.device)
+                if torch.is_tensor(kv_offset):
+                    kv_arange = kv_arange + kv_offset.to(device=cache_position.device, dtype=kv_arange.dtype)
+                elif kv_offset:
+                    kv_arange = kv_arange + int(kv_offset)
+
+                mask = _materialize_mask(mask_function, batch_size, cache_position, kv_arange)
+                if mask.ndim == 2:
+                    mask = mask.unsqueeze(0)
+                if mask.ndim == 3:
+                    mask = mask.unsqueeze(1)
+                if mask.shape[0] != batch_size:
+                    mask = mask.expand(batch_size, -1, -1, -1)
+
+                if padding_mask is not None:
+                    mask = mask & padding_mask[:, None, None, :]
+
+                if allow_torch_fix and not getattr(masking_utils, "_is_torch_greater_or_equal_than_2_5", True):
+                    mask = mask | torch.all(~mask, dim=-1, keepdim=True)
+
+                return mask
+
+            _patched_sdpa_mask.__name__ = "_patched_sdpa_mask"
+            masking_utils.sdpa_mask = _patched_sdpa_mask
+            try:
+                masking_utils.ALL_MASK_ATTENTION_FUNCTIONS._global_mapping["sdpa"] = masking_utils.sdpa_mask
+            except Exception:
+                pass
+
+
         class _PatchedScaledDotProductAttention:
             def __enter__(self):
                 self.original = torch.nn.functional.scaled_dot_product_attention
@@ -685,6 +825,7 @@ def render_qwen3_5_export_runner(
             if not CONTRACT["ok"]:
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
+            _patch_masking_utils_for_onnx_export()
             processor_config = _resolve_processor_config(source_path, base_path)
             image_processor = _load_image_processor(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)

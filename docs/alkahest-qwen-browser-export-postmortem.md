@@ -269,6 +269,23 @@ It means newer Transformers masking utilities expect the export-time KV cache ad
 
 So the direct Qwen export shim has to match not just the cache tensor shapes, but the cache helper interface expected by current masking code.
 
+### 11. Transformers masking utils also need an ONNX-safe SDPA mask shim
+
+After the cache adapter gained `get_mask_sizes(...)`, the next failure moved one level deeper into the newer Transformers masking utilities:
+
+- `IndexError: tuple index out of range`
+- inside `transformers.masking_utils.sdpa_mask`
+
+The important detail is that the current masking path can receive scalar-form `q_length` / `cache_position` values during export tracing.
+
+That is already handled in the Gemma export lane with a compatibility shim that:
+
+- normalizes scalar `q_length` into a real `cache_position` tensor
+- materializes the boolean causal mask explicitly
+- keeps the ONNX trace away from the brittle branch in the default SDPA masking helper
+
+So the Qwen export lane needs the same style of masking-utils patch, not a different model-specific workaround.
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -314,6 +331,7 @@ What is true right now:
 - current `alkahest-*` browser export is intended to ship only `text + image`
 - the direct Qwen export lane is still blocked, but the blocker has moved from synthetic vision sample sizing into the merged decoder export shim
 - the direct Qwen export lane is still blocked, but the blocker is now in narrow compatibility shims around the merged decoder export path
+- the direct Qwen export lane is still blocked, but the remaining blockers are now narrow compatibility shims around the merged decoder and masking helper paths
 
 What is likely true next:
 
@@ -331,4 +349,5 @@ It is:
 - reserve one image placeholder slot per merged image feature token
 - merge image features back into `inputs_embeds` directly from `mm_token_type_ids`
 - keep the flat KV cache shim aligned with the current Transformers masking helper interface
+- patch the newer Transformers SDPA masking helper for ONNX export just like the Gemma lane already does
 - then resume ONNX export from there
