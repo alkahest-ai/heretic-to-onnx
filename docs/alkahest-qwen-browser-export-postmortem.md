@@ -301,6 +301,12 @@ For the current Qwen text stack, the export-time cache adapter has to satisfy no
 - `has_previous_state()`
 - `update(...)`
 
+One subtle nuance is that the current Qwen linear-attention path can call:
+
+- `has_previous_state(layer_idx)`
+
+So the shim has to accept the optional layer index argument as part of the current cache helper contract.
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
