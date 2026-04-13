@@ -463,15 +463,27 @@ def render_gemma4_export_runner(
             last_error = None
             for root in (source_path, base_path):
                 candidate = root / "video_preprocessor_config.json"
-                if not candidate.exists():
+                if candidate.exists():
+                    try:
+                        return Gemma4VideoProcessor.from_pretrained(str(root), trust_remote_code=False)
+                    except Exception as exc:
+                        last_error = exc
+
+                processor_candidate = root / "processor_config.json"
+                if not processor_candidate.exists():
                     continue
                 try:
-                    return Gemma4VideoProcessor.from_pretrained(str(root), trust_remote_code=False)
+                    processor_config = _load_json(processor_candidate)
+                    video_processor = processor_config.get("video_processor")
+                    if isinstance(video_processor, dict) and video_processor:
+                        return Gemma4VideoProcessor(**video_processor)
                 except Exception as exc:
                     last_error = exc
             if last_error is not None:
                 raise RuntimeError("failed to load Gemma 4 video processor from source/base assets") from last_error
-            raise FileNotFoundError("video_preprocessor_config.json was not found in the source or base model assets")
+            raise FileNotFoundError(
+                "video_preprocessor_config.json/processor_config.json was not found in the source or base model assets"
+            )
 
 
         class FlatGemma4Cache:

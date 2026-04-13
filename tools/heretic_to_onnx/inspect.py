@@ -49,6 +49,14 @@ def _can_synthesize_preprocessor(repo: RepoHandle) -> bool:
     return isinstance(image_processor, dict) and bool(image_processor)
 
 
+def _can_synthesize_video_preprocessor(repo: RepoHandle) -> bool:
+    if not repo.exists("processor_config.json"):
+        return False
+    processor_config = repo.read_json("processor_config.json")
+    video_processor = processor_config.get("video_processor")
+    return isinstance(video_processor, dict) and bool(video_processor)
+
+
 def inspect_manifest(
     manifest: Manifest,
     *,
@@ -102,6 +110,18 @@ def inspect_manifest(
                 descriptor = source_repo.descriptor if _can_synthesize_preprocessor(source_repo) else base_repo.descriptor
                 report.inherited_assets[asset] = f"synthetic-from:{descriptor}/processor_config.json"
                 report.warnings.append("preprocessor_config.json will be synthesized from processor_config.json")
+            elif asset == "video_preprocessor_config.json" and (
+                _can_synthesize_video_preprocessor(source_repo) or _can_synthesize_video_preprocessor(base_repo)
+            ):
+                descriptor = (
+                    source_repo.descriptor
+                    if _can_synthesize_video_preprocessor(source_repo)
+                    else base_repo.descriptor
+                )
+                report.inherited_assets[asset] = f"synthetic-from:{descriptor}/processor_config.json"
+                report.warnings.append(
+                    "video_preprocessor_config.json will be synthesized from processor_config.json"
+                )
             else:
                 report.ok = False
                 report.errors.append(f"source/base repos are both missing required asset: {asset}")

@@ -68,6 +68,18 @@ def _synthesize_preprocessor_config(repo: RepoHandle, destination: Path) -> bool
     return True
 
 
+def _synthesize_video_preprocessor_config(repo: RepoHandle, destination: Path) -> bool:
+    if not repo.exists("processor_config.json"):
+        return False
+    processor_config = repo.read_json("processor_config.json")
+    video_processor = processor_config.get("video_processor")
+    if not isinstance(video_processor, dict) or not video_processor:
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(video_processor, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return True
+
+
 def _copy_onnx_artifacts(manifest: Manifest, onnx_source_dir: Path, destination: Path) -> tuple[int, list[str]]:
     copied = 0
     missing: list[str] = []
@@ -132,6 +144,15 @@ def package_repo(
                 if synthesized:
                     report.copied_assets[asset] = "synthetic-from-processor_config.json"
                     report.notes.append("synthesized preprocessor_config.json from processor_config.json")
+                else:
+                    raise FileNotFoundError(f"unable to source or synthesize required asset: {asset}")
+            elif asset == "video_preprocessor_config.json":
+                synthesized = _synthesize_video_preprocessor_config(
+                    source_repo, dest_path
+                ) or _synthesize_video_preprocessor_config(base_repo, dest_path)
+                if synthesized:
+                    report.copied_assets[asset] = "synthetic-from-processor_config.json"
+                    report.notes.append("synthesized video_preprocessor_config.json from processor_config.json")
                 else:
                     raise FileNotFoundError(f"unable to source or synthesize required asset: {asset}")
             else:

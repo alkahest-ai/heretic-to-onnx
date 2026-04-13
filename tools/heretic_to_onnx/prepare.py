@@ -42,13 +42,31 @@ def _has_all_files(root: Path, required_files: list[str]) -> bool:
     return root.exists() and all((root / relative_path).exists() for relative_path in required_files)
 
 
+def _can_synthesize_from_processor(root: Path, relative_path: str) -> bool:
+    processor_config_path = root / "processor_config.json"
+    if not processor_config_path.exists():
+        return False
+    try:
+        processor_config = json.loads(processor_config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+
+    if relative_path == "preprocessor_config.json":
+        candidate = processor_config.get("image_processor")
+    elif relative_path == "video_preprocessor_config.json":
+        candidate = processor_config.get("video_processor")
+    else:
+        return False
+    return isinstance(candidate, dict) and bool(candidate)
+
+
 def _can_reuse_base_snapshot(root: Path, required_files: list[str]) -> bool:
     if not root.exists():
         return False
     for relative_path in required_files:
         if (root / relative_path).exists():
             continue
-        if relative_path == "preprocessor_config.json" and (root / "processor_config.json").exists():
+        if _can_synthesize_from_processor(root, relative_path):
             continue
         return False
     return True
@@ -99,9 +117,17 @@ def prepare_repos(
         base_path = layout.base_snapshot
         extra_files = manifest.inherit_assets.from_base_if_missing or ["processor_config.json", "preprocessor_config.json"]
         download_files = list(dict.fromkeys(extra_files))
-        if "preprocessor_config.json" in download_files and "processor_config.json" not in download_files:
+        if (
+            {"preprocessor_config.json", "video_preprocessor_config.json"} & set(download_files)
+            and "processor_config.json" not in download_files
+        ):
             try:
-                if not base_repo.exists("preprocessor_config.json") and base_repo.exists("processor_config.json"):
+                needs_processor_config = False
+                if "preprocessor_config.json" in download_files and not base_repo.exists("preprocessor_config.json"):
+                    needs_processor_config = True
+                if "video_preprocessor_config.json" in download_files and not base_repo.exists("video_preprocessor_config.json"):
+                    needs_processor_config = True
+                if needs_processor_config and base_repo.exists("processor_config.json"):
                     download_files.append("processor_config.json")
             except Exception:
                 pass

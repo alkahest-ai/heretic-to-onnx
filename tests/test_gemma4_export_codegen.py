@@ -153,6 +153,8 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         self.assertIn("Gemma4VideoProcessor", runner)
         self.assertIn("def _load_video_processor(source_path: Path, base_path: Path):", runner)
         self.assertIn('candidate = root / "video_preprocessor_config.json"', runner)
+        self.assertIn('processor_candidate = root / "processor_config.json"', runner)
+        self.assertIn('video_processor = processor_config.get("video_processor")', runner)
         self.assertIn("def _build_video_sample_inputs(video_processor, image_height: int, image_width: int, device):", runner)
         self.assertIn('processed.get("pixel_values_videos")', runner)
         self.assertIn('if CONTRACT.get("supports_video"):', runner)
