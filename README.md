@@ -88,6 +88,7 @@ Active workflow:
 - `docs/roleplay-data-flow.md`: spreadsheet-first `roleplay_v2` dataset flow
 - `docs/rally-end-to-end-runbook.md`: tune -> merge -> ONNX flow
 - `docs/rally-2b-browser-export-postmortem.md`: what it took to get direct Rally 2B browser export working
+- `docs/alkahest-qwen-browser-export-postmortem.md`: current Qwen browser export blockers, modality limits, and bring-up notes
 - `docs/model-execution-matrix.md`: source model to target repo mapping
 - `docs/phala-gpu-tee-h200-runbook.md`: GPU TEE product notes and launch guidance
 - `docs/colab-runbook.md`: fallback Colab flow
