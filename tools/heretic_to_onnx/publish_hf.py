@@ -75,14 +75,17 @@ def _related_repo_id(repo_id: str, *, want_v2: bool) -> str:
     return f"{owner}/{related_name}"
 
 
+def _enhanced_modalities(manifest: Manifest) -> list[str]:
+    supported = [item for item in _capability_superset(manifest) if item in manifest.modalities]
+    return [item for item in supported if item not in {"text", "image"}]
+
+
 def _capability_section(manifest: Manifest, repo_id: str) -> list[str]:
     supported = [item for item in _capability_superset(manifest) if item in manifest.modalities]
     missing = [item for item in _capability_superset(manifest) if item not in manifest.modalities]
-    enhanced = [item for item in supported if item not in {"text", "image"}]
+    enhanced = _enhanced_modalities(manifest)
     base_capabilities = [item for item in supported if item in {"text", "image"}]
-    is_v2 = repo_id.split("/")[-1].endswith("-v2")
-    sibling_repo_id = _related_repo_id(repo_id, want_v2=not is_v2)
-    sibling_url = f"https://huggingface.co/{sibling_repo_id}"
+    has_v2_suffix = repo_id.split("/")[-1].endswith("-v2")
 
     lines = [
         "## Capabilities",
@@ -92,7 +95,9 @@ def _capability_section(manifest: Manifest, repo_id: str) -> list[str]:
         lines.append(f"- Not included in this package: {_format_modality_list(missing)}")
 
     lines.extend(["", "## Version Notes"])
-    if is_v2:
+    if has_v2_suffix:
+        sibling_repo_id = _related_repo_id(repo_id, want_v2=False)
+        sibling_url = f"https://huggingface.co/{sibling_repo_id}"
         lines.extend(
             [
                 "- This is the enhanced browser `v2` package for this model family.",
@@ -100,7 +105,17 @@ def _capability_section(manifest: Manifest, repo_id: str) -> list[str]:
                 f"- The lighter v1 package remains available at [{sibling_repo_id}]({sibling_url}) if you only need {_format_modality_list(base_capabilities)}.",
             ]
         )
+    elif enhanced:
+        lines.extend(
+            [
+                "- This repo uses the enhanced browser `v2` multimodal contract, even though the repo name does not carry a `-v2` suffix.",
+                f"- It includes support for {_format_modality_list(enhanced)} in addition to {_format_modality_list(base_capabilities)}.",
+                "- There is no separate `-v2` sibling for this tuned repo; this package itself is the multimodal variant.",
+            ]
+        )
     else:
+        sibling_repo_id = _related_repo_id(repo_id, want_v2=True)
+        sibling_url = f"https://huggingface.co/{sibling_repo_id}"
         lines.extend(
             [
                 "- This is the stable v1 browser package.",

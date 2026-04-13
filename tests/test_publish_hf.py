@@ -83,6 +83,23 @@ class PublishHFTests(unittest.TestCase):
         self.assertIn("Supported inputs: `text`, `image`, `audio`, `video`", content)
         self.assertIn("The lighter v1 package remains available", content)
 
+    def test_unsuffixed_enhanced_repo_is_described_as_v2_contract(self) -> None:
+        manifest = _manifest(
+            target_repo_id="thomasjvu/rally-2b-rp",
+            modalities=["text", "image", "audio", "video"],
+            architecture="gemma4_conditional_generation",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            package_dir = Path(tmpdir)
+            model_card_path = _ensure_model_card(manifest, package_dir, manifest.target_repo_id)
+            content = model_card_path.read_text(encoding="utf-8")
+
+        self.assertIn("enhanced browser `v2` multimodal contract", content)
+        self.assertIn("repo name does not carry a `-v2` suffix", content)
+        self.assertIn("this package itself is the multimodal variant", content)
+        self.assertNotIn("stable v1 browser package", content)
+        self.assertNotIn("thomasjvu/rally-2b-rp-v2", content)
+
     def test_write_model_card_renders_to_explicit_output_path(self) -> None:
         manifest = _manifest(
             target_repo_id="thomasjvu/alkahest-2b-v2",
