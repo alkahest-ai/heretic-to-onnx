@@ -35,6 +35,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Direct Alkahest-branded Qwen 0.8B browser package.",
   },
   {
+    label: "Alkahest 0.8B V2",
+    modelId: "alkahest-ai/alkahest-0.8b-v2",
+    family: "qwen3_5",
+    modalities: "text + image + video",
+    approxDownload: "~0.9-1.1 GB",
+    dtype: "q4f16",
+    note: "V2 Qwen browser package with video understanding.",
+  },
+  {
     label: "Alkahest 0.8B RP",
     modelId: "alkahest-ai/alkahest-0.8b-rp",
     family: "qwen3_5",
@@ -60,6 +69,15 @@ export const DEFAULT_MODEL_PRESETS = [
     approxDownload: "~1.5-1.8 GB",
     dtype: "q4f16",
     note: "Direct Alkahest-branded Qwen 2B browser package.",
+  },
+  {
+    label: "Alkahest 2B V2",
+    modelId: "alkahest-ai/alkahest-2b-v2",
+    family: "qwen3_5",
+    modalities: "text + image + video",
+    approxDownload: "~1.5-1.8 GB",
+    dtype: "q4f16",
+    note: "V2 Qwen browser package with video understanding.",
   },
   {
     label: "Alkahest 2B RP",
@@ -89,6 +107,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Direct Gemma Rally browser package. Audio is currently disabled in this lane.",
   },
   {
+    label: "Alkahest Rally 2B V2",
+    modelId: "alkahest-ai/rally-2b-v2",
+    family: "gemma4",
+    modalities: "text + image + audio + video",
+    approxDownload: "~3.4-3.5 GB",
+    dtype: "q4f16",
+    note: "V2 Gemma Rally browser package with audio and video understanding.",
+  },
+  {
     label: "Alkahest Rally 2B RP",
     modelId: "alkahest-ai/rally-2b-rp",
     family: "gemma4",
@@ -116,6 +143,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Direct Alkahest-branded Qwen 4B browser package.",
   },
   {
+    label: "Alkahest 4B V2",
+    modelId: "alkahest-ai/alkahest-4b-v2",
+    family: "qwen3_5",
+    modalities: "text + image + video",
+    approxDownload: "~3.1 GB",
+    dtype: "q4f16",
+    note: "V2 Qwen browser package with video understanding.",
+  },
+  {
     label: "Alkahest 4B RP",
     modelId: "alkahest-ai/alkahest-4b-rp",
     family: "qwen3_5",
@@ -134,6 +170,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Desktop-only Gemma tier. Current browser lane is text + image only.",
   },
   {
+    label: "Alkahest Rally 4B V2",
+    modelId: "alkahest-ai/rally-4b-v2",
+    family: "gemma4",
+    modalities: "text + image + audio + video",
+    approxDownload: "~5.2 GB",
+    dtype: "q4f16",
+    note: "Desktop-only Gemma v2 tier with audio and video understanding.",
+  },
+  {
     label: "Alkahest Rally 4B RP",
     modelId: "alkahest-ai/rally-4b-rp",
     family: "gemma4",
@@ -148,6 +193,7 @@ function normalizeMessages(messages) {
   const promptMessages = [];
   const imageSources = [];
   const audioSources = [];
+  const videoSources = [];
 
   for (const message of messages ?? []) {
     if (!message?.role) {
@@ -193,6 +239,14 @@ function normalizeMessages(messages) {
         if (typeof item.url === "string" && item.url) {
           audioSources.push(item.url);
         }
+        continue;
+      }
+
+      if (item?.type === "video") {
+        content.push({ type: "video" });
+        if (typeof item.url === "string" && item.url) {
+          videoSources.push(item.url);
+        }
       }
     }
 
@@ -204,7 +258,7 @@ function normalizeMessages(messages) {
     }
   }
 
-  return { promptMessages, imageSources, audioSources };
+  return { promptMessages, imageSources, audioSources, videoSources };
 }
 
 function makeProgressMessage(info) {
@@ -236,6 +290,61 @@ function resolveModelClass(family) {
     return AutoModelForVision2Seq;
   }
   throw new Error(`No compatible Transformers.js class is available for ${family}.`);
+}
+
+async function buildProcessorInputs(processor, family, prompt, imageArg, audioArg, videoArg) {
+  const options = { add_special_tokens: false };
+  const attempt = async (factory) => {
+    try {
+      return await factory();
+    } catch (error) {
+      return error;
+    }
+  };
+
+  const attempts = [
+    () =>
+      processor({
+        text: prompt,
+        images: imageArg,
+        audio: audioArg,
+        videos: videoArg,
+        ...options,
+      }),
+    () =>
+      processor({
+        text: prompt,
+        images: imageArg,
+        audios: audioArg,
+        videos: videoArg,
+        ...options,
+      }),
+  ];
+
+  if (family === "gemma4") {
+    attempts.push(() => processor(prompt, imageArg, audioArg, videoArg, options));
+    attempts.push(() => processor(prompt, imageArg, audioArg, { videos: videoArg, ...options }));
+    attempts.push(() => processor(prompt, imageArg, audioArg, options));
+  } else {
+    attempts.push(() => processor(prompt, imageArg, videoArg, options));
+    attempts.push(() => processor(prompt, imageArg, { videos: videoArg, ...options }));
+    attempts.push(() => processor(prompt, imageArg, options));
+  }
+
+  if (!imageArg && !audioArg && !videoArg) {
+    attempts.push(() => processor(prompt, options));
+  }
+
+  let lastError = null;
+  for (const factory of attempts) {
+    const result = await attempt(factory);
+    if (!(result instanceof Error)) {
+      return result;
+    }
+    lastError = result;
+  }
+
+  throw lastError ?? new Error("unable to build multimodal processor inputs");
 }
 
 export function findModelPreset(modelId) {
@@ -350,7 +459,7 @@ export function createBrowserChatRuntime({
     onToken,
     onProgress,
   }) {
-    const { promptMessages, imageSources, audioSources } = normalizeMessages([
+    const { promptMessages, imageSources, audioSources, videoSources } = normalizeMessages([
       ...(systemPrompt.trim() ? [{ role: "system", content: systemPrompt.trim() }] : []),
       ...(messages ?? []),
     ]);
@@ -373,26 +482,13 @@ export function createBrowserChatRuntime({
       imageSources.length > 0 ? await Promise.all(imageSources.map((source) => load_image(source))) : [];
     const audios =
       audioSources.length > 0 ? await Promise.all(audioSources.map((source) => read_audio(source))) : [];
+    const videos = videoSources.length > 0 ? [...videoSources] : [];
 
     const imageArg = images.length <= 1 ? images[0] : images;
     const audioArg = audios.length <= 1 ? audios[0] : audios;
+    const videoArg = videos.length <= 1 ? videos[0] : videos;
 
-    let inputs;
-    if (family === "gemma4") {
-      if (imageArg && audioArg) {
-        inputs = await processor(prompt, imageArg, audioArg, { add_special_tokens: false });
-      } else if (imageArg) {
-        inputs = await processor(prompt, imageArg, { add_special_tokens: false });
-      } else if (audioArg) {
-        inputs = await processor(prompt, undefined, audioArg, { add_special_tokens: false });
-      } else {
-        inputs = await processor(prompt, { add_special_tokens: false });
-      }
-    } else if (imageArg) {
-      inputs = await processor(prompt, imageArg, { add_special_tokens: false });
-    } else {
-      inputs = await processor(prompt, { add_special_tokens: false });
-    }
+    const inputs = await buildProcessorInputs(processor, family, prompt, imageArg, audioArg, videoArg);
 
     let streamedText = "";
     const streamer = new TextStreamer(processor.tokenizer, {

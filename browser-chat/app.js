@@ -15,6 +15,8 @@ const elements = {
   imageStatus: document.querySelector("#image-status"),
   audioInput: document.querySelector("#audio-input"),
   audioStatus: document.querySelector("#audio-status"),
+  videoInput: document.querySelector("#video-input"),
+  videoStatus: document.querySelector("#video-status"),
   systemPrompt: document.querySelector("#system-prompt"),
   maxTokens: document.querySelector("#max-tokens"),
   temperature: document.querySelector("#temperature"),
@@ -37,6 +39,7 @@ const state = {
   composerMedia: {
     image: null,
     audio: null,
+    video: null,
   },
 };
 
@@ -62,7 +65,8 @@ function setBusy({ loading = state.loading, generating = state.generating } = {}
   elements.modelId.disabled = disabled;
   elements.presetModel.disabled = disabled;
   elements.imageInput.disabled = disabled;
-  elements.audioInput.disabled = disabled || !selectedPresetSupportsAudio();
+  elements.audioInput.disabled = disabled || !selectedPresetSupports("audio");
+  elements.videoInput.disabled = disabled || !selectedPresetSupports("video");
   elements.systemPrompt.disabled = disabled;
   elements.maxTokens.disabled = disabled;
   elements.temperature.disabled = disabled;
@@ -93,6 +97,9 @@ function createBubble(message) {
   }
   if (message.audio) {
     attachments.push(`audio: ${message.audio.name}`);
+  }
+  if (message.video) {
+    attachments.push(`video: ${message.video.name}`);
   }
 
   if (attachments.length > 0) {
@@ -136,12 +143,8 @@ function syncPresetSelection() {
   syncComposerMediaState();
 }
 
-function selectedPresetSupportsAudio() {
-  return findModelPreset(elements.modelId.value.trim())?.family === "gemma4";
-}
-
-function selectedPresetSupportsImage() {
-  return Boolean(findModelPreset(elements.modelId.value.trim())?.modalities?.includes("image"));
+function selectedPresetSupports(modality) {
+  return Boolean(findModelPreset(elements.modelId.value.trim())?.modalities?.includes(modality));
 }
 
 function revokeMediaEntry(entry) {
@@ -154,11 +157,14 @@ function resetComposerMedia({ revoke = true } = {}) {
   if (revoke) {
     revokeMediaEntry(state.composerMedia.image);
     revokeMediaEntry(state.composerMedia.audio);
+    revokeMediaEntry(state.composerMedia.video);
   }
   state.composerMedia.image = null;
   state.composerMedia.audio = null;
+  state.composerMedia.video = null;
   elements.imageInput.value = "";
   elements.audioInput.value = "";
+  elements.videoInput.value = "";
   syncComposerMediaState();
 }
 
@@ -166,6 +172,7 @@ function revokeMessageMedia(messages) {
   for (const message of messages) {
     revokeMediaEntry(message.image);
     revokeMediaEntry(message.audio);
+    revokeMediaEntry(message.video);
   }
 }
 
@@ -180,10 +187,10 @@ function describeMediaEntry(entry, fallback) {
 function syncComposerMediaState() {
   elements.imageStatus.textContent = describeMediaEntry(
     state.composerMedia.image,
-    selectedPresetSupportsImage() ? "No image selected." : "This preset does not expose image input.",
+    selectedPresetSupports("image") ? "No image selected." : "This preset does not expose image input.",
   );
 
-  const audioEnabled = selectedPresetSupportsAudio();
+  const audioEnabled = selectedPresetSupports("audio");
   if (!audioEnabled && state.composerMedia.audio) {
     revokeMediaEntry(state.composerMedia.audio);
     state.composerMedia.audio = null;
@@ -192,13 +199,25 @@ function syncComposerMediaState() {
   elements.audioInput.disabled = state.loading || state.generating || !audioEnabled;
   elements.audioStatus.textContent = describeMediaEntry(
     state.composerMedia.audio,
-    audioEnabled ? "No audio selected." : "Audio input is enabled only for Rally / Gemma presets.",
+    audioEnabled ? "No audio selected." : "Audio input is enabled only for presets that ship audio support.",
+  );
+
+  const videoEnabled = selectedPresetSupports("video");
+  if (!videoEnabled && state.composerMedia.video) {
+    revokeMediaEntry(state.composerMedia.video);
+    state.composerMedia.video = null;
+    elements.videoInput.value = "";
+  }
+  elements.videoInput.disabled = state.loading || state.generating || !videoEnabled;
+  elements.videoStatus.textContent = describeMediaEntry(
+    state.composerMedia.video,
+    videoEnabled ? "No video selected." : "Video input is enabled only for v2 multimodal presets.",
   );
 }
 
 function buildConversationMessages(messages) {
   return messages.map((message) => {
-    if (message.role !== "user" || (!message.image && !message.audio)) {
+    if (message.role !== "user" || (!message.image && !message.audio && !message.video)) {
       return {
         role: message.role,
         content: message.content,
@@ -211,6 +230,9 @@ function buildConversationMessages(messages) {
     }
     if (message.audio) {
       content.push({ type: "audio", url: message.audio.url });
+    }
+    if (message.video) {
+      content.push({ type: "video", url: message.video.url });
     }
     if (typeof message.content === "string" && message.content.trim()) {
       content.push({ type: "text", text: message.content.trim() });
@@ -227,11 +249,20 @@ function defaultPromptForComposerMedia() {
   if (state.composerMedia.image && state.composerMedia.audio) {
     return "Describe the attached image and transcribe the attached audio.";
   }
+  if (state.composerMedia.image && state.composerMedia.video) {
+    return "Describe the attached image and summarize the attached video.";
+  }
+  if (state.composerMedia.audio && state.composerMedia.video) {
+    return "Transcribe the attached audio and summarize the attached video.";
+  }
   if (state.composerMedia.image) {
     return "Describe the attached image.";
   }
   if (state.composerMedia.audio) {
     return "Transcribe the attached audio.";
+  }
+  if (state.composerMedia.video) {
+    return "Summarize the attached video.";
   }
   return "";
 }
@@ -287,7 +318,7 @@ async function loadModel() {
 async function sendMessage() {
   const typedPrompt = elements.promptInput.value.trim();
   const prompt = typedPrompt || defaultPromptForComposerMedia();
-  if (!prompt && !state.composerMedia.image && !state.composerMedia.audio) {
+  if (!prompt && !state.composerMedia.image && !state.composerMedia.audio && !state.composerMedia.video) {
     return;
   }
 
@@ -305,6 +336,7 @@ async function sendMessage() {
     content: prompt,
     image: state.composerMedia.image,
     audio: state.composerMedia.audio,
+    video: state.composerMedia.video,
   };
   const assistantMessage = { role: "assistant", content: "", pending: true };
   state.messages.push(userMessage, assistantMessage);
@@ -312,8 +344,10 @@ async function sendMessage() {
   elements.promptInput.value = "";
   state.composerMedia.image = null;
   state.composerMedia.audio = null;
+  state.composerMedia.video = null;
   elements.imageInput.value = "";
   elements.audioInput.value = "";
+  elements.videoInput.value = "";
   syncComposerMediaState();
 
   try {
@@ -418,6 +452,10 @@ function bindEvents() {
 
   elements.audioInput.addEventListener("change", () => {
     handleMediaSelection("audio", elements.audioInput.files?.[0] ?? null);
+  });
+
+  elements.videoInput.addEventListener("change", () => {
+    handleMediaSelection("video", elements.videoInput.files?.[0] ?? null);
   });
 
   elements.loadModel.addEventListener("click", (event) => {

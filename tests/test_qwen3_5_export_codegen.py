@@ -15,7 +15,7 @@ from tools.heretic_to_onnx.qwen3_5_export_codegen import (
 )
 
 
-def _sample_manifest() -> Manifest:
+def _sample_manifest(*, include_video: bool = False) -> Manifest:
     return Manifest(
         source_model_id="Qwen/Qwen3.5-0.8B",
         base_model_id="Qwen/Qwen3.5-0.8B",
@@ -23,7 +23,7 @@ def _sample_manifest() -> Manifest:
         target_repo_id="alkahest-ai/alkahest-0.8b",
         target_dtype="q4f16",
         target_device="webgpu",
-        modalities=["text", "image"],
+        modalities=["text", "image", "video"] if include_video else ["text", "image"],
         inherit_assets=InheritAssets(),
         expected_architecture="Qwen3_5ForConditionalGeneration",
         expected_onnx_files=[
@@ -69,6 +69,7 @@ def _sample_contract() -> ExportContract:
         ok=True,
         model_type="qwen3_5",
         architecture="Qwen3_5ForConditionalGeneration",
+        supports_video=True,
         num_hidden_layers=2,
         layer_types=["linear_attention", "full_attention"],
         num_key_value_heads=4,
@@ -111,8 +112,8 @@ def _sample_contract() -> ExportContract:
                 name="vision_encoder",
                 raw_filename="vision_encoder.onnx",
                 package_filename="vision_encoder_q4f16.onnx",
-                inputs=["pixel_values", "image_grid_thw"],
-                outputs=["image_features"],
+                inputs=["pixel_values", "pixel_values_videos", "image_grid_thw", "video_grid_thw"],
+                outputs=["image_features", "video_features"],
                 dynamic_axes={},
             ),
             SessionSpec(
@@ -130,7 +131,9 @@ def _sample_contract() -> ExportContract:
                 inputs=[
                     "inputs_embeds",
                     "image_features",
+                    "video_features",
                     "image_grid_thw",
+                    "video_grid_thw",
                     "mm_token_type_ids",
                     "attention_mask",
                     "position_ids",
@@ -251,6 +254,27 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
             ],
         )
 
+    def test_build_contract_adds_video_visual_io_for_v2_manifests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir)
+            _write_source_config(
+                source_path,
+                layer_types=["linear_attention", "full_attention"],
+            )
+
+            contract = build_qwen3_5_export_contract(_sample_manifest(include_video=True), source_path)
+
+        self.assertTrue(contract.supports_video)
+        vision_session = contract.sessions[0]
+        self.assertEqual(
+            vision_session.inputs,
+            ["pixel_values", "pixel_values_videos", "image_grid_thw", "video_grid_thw"],
+        )
+        self.assertEqual(vision_session.outputs, ["image_features", "video_features"])
+        decoder_session = contract.sessions[-1]
+        self.assertIn("video_features", decoder_session.inputs)
+        self.assertIn("video_grid_thw", decoder_session.inputs)
+
     def test_runner_handles_visual_pooling_and_placeholder_scatter(self) -> None:
         runner = render_qwen3_5_export_runner(
             _sample_contract(),
@@ -263,8 +287,8 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
 
         self.assertIn('pooled = _merge_visual_tensors(getattr(outputs, "pooler_output", None))', runner)
         self.assertIn('pooled = _merge_visual_tensors(outputs.get("pooler_output"))', runner)
-        self.assertIn("image_mask = mm_token_type_ids == 1", runner)
-        self.assertIn("merged_inputs_embeds = merged_inputs_embeds.masked_scatter(", runner)
+        self.assertIn('mm_token_type_ids == 1', runner)
+        self.assertIn("masked_scatter(", runner)
 
     def test_runner_supports_mixed_cache_methods_and_sample_builder(self) -> None:
         runner = render_qwen3_5_export_runner(
@@ -283,6 +307,9 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('for cache_entry in CONTRACT["decoder_cache_entries"]:', runner)
         self.assertIn('conv_state_shape = (1, linear_conv_dim, CONTRACT["linear_conv_kernel_dim"])', runner)
         self.assertIn('recurrent_state_shape = (', runner)
+        self.assertIn('model.model.get_video_features(', runner)
+        self.assertIn('mm_token_type_ids == 2', runner)
+        self.assertIn('pixel_values_videos', runner)
 
     def test_runner_uses_supported_export_kwargs_without_legacy_fallback_chain(self) -> None:
         runner = render_qwen3_5_export_runner(

@@ -34,6 +34,11 @@ RALLY4_DIRECT_REPO="${RALLY4_DIRECT_REPO:-${HF_OWNER}/rally-4b}"
 ALKAHEST4_DIRECT_REPO="${ALKAHEST4_DIRECT_REPO:-${HF_OWNER}/alkahest-4b}"
 ALKAHEST2_DIRECT_REPO="${ALKAHEST2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b}"
 ALKAHEST08_DIRECT_REPO="${ALKAHEST08_DIRECT_REPO:-${HF_OWNER}/alkahest-0.8b}"
+RALLY2_V2_DIRECT_REPO="${RALLY2_V2_DIRECT_REPO:-${HF_OWNER}/rally-2b-v2}"
+RALLY4_V2_DIRECT_REPO="${RALLY4_V2_DIRECT_REPO:-${HF_OWNER}/rally-4b-v2}"
+ALKAHEST4_V2_DIRECT_REPO="${ALKAHEST4_V2_DIRECT_REPO:-${HF_OWNER}/alkahest-4b-v2}"
+ALKAHEST2_V2_DIRECT_REPO="${ALKAHEST2_V2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b-v2}"
+ALKAHEST08_V2_DIRECT_REPO="${ALKAHEST08_V2_DIRECT_REPO:-${HF_OWNER}/alkahest-0.8b-v2}"
 RALLY2_TUNED_REPO="${RALLY2_TUNED_REPO:-${HF_OWNER}/rally-2b-rp}"
 RALLY4_TUNED_REPO="${RALLY4_TUNED_REPO:-${HF_OWNER}/rally-4b-rp}"
 ALKAHEST4_TUNED_REPO="${ALKAHEST4_TUNED_REPO:-${HF_OWNER}/alkahest-4b-rp}"
@@ -270,6 +275,11 @@ modes:
   alkahest-4b-direct
   alkahest-2b-direct
   alkahest-0.8b-direct
+  rally-2b-v2-direct
+  rally-4b-v2-direct
+  alkahest-4b-v2-direct
+  alkahest-2b-v2-direct
+  alkahest-0.8b-v2-direct
   rally
   rally-4b
   alkahest-4b
@@ -308,6 +318,21 @@ case "$MODE" in
     ;;
   alkahest-0.8b-direct)
     convert_direct "alkahest-0.8b-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic.yaml" "$ALKAHEST08_DIRECT_REPO"
+    ;;
+  rally-2b-v2-direct)
+    convert_direct "rally-2b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara-v2.yaml" "$RALLY2_V2_DIRECT_REPO"
+    ;;
+  rally-4b-v2-direct)
+    convert_direct "rally-4b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic-v2.yaml" "$RALLY4_V2_DIRECT_REPO"
+    ;;
+  alkahest-4b-v2-direct)
+    convert_direct "alkahest-4b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-4b-heretic-v2.yaml" "$ALKAHEST4_V2_DIRECT_REPO"
+    ;;
+  alkahest-2b-v2-direct)
+    convert_direct "alkahest-2b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-2b-heretic-v2.yaml" "$ALKAHEST2_V2_DIRECT_REPO"
+    ;;
+  alkahest-0.8b-v2-direct)
+    convert_direct "alkahest-0.8b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic-v2.yaml" "$ALKAHEST08_V2_DIRECT_REPO"
     ;;
   rally)
     compile_approved_dataset

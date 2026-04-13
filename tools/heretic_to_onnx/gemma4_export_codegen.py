@@ -29,6 +29,8 @@ class ExportContract:
     model_type: str
     architecture: str
     use_bidirectional_attention: str | None
+    supports_audio: bool
+    supports_video: bool
     num_hidden_layers: int
     num_kv_shared_layers: int
     num_cache_layers: int
@@ -43,6 +45,8 @@ class ExportContract:
             "model_type": self.model_type,
             "architecture": self.architecture,
             "use_bidirectional_attention": self.use_bidirectional_attention,
+            "supports_audio": self.supports_audio,
+            "supports_video": self.supports_video,
             "num_hidden_layers": self.num_hidden_layers,
             "num_kv_shared_layers": self.num_kv_shared_layers,
             "num_cache_layers": self.num_cache_layers,
@@ -92,6 +96,8 @@ def build_gemma4_export_contract(
     layer_types = [str(value) for value in text_config.get("layer_types", [])[:num_cache_layers]]
     hidden_size_per_layer_input = int(text_config.get("hidden_size_per_layer_input", 0))
     use_bidirectional_attention = text_config.get("use_bidirectional_attention")
+    supports_audio = "audio" in manifest.modalities
+    supports_video = "video" in manifest.modalities
 
     warnings: list[str] = []
     ok = True
@@ -111,20 +117,41 @@ def build_gemma4_export_contract(
             "Gemma 4 configs with use_bidirectional_attention='vision' are not supported by the current browser contract"
         )
 
+    vision_session = SessionSpec(
+        name="vision_encoder",
+        raw_filename="vision_encoder.onnx",
+        package_filename=package_filenames.get("vision_encoder", "vision_encoder_q4f16.onnx"),
+        inputs=["pixel_values", "pixel_position_ids"],
+        outputs=["image_features"],
+        dynamic_axes={
+            "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
+            "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
+            "image_features": {0: "image_tokens"},
+        },
+        notes=["Matches the Transformers.js Gemma 4 vision session input name `pixel_position_ids`."],
+    )
+    if supports_video:
+        vision_session.inputs = [
+            "pixel_values",
+            "pixel_position_ids",
+            "pixel_values_videos",
+            "video_position_ids",
+        ]
+        vision_session.outputs = ["image_features", "video_features"]
+        vision_session.dynamic_axes = {
+            "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
+            "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
+            "pixel_values_videos": {0: "video_batch", 1: "video_frames", 3: "frame_height", 4: "frame_width"},
+            "video_position_ids": {0: "video_batch", 1: "video_frames", 2: "video_patches"},
+            "image_features": {0: "image_tokens"},
+            "video_features": {0: "video_tokens"},
+        }
+        vision_session.notes.append(
+            "V2 multimodal contracts export both image and video visual features from the shared Gemma 4 vision tower."
+        )
+
     sessions = [
-        SessionSpec(
-            name="vision_encoder",
-            raw_filename="vision_encoder.onnx",
-            package_filename=package_filenames.get("vision_encoder", "vision_encoder_q4f16.onnx"),
-            inputs=["pixel_values", "pixel_position_ids"],
-            outputs=["image_features"],
-            dynamic_axes={
-                "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
-                "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
-                "image_features": {0: "image_tokens"},
-            },
-            notes=["Matches the Transformers.js Gemma 4 vision session input name `pixel_position_ids`."],
-        ),
+        vision_session,
         SessionSpec(
             name="embed_tokens",
             raw_filename="embed_tokens.onnx",
@@ -140,7 +167,7 @@ def build_gemma4_export_contract(
         ),
     ]
 
-    if "audio_encoder" in package_filenames:
+    if supports_audio or "audio_encoder" in package_filenames:
         sessions.insert(
             1,
             SessionSpec(
@@ -154,7 +181,10 @@ def build_gemma4_export_contract(
                     "input_features_mask": {0: "audio_batch", 1: "audio_frames"},
                     "audio_features": {0: "audio_tokens"},
                 },
-                notes=["Audio padding is stripped in the wrapper so the output matches browser merge semantics."],
+                notes=[
+                    "Audio padding is stripped in the wrapper so the output matches browser merge semantics.",
+                    "V2 audio exports keep the upstream Gemma input names so browser runtimes can reuse processor outputs.",
+                ],
             ),
         )
 
@@ -202,6 +232,8 @@ def build_gemma4_export_contract(
         use_bidirectional_attention=str(use_bidirectional_attention)
         if use_bidirectional_attention is not None
         else None,
+        supports_audio=supports_audio,
+        supports_video=supports_video,
         num_hidden_layers=num_hidden_layers,
         num_kv_shared_layers=num_kv_shared_layers,
         num_cache_layers=num_cache_layers,
@@ -465,13 +497,22 @@ def render_gemma4_export_runner(
                 super().__init__()
                 self.model = model
 
-            def forward(self, pixel_values, pixel_position_ids):
-                outputs = self.model.model.get_image_features(
+            def forward(self, pixel_values, pixel_position_ids, *args):
+                image_outputs = self.model.model.get_image_features(
                     pixel_values=pixel_values,
                     image_position_ids=pixel_position_ids,
                     return_dict=True,
                 )
-                return outputs.pooler_output
+                if not CONTRACT.get("supports_video"):
+                    return image_outputs.pooler_output
+
+                pixel_values_videos, video_position_ids = args
+                video_outputs = self.model.model.get_video_features(
+                    pixel_values_videos=pixel_values_videos,
+                    video_position_ids=video_position_ids,
+                    return_dict=True,
+                )
+                return image_outputs.pooler_output, video_outputs.pooler_output
 
 
         class Gemma4AudioEncoderWrapper(torch.nn.Module):
@@ -480,6 +521,7 @@ def render_gemma4_export_runner(
                 self.model = model
 
             def forward(self, input_features, input_features_mask):
+                input_features, input_features_mask = _prepare_audio_core_inputs(input_features, input_features_mask)
                 outputs = self.model.model.get_audio_features(
                     input_features=input_features,
                     input_features_mask=input_features_mask,
@@ -592,6 +634,10 @@ def render_gemma4_export_runner(
             return multiple, multiple
 
 
+        def _prepare_audio_core_inputs(input_features, input_features_mask):
+            return input_features.contiguous(), input_features_mask.to(dtype=torch.bool).contiguous()
+
+
         def _load_model(source_path: Path, dtype_name: str, device: str):
             torch_dtype = _parse_dtype(dtype_name)
             model_kwargs = {{
@@ -625,18 +671,31 @@ def render_gemma4_export_runner(
                 raise RuntimeError("Gemma 4 image processor did not return image_position_ids/pixel_position_ids")
             pixel_position_ids = pixel_position_ids.to(device)
 
-            sampling_rate = int(getattr(feature_extractor, "sampling_rate", 16000))
-            dummy_audio = np.zeros(sampling_rate, dtype=np.float32)
-            audio_batch = feature_extractor(
-                [dummy_audio],
-                sampling_rate=sampling_rate,
-                return_tensors="pt",
-            )
-            input_features = audio_batch["input_features"].to(device)
-            input_features_mask = audio_batch.get("input_features_mask", audio_batch.get("attention_mask"))
-            if input_features_mask is None:
-                raise RuntimeError("Gemma 4 feature extractor did not return an audio mask")
-            input_features_mask = input_features_mask.to(device=device, dtype=torch.bool)
+            pixel_values_videos = None
+            video_position_ids = None
+            if CONTRACT.get("supports_video"):
+                frames = 4
+                pixel_values_videos = pixel_values.unsqueeze(1).repeat(1, frames, 1, 1, 1)
+                video_position_ids = pixel_position_ids.unsqueeze(1).repeat(1, frames, 1, 1)
+
+            input_features = None
+            input_features_mask = None
+            if CONTRACT.get("supports_audio"):
+                if feature_extractor is None:
+                    raise RuntimeError("Gemma 4 audio export requested, but no feature extractor was available")
+                sampling_rate = int(getattr(feature_extractor, "sampling_rate", 16000))
+                dummy_audio = np.zeros(sampling_rate, dtype=np.float32)
+                audio_batch = feature_extractor(
+                    [dummy_audio],
+                    sampling_rate=sampling_rate,
+                    return_tensors="pt",
+                )
+                input_features = audio_batch["input_features"].to(device)
+                input_features_mask = audio_batch.get("input_features_mask", audio_batch.get("attention_mask"))
+                if input_features_mask is None:
+                    raise RuntimeError("Gemma 4 feature extractor did not return an audio mask")
+                input_features_mask = input_features_mask.to(device=device, dtype=torch.bool)
+                input_features, input_features_mask = _prepare_audio_core_inputs(input_features, input_features_mask)
 
             input_ids = torch.tensor([[1, 2, 3, 4]], dtype=torch.long, device=device)
             inputs_embeds = torch.zeros((1, 1, text_config.hidden_size), dtype=hidden_dtype, device=device)
@@ -657,9 +716,7 @@ def render_gemma4_export_runner(
                 cache_tensors.append(torch.zeros(cache_shape, dtype=hidden_dtype, device=device))
                 cache_tensors.append(torch.zeros(cache_shape, dtype=hidden_dtype, device=device))
 
-            return {{
-                "vision_encoder": (pixel_values, pixel_position_ids),
-                "audio_encoder": (input_features, input_features_mask),
+            sample_inputs = {{
                 "embed_tokens": (input_ids,),
                 "decoder_model_merged": (
                     inputs_embeds,
@@ -669,6 +726,18 @@ def render_gemma4_export_runner(
                     *cache_tensors,
                 ),
             }}
+            if CONTRACT.get("supports_video"):
+                sample_inputs["vision_encoder"] = (
+                    pixel_values,
+                    pixel_position_ids,
+                    pixel_values_videos,
+                    video_position_ids,
+                )
+            else:
+                sample_inputs["vision_encoder"] = (pixel_values, pixel_position_ids)
+            if CONTRACT.get("supports_audio"):
+                sample_inputs["audio_encoder"] = (input_features, input_features_mask)
+            return sample_inputs
 
 
         def _normalize_external_data(output_path: Path):
@@ -736,17 +805,18 @@ def render_gemma4_export_runner(
 
             _patch_masking_utils_for_onnx_export()
             image_processor = _load_image_processor(source_path, base_path)
-            feature_extractor = _load_feature_extractor(source_path, base_path)
+            feature_extractor = _load_feature_extractor(source_path, base_path) if CONTRACT.get("supports_audio") else None
             processor_config = _resolve_processor_config(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)
             sample_inputs = _build_sample_inputs(model, image_processor, feature_extractor, processor_config)
 
             wrappers = {{
                 "vision_encoder": Gemma4VisionEncoderWrapper(model),
-                "audio_encoder": Gemma4AudioEncoderWrapper(model),
                 "embed_tokens": Gemma4EmbedTokensWrapper(model),
                 "decoder_model_merged": Gemma4MergedDecoderWrapper(model),
             }}
+            if CONTRACT.get("supports_audio"):
+                wrappers["audio_encoder"] = Gemma4AudioEncoderWrapper(model)
 
             results = {{}}
             for session_spec in CONTRACT["sessions"]:

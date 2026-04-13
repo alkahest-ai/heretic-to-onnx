@@ -40,6 +40,7 @@ class ExportContract:
     ok: bool
     model_type: str
     architecture: str
+    supports_video: bool
     num_hidden_layers: int
     layer_types: list[str]
     num_key_value_heads: int
@@ -60,6 +61,7 @@ class ExportContract:
             "ok": self.ok,
             "model_type": self.model_type,
             "architecture": self.architecture,
+            "supports_video": self.supports_video,
             "num_hidden_layers": self.num_hidden_layers,
             "layer_types": list(self.layer_types),
             "num_key_value_heads": self.num_key_value_heads,
@@ -168,6 +170,7 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
     linear_value_head_dim = int(text_config.get("linear_value_head_dim", 0))
     image_token_id = source_config.get("image_token_id")
     video_token_id = source_config.get("video_token_id")
+    supports_video = "video" in manifest.modalities
 
     warnings: list[str] = []
     ok = True
@@ -222,20 +225,36 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
     if not unknown_layer_types and len(layer_types) == num_hidden_layers:
         decoder_cache_entries = _build_qwen3_5_decoder_cache_entries(layer_types)
 
+    vision_session = SessionSpec(
+        name="vision_encoder",
+        raw_filename="vision_encoder.onnx",
+        package_filename=package_filenames.get("vision_encoder", "vision_encoder_q4f16.onnx"),
+        inputs=["pixel_values", "image_grid_thw"],
+        outputs=["image_features"],
+        dynamic_axes={
+            "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
+            "image_grid_thw": {0: "image_batch"},
+            "image_features": {0: "image_tokens"},
+        },
+        notes=["This session extracts LM-ready visual features for Qwen3.5 browser inference."],
+    )
+    if supports_video:
+        vision_session.inputs = ["pixel_values", "pixel_values_videos", "image_grid_thw", "video_grid_thw"]
+        vision_session.outputs = ["image_features", "video_features"]
+        vision_session.dynamic_axes = {
+            "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
+            "pixel_values_videos": {0: "video_batch", 1: "video_frames", 3: "frame_height", 4: "frame_width"},
+            "image_grid_thw": {0: "image_batch"},
+            "video_grid_thw": {0: "video_batch"},
+            "image_features": {0: "image_tokens"},
+            "video_features": {0: "video_tokens"},
+        }
+        vision_session.notes.append(
+            "V2 multimodal contracts export both image and video feature paths from the shared visual tower."
+        )
+
     sessions = [
-        SessionSpec(
-            name="vision_encoder",
-            raw_filename="vision_encoder.onnx",
-            package_filename=package_filenames.get("vision_encoder", "vision_encoder_q4f16.onnx"),
-            inputs=["pixel_values", "image_grid_thw"],
-            outputs=["image_features"],
-            dynamic_axes={
-                "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
-                "image_grid_thw": {0: "image_batch"},
-                "image_features": {0: "image_tokens"},
-            },
-            notes=["This session extracts LM-ready visual features for Qwen3.5 browser inference."],
-        ),
+        vision_session,
         SessionSpec(
             name="embed_tokens",
             raw_filename="embed_tokens.onnx",
@@ -250,14 +269,19 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         ),
     ]
 
-    decoder_inputs = [
-        "inputs_embeds",
-        "image_features",
-        "image_grid_thw",
-        "mm_token_type_ids",
-        "attention_mask",
-        "position_ids",
-    ]
+    decoder_inputs = ["inputs_embeds"]
+    if supports_video:
+        decoder_inputs.extend(
+            [
+                "image_features",
+                "video_features",
+                "image_grid_thw",
+                "video_grid_thw",
+            ]
+        )
+    else:
+        decoder_inputs.extend(["image_features", "image_grid_thw"])
+    decoder_inputs.extend(["mm_token_type_ids", "attention_mask", "position_ids"])
     decoder_outputs = ["logits"]
     decoder_dynamic_axes: dict[str, dict[int, str]] = {
         "inputs_embeds": {0: "batch", 1: "sequence"},
@@ -268,6 +292,9 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         "position_ids": {0: "batch", 1: "sequence"},
         "logits": {0: "batch", 1: "sequence"},
     }
+    if supports_video:
+        decoder_dynamic_axes["video_features"] = {0: "video_tokens"}
+        decoder_dynamic_axes["video_grid_thw"] = {0: "video_batch"}
 
     for cache_entry in decoder_cache_entries:
         decoder_inputs.extend(cache_entry.input_names)
@@ -307,6 +334,7 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         ok=ok,
         model_type=str(source_config.get("model_type", "")),
         architecture=architecture,
+        supports_video=supports_video,
         num_hidden_layers=num_hidden_layers,
         layer_types=layer_types,
         num_key_value_heads=num_key_value_heads,
@@ -761,13 +789,28 @@ def render_qwen3_5_export_runner(
                 super().__init__()
                 self.model = model
 
-            def forward(self, pixel_values, image_grid_thw):
-                outputs = self.model.model.get_image_features(
+            def forward(self, pixel_values, *args):
+                if not CONTRACT.get("supports_video"):
+                    image_grid_thw = args[0]
+                    outputs = self.model.model.get_image_features(
+                        pixel_values=pixel_values,
+                        image_grid_thw=image_grid_thw,
+                        return_dict=True,
+                    )
+                    return _extract_visual_tensor(outputs)
+
+                pixel_values_videos, image_grid_thw, video_grid_thw = args
+                image_outputs = self.model.model.get_image_features(
                     pixel_values=pixel_values,
                     image_grid_thw=image_grid_thw,
                     return_dict=True,
                 )
-                return _extract_visual_tensor(outputs)
+                video_outputs = self.model.model.get_video_features(
+                    pixel_values_videos=pixel_values_videos,
+                    video_grid_thw=video_grid_thw,
+                    return_dict=True,
+                )
+                return _extract_visual_tensor(image_outputs), _extract_visual_tensor(video_outputs)
 
 
         class Qwen35EmbedTokensWrapper(torch.nn.Module):
@@ -791,35 +834,72 @@ def render_qwen3_5_export_runner(
                 super().__init__()
                 self.model = model
 
+            def _scatter_visual_features(self, merged_inputs_embeds, visual_features, slot_mask, dependency, label):
+                if visual_features is None:
+                    return merged_inputs_embeds
+                if not slot_mask.any():
+                    return merged_inputs_embeds
+                merged_visual_features = _attach_tensor_dependency(visual_features, dependency)
+                merged_visual_features = merged_visual_features.reshape(-1, merged_inputs_embeds.shape[-1])
+                expanded_slot_mask = slot_mask.unsqueeze(-1).expand_as(merged_inputs_embeds)
+                if merged_inputs_embeds[expanded_slot_mask].numel() != merged_visual_features.numel():
+                    raise RuntimeError(
+                        f"{{label}} features and placeholder token slots do not match when building the "
+                        "Qwen merged decoder export sample"
+                    )
+                return merged_inputs_embeds.masked_scatter(
+                    expanded_slot_mask,
+                    merged_visual_features.reshape(-1).to(
+                        device=merged_inputs_embeds.device,
+                        dtype=merged_inputs_embeds.dtype,
+                    ),
+                )
+
             def forward(
                 self,
                 inputs_embeds,
-                image_features,
-                image_grid_thw,
-                mm_token_type_ids,
-                attention_mask,
-                position_ids,
-                *past_key_values,
+                *decoder_inputs,
             ):
+                if CONTRACT.get("supports_video"):
+                    (
+                        image_features,
+                        video_features,
+                        image_grid_thw,
+                        video_grid_thw,
+                        mm_token_type_ids,
+                        attention_mask,
+                        position_ids,
+                        *past_key_values,
+                    ) = decoder_inputs
+                else:
+                    (
+                        image_features,
+                        image_grid_thw,
+                        mm_token_type_ids,
+                        attention_mask,
+                        position_ids,
+                        *past_key_values,
+                    ) = decoder_inputs
+                    video_features = None
+                    video_grid_thw = None
+
                 flat_cache = FlatQwen35Cache(CONTRACT["decoder_cache_entries"], past_key_values)
 
                 merged_inputs_embeds = inputs_embeds.clone()
-                image_mask = mm_token_type_ids == 1
-                if image_mask.any():
-                    merged_image_features = _attach_tensor_dependency(image_features, image_grid_thw)
-                    merged_image_features = merged_image_features.reshape(-1, merged_inputs_embeds.shape[-1])
-                    slot_mask = image_mask.unsqueeze(-1).expand_as(merged_inputs_embeds)
-                    if merged_inputs_embeds[slot_mask].numel() != merged_image_features.numel():
-                        raise RuntimeError(
-                            "image features and image token slots do not match when building the "
-                            "Qwen merged decoder export sample"
-                        )
-                    merged_inputs_embeds = merged_inputs_embeds.masked_scatter(
-                        slot_mask,
-                        merged_image_features.reshape(-1).to(
-                            device=merged_inputs_embeds.device,
-                            dtype=merged_inputs_embeds.dtype,
-                        ),
+                merged_inputs_embeds = self._scatter_visual_features(
+                    merged_inputs_embeds,
+                    image_features,
+                    mm_token_type_ids == 1,
+                    image_grid_thw,
+                    "image",
+                )
+                if CONTRACT.get("supports_video"):
+                    merged_inputs_embeds = self._scatter_visual_features(
+                        merged_inputs_embeds,
+                        video_features,
+                        mm_token_type_ids == 2,
+                        video_grid_thw,
+                        "video",
                     )
 
                 outputs = self.model(
@@ -889,6 +969,20 @@ def render_qwen3_5_export_runner(
             return image_size
 
 
+        def _validate_visual_sample_paths(model, pixel_values, image_grid_thw, pixel_values_videos, video_grid_thw):
+            model.model.get_image_features(
+                pixel_values=pixel_values,
+                image_grid_thw=image_grid_thw,
+                return_dict=True,
+            )
+            if CONTRACT.get("supports_video"):
+                model.model.get_video_features(
+                    pixel_values_videos=pixel_values_videos,
+                    video_grid_thw=video_grid_thw,
+                    return_dict=True,
+                )
+
+
         def _build_sample_inputs(model, processor_config: dict, image_processor):
             config = model.config
             hidden_dtype = model.get_input_embeddings().weight.dtype
@@ -915,7 +1009,36 @@ def render_qwen3_5_export_runner(
 
             embed_wrapper = Qwen35EmbedTokensWrapper(model).to(device)
             vision_wrapper = Qwen35VisionEncoderWrapper(model).to(device)
-            image_features = vision_wrapper(pixel_values, image_grid_thw)
+            if CONTRACT.get("supports_video"):
+                frames = 4
+                pixel_values_videos = torch.zeros(
+                    (1, frames, pixel_values.shape[1], pixel_values.shape[2], pixel_values.shape[3]),
+                    dtype=hidden_dtype,
+                    device=device,
+                )
+                video_grid_thw = torch.tensor(
+                    [[frames, int(image_grid_thw[0, 1]), int(image_grid_thw[0, 2])]],
+                    dtype=torch.long,
+                    device=device,
+                )
+                _validate_visual_sample_paths(
+                    model,
+                    pixel_values,
+                    image_grid_thw,
+                    pixel_values_videos,
+                    video_grid_thw,
+                )
+                image_features, video_features = vision_wrapper(
+                    pixel_values,
+                    pixel_values_videos,
+                    image_grid_thw,
+                    video_grid_thw,
+                )
+            else:
+                pixel_values_videos = None
+                video_grid_thw = None
+                video_features = None
+                image_features = vision_wrapper(pixel_values, image_grid_thw)
 
             if image_features.ndim == 3:
                 image_token_slots = int(image_features.shape[1])
@@ -924,7 +1047,16 @@ def render_qwen3_5_export_runner(
             else:
                 raise ValueError(f"unsupported image_features rank: {{image_features.ndim}}")
 
-            total_sequence = max(image_token_slots + 8, 16)
+            video_token_slots = 0
+            if video_features is not None:
+                if video_features.ndim == 3:
+                    video_token_slots = int(video_features.shape[1])
+                elif video_features.ndim == 2:
+                    video_token_slots = int(video_features.shape[0])
+                else:
+                    raise ValueError(f"unsupported video_features rank: {{video_features.ndim}}")
+
+            total_sequence = max(image_token_slots + video_token_slots + 8, 16)
             input_ids = torch.full((1, total_sequence), config.pad_token_id, dtype=torch.long, device=device)
             mm_token_type_ids = torch.zeros((1, total_sequence), dtype=torch.int32, device=device)
             if getattr(config, "image_token_id", None) is not None:
@@ -932,6 +1064,11 @@ def render_qwen3_5_export_runner(
                 end = start + image_token_slots
                 input_ids[:, start:end] = config.image_token_id
                 mm_token_type_ids[:, start:end] = 1
+                if CONTRACT.get("supports_video") and getattr(config, "video_token_id", None) is not None:
+                    video_start = end
+                    video_end = video_start + video_token_slots
+                    input_ids[:, video_start:video_end] = config.video_token_id
+                    mm_token_type_ids[:, video_start:video_end] = 2
             attention_mask = torch.ones((1, total_sequence), dtype=torch.bool, device=device)
             position_ids = torch.arange(total_sequence, dtype=torch.long, device=device).unsqueeze(0)
             inputs_embeds = embed_wrapper(input_ids)
@@ -956,10 +1093,30 @@ def render_qwen3_5_export_runner(
                 else:
                     raise ValueError(f"unsupported Qwen3.5 cache layer type: {{cache_entry['layer_type']!r}}")
 
-            return {{
-                "vision_encoder": (pixel_values, image_grid_thw),
+            sample_inputs = {{
                 "embed_tokens": (input_ids,),
-                "decoder_model_merged": (
+            }}
+            if CONTRACT.get("supports_video"):
+                sample_inputs["vision_encoder"] = (
+                    pixel_values,
+                    pixel_values_videos,
+                    image_grid_thw,
+                    video_grid_thw,
+                )
+                sample_inputs["decoder_model_merged"] = (
+                    inputs_embeds,
+                    image_features,
+                    video_features,
+                    image_grid_thw,
+                    video_grid_thw,
+                    mm_token_type_ids,
+                    attention_mask,
+                    position_ids,
+                    *cache_tensors,
+                )
+            else:
+                sample_inputs["vision_encoder"] = (pixel_values, image_grid_thw)
+                sample_inputs["decoder_model_merged"] = (
                     inputs_embeds,
                     image_features,
                     image_grid_thw,
@@ -967,8 +1124,8 @@ def render_qwen3_5_export_runner(
                     attention_mask,
                     position_ids,
                     *cache_tensors,
-                ),
-            }}
+                )
+            return sample_inputs
 
 
         def _normalize_external_data(output_path: Path):

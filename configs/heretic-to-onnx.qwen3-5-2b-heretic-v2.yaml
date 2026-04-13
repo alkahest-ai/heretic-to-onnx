@@ -1,0 +1,29 @@
+source_model_id: tvall43/Qwen3.5-2B-heretic-v3b
+base_model_id: Qwen/Qwen3.5-2B
+architecture: qwen3_5_conditional_generation
+target_repo_id: alkahest-ai/alkahest-2b-v2
+target_dtype: q4f16
+target_device: webgpu
+modalities:
+  - text
+  - image
+  - video
+inherit_assets:
+  from_source:
+    - config.json
+    - generation_config.json
+    - tokenizer.json
+    - tokenizer_config.json
+    - chat_template.jinja
+  from_base_if_missing:
+    - preprocessor_config.json
+    - video_preprocessor_config.json
+expected_architecture: Qwen3_5ForConditionalGeneration
+expected_onnx_files:
+  - onnx/vision_encoder_q4f16.onnx
+  - onnx/embed_tokens_q4f16.onnx
+  - onnx/decoder_model_merged_q4f16.onnx
+validation:
+  smoke_prompt: Describe the attached image or video in character as a private uncensored companion.
+  browser_loader_class: Qwen3_5ForConditionalGeneration
+  processor_class: AutoProcessor

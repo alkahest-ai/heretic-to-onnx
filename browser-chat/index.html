@@ -68,6 +68,14 @@
                   Audio input is enabled only for Rally / Gemma presets.
                 </small>
               </label>
+
+              <label class="field">
+                <span>Video Input</span>
+                <input id="video-input" type="file" accept="video/*" />
+                <small id="video-status" class="field-hint">
+                  Video input is enabled only for v2 multimodal presets.
+                </small>
+              </label>
             </div>
 
             <div class="parameter-grid">
@@ -106,7 +114,8 @@
                 <li>First load can still be large and may take several minutes.</li>
                 <li>Private Hugging Face repos are not suitable for direct browser loading.</li>
                 <li>Best experience is desktop Safari or Chromium on modern hardware.</li>
-                <li>Audio input is supported only on Rally / Gemma presets.</li>
+                <li>Audio input is supported only on v2 Rally / Gemma presets.</li>
+                <li>Video input is supported only on v2 multimodal presets.</li>
               </ul>
             </div>
           </div>
