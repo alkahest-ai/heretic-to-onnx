@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from copy import deepcopy
 from pathlib import Path
+
+os.environ.setdefault("UNSLOTH_COMPILE_DISABLE", "1")
+os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
 
 from unsloth import FastLanguageModel
 from datasets import DatasetDict, load_dataset
