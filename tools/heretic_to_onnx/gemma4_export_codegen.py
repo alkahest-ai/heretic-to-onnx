@@ -271,7 +271,7 @@ def render_gemma4_export_runner(
         import numpy as np
         import onnx
         import torch
-        from transformers import AutoFeatureExtractor, AutoImageProcessor, Gemma4ForConditionalGeneration
+        from transformers import AutoFeatureExtractor, AutoImageProcessor, AutoProcessor, Gemma4ForConditionalGeneration
 
         CONTRACT = __CONTRACT_JSON__
 
@@ -459,6 +459,21 @@ def render_gemma4_export_runner(
             raise FileNotFoundError("processor_config.json/preprocessor_config.json was not found in the source or base model assets")
 
 
+        def _load_processor(source_path: Path, base_path: Path):
+            last_error = None
+            for root in (source_path, base_path):
+                candidate = root / "processor_config.json"
+                if not candidate.exists():
+                    continue
+                try:
+                    return AutoProcessor.from_pretrained(str(root), trust_remote_code=False)
+                except Exception as exc:
+                    last_error = exc
+            if last_error is not None:
+                raise RuntimeError("failed to load Gemma 4 processor from source/base assets") from last_error
+            raise FileNotFoundError("processor_config.json was not found in the source or base model assets")
+
+
         class FlatGemma4Cache:
             def __init__(self, entries):
                 self.keys = [key for key, _ in entries]
@@ -638,6 +653,31 @@ def render_gemma4_export_runner(
             return input_features.contiguous(), input_features_mask.to(dtype=torch.bool).contiguous()
 
 
+        def _build_video_sample_inputs(processor, image_height: int, image_width: int, device):
+            if processor is None:
+                raise RuntimeError("Gemma 4 video export requested, but no multimodal processor was available")
+
+            frames = 4
+            dummy_video = [[np.zeros((image_height, image_width, 3), dtype=np.uint8) for _ in range(frames)]]
+            processor_kwargs = {{
+                "videos": dummy_video,
+                "return_tensors": "pt",
+            }}
+
+            try:
+                processed = processor(**processor_kwargs)
+            except Exception:
+                processed = processor(videos=dummy_video, return_tensors="pt", do_sample_frames=False)
+
+            pixel_values_videos = processed.get("pixel_values_videos")
+            video_position_ids = processed.get("video_position_ids")
+            if pixel_values_videos is None or video_position_ids is None:
+                raise RuntimeError(
+                    "Gemma 4 processor did not return pixel_values_videos/video_position_ids for the synthetic video sample"
+                )
+            return pixel_values_videos.to(device), video_position_ids.to(device)
+
+
         def _load_model(source_path: Path, dtype_name: str, device: str):
             torch_dtype = _parse_dtype(dtype_name)
             model_kwargs = {{
@@ -654,7 +694,7 @@ def render_gemma4_export_runner(
             return model
 
 
-        def _build_sample_inputs(model, image_processor, feature_extractor, processor_config: dict):
+        def _build_sample_inputs(model, image_processor, feature_extractor, processor, processor_config: dict):
             text_config = model.config.text_config
             hidden_dtype = model.model.language_model.embed_tokens.weight.dtype
             device = next(model.parameters()).device
@@ -674,9 +714,12 @@ def render_gemma4_export_runner(
             pixel_values_videos = None
             video_position_ids = None
             if CONTRACT.get("supports_video"):
-                frames = 4
-                pixel_values_videos = pixel_values.unsqueeze(1).repeat(1, frames, 1, 1, 1)
-                video_position_ids = pixel_position_ids.unsqueeze(1).repeat(1, frames, 1, 1)
+                pixel_values_videos, video_position_ids = _build_video_sample_inputs(
+                    processor,
+                    image_height,
+                    image_width,
+                    device,
+                )
 
             input_features = None
             input_features_mask = None
@@ -806,9 +849,10 @@ def render_gemma4_export_runner(
             _patch_masking_utils_for_onnx_export()
             image_processor = _load_image_processor(source_path, base_path)
             feature_extractor = _load_feature_extractor(source_path, base_path) if CONTRACT.get("supports_audio") else None
+            processor = _load_processor(source_path, base_path) if CONTRACT.get("supports_video") else None
             processor_config = _resolve_processor_config(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)
-            sample_inputs = _build_sample_inputs(model, image_processor, feature_extractor, processor_config)
+            sample_inputs = _build_sample_inputs(model, image_processor, feature_extractor, processor, processor_config)
 
             wrappers = {{
                 "vision_encoder": Gemma4VisionEncoderWrapper(model),

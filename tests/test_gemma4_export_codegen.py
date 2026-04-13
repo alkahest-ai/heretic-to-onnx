@@ -150,6 +150,9 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
 
         self.assertIn("def _prepare_audio_core_inputs(input_features, input_features_mask):", runner)
         self.assertIn("model.model.get_video_features(", runner)
+        self.assertIn("AutoProcessor.from_pretrained", runner)
+        self.assertIn("def _build_video_sample_inputs(processor, image_height: int, image_width: int, device):", runner)
+        self.assertIn('processed.get("pixel_values_videos")', runner)
         self.assertIn('if CONTRACT.get("supports_video"):', runner)
         self.assertIn('if CONTRACT.get("supports_audio"):', runner)
         self.assertIn('wrappers["audio_encoder"] = Gemma4AudioEncoderWrapper(model)', runner)
