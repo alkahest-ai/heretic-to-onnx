@@ -120,14 +120,30 @@ convert_direct() {
   local manifest_path="$MANIFEST_ROOT/$label.yaml"
   local work_dir="$WORK_ROOT/$label"
   local package_dir="$PACKAGE_ROOT/$label"
+  local source_override=""
 
   require_hf_token "$label direct conversion"
 
+  if [[ "$label" == *"-v2-direct" ]]; then
+    local sibling_label="${label%-v2-direct}-direct"
+    local sibling_source="$WORK_ROOT/$sibling_label/inputs/source"
+    if [[ -f "$sibling_source/config.json" ]] && [[ -f "$sibling_source/model.safetensors.index.json" || -f "$sibling_source/model.safetensors" ]]; then
+      source_override="$sibling_source"
+      echo "[manifest] reusing existing source snapshot from $source_override"
+    fi
+  fi
+
   echo "[manifest] $label"
-  "$PYTHON_BIN" -m tools.heretic_to_onnx render-manifest \
-    --template "$template" \
-    --output "$manifest_path" \
+  render_args=(
+    "$PYTHON_BIN" -m tools.heretic_to_onnx render-manifest
+    --template "$template"
+    --output "$manifest_path"
     --target-repo-id "$target_repo"
+  )
+  if [[ -n "$source_override" ]]; then
+    render_args+=(--source-model-id "$source_override")
+  fi
+  "${render_args[@]}"
 
   echo "[convert] $label"
   "$PYTHON_BIN" -m tools.heretic_to_onnx convert \
