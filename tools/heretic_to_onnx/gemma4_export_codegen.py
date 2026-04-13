@@ -271,7 +271,7 @@ def render_gemma4_export_runner(
         import numpy as np
         import onnx
         import torch
-        from transformers import AutoFeatureExtractor, AutoImageProcessor, Gemma4ForConditionalGeneration
+        from transformers import AutoFeatureExtractor, AutoImageProcessor, Gemma4ForConditionalGeneration, Gemma4VideoProcessor
 
         CONTRACT = __CONTRACT_JSON__
 
@@ -462,26 +462,16 @@ def render_gemma4_export_runner(
         def _load_video_processor(source_path: Path, base_path: Path):
             last_error = None
             for root in (source_path, base_path):
-                candidate = root / "processor_config.json"
+                candidate = root / "video_preprocessor_config.json"
                 if not candidate.exists():
                     continue
                 try:
-                    image_processor = AutoImageProcessor.from_pretrained(str(root), trust_remote_code=False)
+                    return Gemma4VideoProcessor.from_pretrained(str(root), trust_remote_code=False)
                 except Exception as exc:
                     last_error = exc
-                    continue
-
-                video_processor = getattr(image_processor, "video_processor", None)
-                if video_processor is not None:
-                    return video_processor
-                if hasattr(image_processor, "image_processor") and getattr(image_processor, "image_processor") is not None:
-                    nested_video_processor = getattr(image_processor.image_processor, "video_processor", None)
-                    if nested_video_processor is not None:
-                        return nested_video_processor
-                last_error = RuntimeError("Gemma 4 image processor did not expose a video_processor")
             if last_error is not None:
                 raise RuntimeError("failed to load Gemma 4 video processor from source/base assets") from last_error
-            raise FileNotFoundError("processor_config.json was not found in the source or base model assets")
+            raise FileNotFoundError("video_preprocessor_config.json was not found in the source or base model assets")
 
 
         class FlatGemma4Cache:

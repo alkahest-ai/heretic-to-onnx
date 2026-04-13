@@ -19,6 +19,7 @@ inherit_assets:
   from_base_if_missing:
     - processor_config.json
     - preprocessor_config.json
+    - video_preprocessor_config.json
 expected_architecture: Gemma4ForConditionalGeneration
 expected_onnx_files:
   - onnx/vision_encoder_q4f16.onnx
