@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+TRAIN_PYTHON_BIN="${TRAIN_PYTHON_BIN:-python3}"
 MODE="${1:-all}"
 
 WORK_ROOT="${WORK_ROOT:-$ROOT_DIR/build/phala_gpu_tee}"
@@ -85,10 +86,10 @@ bootstrap_env() {
 
 generate_review_batch() {
   echo "[dataset] rendering roleplay_v2 prompt pack"
-  "$PYTHON_BIN" "$ROOT_DIR/scripts/render_roleplay_prompt_pack.py" --limit "$PROMPT_LIMIT"
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/render_roleplay_prompt_pack.py" --limit "$PROMPT_LIMIT"
 
   echo "[dataset] generating reviewed-batch candidate conversations"
-  "$PYTHON_BIN" "$ROOT_DIR/scripts/synthesize_roleplay_batch.py" \
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/synthesize_roleplay_batch.py" \
     --count "$DATASET_COUNT" \
     --seed "$DATASET_SEED" \
     --id-prefix "$DATASET_ID_PREFIX" \
@@ -117,10 +118,10 @@ compile_approved_dataset() {
   fi
 
   echo "[dataset] merging approved roleplay_v2 corpus"
-  "$PYTHON_BIN" "$ROOT_DIR/scripts/build_roleplay_training_corpus.py"
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/build_roleplay_training_corpus.py"
 
   echo "[dataset] validating and splitting approved corpus"
-  "$PYTHON_BIN" "$ROOT_DIR/scripts/prepare_roleplay_dataset.py" \
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/prepare_roleplay_dataset.py" \
     --input "$ROOT_DIR/data/roleplay_v2/corpus.jsonl"
 }
 
@@ -134,7 +135,7 @@ prepare_training_dataset() {
       ;;
     hf_texting_sex)
       echo "[dataset] preparing external chat SFT dataset from $SFT_DATASET_ID"
-      "$PYTHON_BIN" "$ROOT_DIR/scripts/prepare_texting_sex_dataset.py" \
+      "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/prepare_texting_sex_dataset.py" \
         --dataset-id "$SFT_DATASET_ID" \
         --split "$SFT_DATASET_SPLIT" \
         --output-dir "$SFT_DATASET_OUTPUT_DIR" \
@@ -213,7 +214,7 @@ train_model() {
   require_hf_token "$label training"
 
   echo "[train] $label"
-  "$PYTHON_BIN" "$ROOT_DIR/scripts/train_rally_unsloth.py" \
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/train_rally_unsloth.py" \
     --model-name "$model_name" \
     --train-file "$TRAIN_FILE" \
     --val-file "$VAL_FILE" \
