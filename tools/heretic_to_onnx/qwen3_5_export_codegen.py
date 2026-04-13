@@ -983,6 +983,30 @@ def render_qwen3_5_export_runner(
                 )
 
 
+        def _build_video_sample_inputs(image_processor, pixel_values, image_grid_thw, image_size, hidden_dtype, device):
+            frames = 4
+            if image_processor is not None:
+                try:
+                    blank_frames = [Image.new("RGB", (image_size, image_size), color=0) for _ in range(frames)]
+                    processed_video = image_processor(videos=[blank_frames], return_tensors="pt")
+                    if "pixel_values_videos" in processed_video and "video_grid_thw" in processed_video:
+                        return (
+                            processed_video["pixel_values_videos"].to(device=device, dtype=hidden_dtype),
+                            processed_video["video_grid_thw"].to(device=device, dtype=torch.long),
+                        )
+                except Exception:
+                    pass
+
+            repeat_shape = [frames] + [1] * max(pixel_values.ndim - 1, 0)
+            pixel_values_videos = pixel_values.repeat(*repeat_shape)
+            if image_grid_thw.ndim == 2 and image_grid_thw.shape[-1] == 3 and image_grid_thw.shape[0] > 0:
+                video_grid_thw = image_grid_thw[:1].clone()
+                video_grid_thw[:, 0] = frames
+            else:
+                video_grid_thw = torch.tensor([[frames, 1, 1]], dtype=torch.long, device=device)
+            return pixel_values_videos, video_grid_thw
+
+
         def _build_sample_inputs(model, processor_config: dict, image_processor):
             config = model.config
             hidden_dtype = model.get_input_embeddings().weight.dtype
@@ -1010,16 +1034,13 @@ def render_qwen3_5_export_runner(
             embed_wrapper = Qwen35EmbedTokensWrapper(model).to(device)
             vision_wrapper = Qwen35VisionEncoderWrapper(model).to(device)
             if CONTRACT.get("supports_video"):
-                frames = 4
-                pixel_values_videos = torch.zeros(
-                    (1, frames, pixel_values.shape[1], pixel_values.shape[2], pixel_values.shape[3]),
-                    dtype=hidden_dtype,
-                    device=device,
-                )
-                video_grid_thw = torch.tensor(
-                    [[frames, int(image_grid_thw[0, 1]), int(image_grid_thw[0, 2])]],
-                    dtype=torch.long,
-                    device=device,
+                pixel_values_videos, video_grid_thw = _build_video_sample_inputs(
+                    image_processor,
+                    pixel_values,
+                    image_grid_thw,
+                    image_size,
+                    hidden_dtype,
+                    device,
                 )
                 _validate_visual_sample_paths(
                     model,

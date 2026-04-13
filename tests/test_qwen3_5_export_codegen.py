@@ -310,6 +310,7 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('model.model.get_video_features(', runner)
         self.assertIn('mm_token_type_ids == 2', runner)
         self.assertIn('pixel_values_videos', runner)
+        self.assertIn('repeat_shape = [frames] + [1] * max(pixel_values.ndim - 1, 0)', runner)
 
     def test_runner_uses_supported_export_kwargs_without_legacy_fallback_chain(self) -> None:
         runner = render_qwen3_5_export_runner(
