@@ -35,6 +35,16 @@ class TextSFTDatasetTests(unittest.TestCase):
         self.assertIn("Thread title: Late night flirting", messages[1]["content"])
         self.assertEqual(messages[2]["role"], "assistant")
 
+    def test_strips_sales_boilerplate_from_instruction(self) -> None:
+        row = {
+            "thread_title": "Late night flirting",
+            "instruction": "You are an online girlfriend who tries to sell sexy videos while sexting.",
+            "message": "I missed you all day, come closer and tell me what you want tonight." * 2,
+        }
+        messages = texting_sex_row_to_messages(row)
+        self.assertNotIn("sell sexy videos", messages[0]["content"].lower())
+        self.assertIn("adult texting partner", messages[0]["content"].lower())
+
     def test_assign_split_is_stable(self) -> None:
         row_id = "hfchat-deadbeefcafebabe"
         self.assertEqual(assign_split(row_id, val_fraction=0.2), assign_split(row_id, val_fraction=0.2))

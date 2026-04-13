@@ -60,6 +60,12 @@ def main() -> int:
     parser.add_argument("--save-merged", action="store_true")
     parser.add_argument("--load-in-4bit", action="store_true", default=True)
     parser.add_argument("--no-load-in-4bit", dest="load_in_4bit", action="store_false")
+    parser.add_argument(
+        "--dataset-num-proc",
+        type=int,
+        default=0,
+        help="Dataset preprocessing worker count for TRL. Use 0 to disable multiprocessing.",
+    )
     args = parser.parse_args()
 
     dataset = load_dataset(
@@ -131,7 +137,7 @@ def main() -> int:
             output_dir=str(Path(args.output_dir).expanduser().resolve()),
             optim="adamw_8bit",
             seed=args.seed,
-            dataset_num_proc=1,
+            dataset_num_proc=args.dataset_num_proc or None,
             report_to=[],
         ),
     )

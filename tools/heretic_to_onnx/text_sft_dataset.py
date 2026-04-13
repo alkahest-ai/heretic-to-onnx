@@ -44,6 +44,22 @@ DEFAULT_BANNED_MARKERS = (
     "passed out",
 )
 
+DEFAULT_SYSTEM_PROMPT = "You are a flirty adult texting partner."
+SALES_BOILERPLATE_PATTERNS = (
+    re.compile(
+        r"(?:^|[\s,;:\-]+)(?:who\s+)?(?:tries|trying|try)\s+to\s+sell\s+(?:sexy|adult|nude|explicit)\s+(?:video|videos|pics|pictures)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:^|[\s,;:\-]+)(?:sell|selling)\s+(?:sexy|adult|nude|explicit)\s+(?:video|videos|pics|pictures)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:^|[\s,;:\-]+)(?:you(?:'re| are)?\s+)?an?\s+online\s+girlfriend[^.]{0,120}?(?:sell|selling)\s+(?:sexy|adult|nude|explicit)\s+(?:video|videos|pics|pictures)\b",
+        re.IGNORECASE,
+    ),
+)
+
 
 def _normalize_whitespace(value: Any) -> str:
     if not isinstance(value, str):
@@ -59,6 +75,28 @@ def _combined_row_text(row: dict[str, Any]) -> str:
     ).lower()
 
 
+def _sanitize_instruction(value: Any) -> str:
+    instruction = _normalize_whitespace(value)
+    if not instruction:
+        return ""
+    matched_sales_boilerplate = False
+    for pattern in SALES_BOILERPLATE_PATTERNS:
+        if pattern.search(instruction):
+            matched_sales_boilerplate = True
+            instruction = pattern.sub("", instruction)
+    instruction = re.sub(r"\s+", " ", instruction)
+    instruction = re.sub(r"\s+([,.;:!?])", r"\1", instruction)
+    instruction = re.sub(r"([,;:]){2,}", r"\1", instruction)
+    instruction = instruction.strip(" ,;:-")
+    if matched_sales_boilerplate:
+        return DEFAULT_SYSTEM_PROMPT
+    if not instruction:
+        return DEFAULT_SYSTEM_PROMPT
+    if "sell sexy videos" in instruction.lower():
+        return DEFAULT_SYSTEM_PROMPT
+    return instruction
+
+
 def reject_reason_for_texting_sex_row(
     row: dict[str, Any],
     *,
@@ -66,6 +104,7 @@ def reject_reason_for_texting_sex_row(
     min_message_chars: int = 80,
 ) -> str | None:
     instruction = _normalize_whitespace(row.get("instruction"))
+    instruction = _sanitize_instruction(instruction)
     assistant = _normalize_whitespace(row.get("message"))
     if not instruction:
         return "missing_instruction"
@@ -85,7 +124,7 @@ def reject_reason_for_texting_sex_row(
 
 
 def texting_sex_row_to_messages(row: dict[str, Any]) -> list[dict[str, str]]:
-    instruction = _normalize_whitespace(row.get("instruction"))
+    instruction = _sanitize_instruction(row.get("instruction"))
     thread_title = _normalize_whitespace(row.get("thread_title"))
     assistant = _normalize_whitespace(row.get("message"))
 
