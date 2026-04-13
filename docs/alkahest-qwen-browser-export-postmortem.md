@@ -163,7 +163,23 @@ The next attempted fix was:
 
 - generate the visual sample through Hugging Face `AutoImageProcessor`
 
-That is the correct direction, but it has not yet been live-validated on the remote H200 box in this document because the box failed to pull the latest exporter patch when GitHub DNS resolution broke.
+That moved the export lane forward, but it exposed the next blocker in the visual path instead of fully solving the lane.
+
+### 5. ONNX export currently fails on the Qwen vision SDPA / GQA path
+
+Once the visual sample path became more faithful to upstream preprocessing, the export advanced into the actual Qwen vision attention stack.
+
+The next failure was:
+
+- `AssertionError: conversion of scaled_dot_product_attention not implemented if enable_gqa is True`
+
+This is not a Qwen packaging issue. It is a PyTorch ONNX exporter limitation on the attention operator emitted by the current Qwen vision stack.
+
+The practical implication is:
+
+- the current direct Qwen browser lane needs an ONNX-safe fallback attention implementation during export
+
+That is a model-export compatibility problem, not evidence that Qwen image understanding is impossible.
 
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
@@ -213,11 +229,12 @@ What is true right now:
 What is likely true next:
 
 - direct Qwen browser export is still feasible
-- but it needs a more faithful vision sample path than the current synthetic trace uses
+- but it needs both a faithful processor-driven sample path and an ONNX-safe attention path for the visual tower
 
 The next debug target is not the decoder and not quantization.
 
 It is:
 
 - build a vision sample that exactly matches the upstream Qwen processor/model expectation
+- patch or bypass the Qwen vision SDPA/GQA path so ONNX export can lower it safely
 - then resume ONNX export from there

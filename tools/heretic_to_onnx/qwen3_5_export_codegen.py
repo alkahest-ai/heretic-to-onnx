@@ -251,6 +251,61 @@ def render_qwen3_5_export_runner(
             return None
 
 
+        class _PatchedScaledDotProductAttention:
+            def __enter__(self):
+                self.original = torch.nn.functional.scaled_dot_product_attention
+                torch.nn.functional.scaled_dot_product_attention = _onnx_safe_scaled_dot_product_attention
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                torch.nn.functional.scaled_dot_product_attention = self.original
+                return False
+
+
+        def _onnx_safe_scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            attn_mask=None,
+            dropout_p=0.0,
+            is_causal=False,
+            scale=None,
+            enable_gqa=False,
+        ):
+            if scale is None:
+                scale = 1.0 / math.sqrt(query.shape[-1])
+
+            if enable_gqa and query.shape[-3] != key.shape[-3]:
+                if query.shape[-3] % key.shape[-3] != 0:
+                    raise ValueError("query heads must be divisible by key heads when enable_gqa=True")
+                repeat_factor = query.shape[-3] // key.shape[-3]
+                key = key.repeat_interleave(repeat_factor, dim=-3)
+                value = value.repeat_interleave(repeat_factor, dim=-3)
+
+            attn_scores = torch.matmul(query, key.transpose(-2, -1)) * scale
+
+            if attn_mask is not None:
+                if attn_mask.dtype == torch.bool:
+                    fill_value = torch.finfo(attn_scores.dtype).min
+                    attn_scores = attn_scores.masked_fill(~attn_mask, fill_value)
+                else:
+                    attn_scores = attn_scores + attn_mask.to(dtype=attn_scores.dtype)
+
+            if is_causal:
+                query_length = query.shape[-2]
+                key_length = key.shape[-2]
+                causal_mask = torch.ones((query_length, key_length), dtype=torch.bool, device=query.device).tril(
+                    diagonal=key_length - query_length
+                )
+                fill_value = torch.finfo(attn_scores.dtype).min
+                attn_scores = attn_scores.masked_fill(~causal_mask, fill_value)
+
+            attn_probs = torch.softmax(attn_scores, dim=-1)
+            if dropout_p and dropout_p > 0:
+                attn_probs = torch.dropout(attn_probs, dropout_p, train=False)
+            return torch.matmul(attn_probs, value)
+
+
         class AttrDict(dict):
             __getattr__ = dict.get
             __setattr__ = dict.__setitem__
@@ -498,13 +553,16 @@ def render_qwen3_5_export_runner(
             if dynamic_axes is not None:
                 export_kwargs["dynamic_axes"] = dynamic_axes
             try:
-                torch.onnx.export(module, **export_kwargs, external_data=True)
+                with _PatchedScaledDotProductAttention():
+                    torch.onnx.export(module, **export_kwargs, external_data=True)
             except TypeError:
                 export_kwargs.pop("dynamo", None)
                 try:
-                    torch.onnx.export(module, **export_kwargs, external_data=True)
+                    with _PatchedScaledDotProductAttention():
+                        torch.onnx.export(module, **export_kwargs, external_data=True)
                 except TypeError:
-                    torch.onnx.export(module, **export_kwargs, use_external_data_format=True)
+                    with _PatchedScaledDotProductAttention():
+                        torch.onnx.export(module, **export_kwargs, use_external_data_format=True)
             _normalize_external_data(output_path)
 
 
