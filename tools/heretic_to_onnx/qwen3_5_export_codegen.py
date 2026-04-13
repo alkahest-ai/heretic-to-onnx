@@ -24,13 +24,32 @@ class SessionSpec:
 
 
 @dataclass(slots=True)
+class DecoderCacheEntry:
+    layer_index: int
+    layer_type: str
+    input_names: list[str]
+    output_names: list[str]
+    notes: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class ExportContract:
     ok: bool
     model_type: str
     architecture: str
     num_hidden_layers: int
+    layer_types: list[str]
     num_key_value_heads: int
     head_dim: int
+    linear_conv_kernel_dim: int
+    linear_num_key_heads: int
+    linear_num_value_heads: int
+    linear_key_head_dim: int
+    linear_value_head_dim: int
+    decoder_cache_entries: list[DecoderCacheEntry]
     image_token_id: int | None
     video_token_id: int | None
     sessions: list[SessionSpec]
@@ -42,8 +61,15 @@ class ExportContract:
             "model_type": self.model_type,
             "architecture": self.architecture,
             "num_hidden_layers": self.num_hidden_layers,
+            "layer_types": list(self.layer_types),
             "num_key_value_heads": self.num_key_value_heads,
             "head_dim": self.head_dim,
+            "linear_conv_kernel_dim": self.linear_conv_kernel_dim,
+            "linear_num_key_heads": self.linear_num_key_heads,
+            "linear_num_value_heads": self.linear_num_value_heads,
+            "linear_key_head_dim": self.linear_key_head_dim,
+            "linear_value_head_dim": self.linear_value_head_dim,
+            "decoder_cache_entries": [entry.to_dict() for entry in self.decoder_cache_entries],
             "image_token_id": self.image_token_id,
             "video_token_id": self.video_token_id,
             "sessions": [session.to_dict() for session in self.sessions],
@@ -71,11 +97,60 @@ def _load_source_config(source_path: str | Path) -> dict[str, Any]:
     return json.loads(config_path.read_text(encoding="utf-8"))
 
 
+def _resolve_qwen3_5_layer_types(text_config: dict[str, Any], num_hidden_layers: int) -> list[str]:
+    raw_layer_types = text_config.get("layer_types")
+    if isinstance(raw_layer_types, list) and all(isinstance(item, str) for item in raw_layer_types):
+        return [str(item) for item in raw_layer_types[:num_hidden_layers]]
+
+    full_attention_interval = int(text_config.get("full_attention_interval", 0) or 0)
+    if full_attention_interval > 0:
+        return [
+            "full_attention" if (layer_index + 1) % full_attention_interval == 0 else "linear_attention"
+            for layer_index in range(num_hidden_layers)
+        ]
+
+    return []
+
+
+def _build_qwen3_5_decoder_cache_entries(layer_types: list[str]) -> list[DecoderCacheEntry]:
+    entries: list[DecoderCacheEntry] = []
+    for layer_index, layer_type in enumerate(layer_types):
+        if layer_type == "full_attention":
+            input_names = [
+                f"past_key_values.{layer_index}.key",
+                f"past_key_values.{layer_index}.value",
+            ]
+            output_names = [
+                f"present.{layer_index}.key",
+                f"present.{layer_index}.value",
+            ]
+        elif layer_type == "linear_attention":
+            input_names = [
+                f"past_key_values.{layer_index}.conv_state",
+                f"past_key_values.{layer_index}.recurrent_state",
+            ]
+            output_names = [
+                f"present.{layer_index}.conv_state",
+                f"present.{layer_index}.recurrent_state",
+            ]
+        else:
+            raise ValueError(f"unsupported Qwen3.5 layer type: {layer_type!r}")
+
+        entries.append(
+            DecoderCacheEntry(
+                layer_index=layer_index,
+                layer_type=layer_type,
+                input_names=input_names,
+                output_names=output_names,
+            )
+        )
+    return entries
+
+
 def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -> ExportContract:
     source_config = _load_source_config(source_path)
     text_config = source_config.get("text_config", {})
     package_filenames = _session_filename_map(manifest)
-    layer_types = text_config.get("layer_types", [])
 
     architecture = ""
     architectures = source_config.get("architectures")
@@ -83,8 +158,14 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         architecture = str(architectures[0])
 
     num_hidden_layers = int(text_config.get("num_hidden_layers", 0))
+    layer_types = _resolve_qwen3_5_layer_types(text_config, num_hidden_layers)
     num_key_value_heads = int(text_config.get("num_key_value_heads", 0))
     head_dim = int(text_config.get("head_dim", 0))
+    linear_conv_kernel_dim = int(text_config.get("linear_conv_kernel_dim", 0))
+    linear_num_key_heads = int(text_config.get("linear_num_key_heads", 0))
+    linear_num_value_heads = int(text_config.get("linear_num_value_heads", 0))
+    linear_key_head_dim = int(text_config.get("linear_key_head_dim", 0))
+    linear_value_head_dim = int(text_config.get("linear_value_head_dim", 0))
     image_token_id = source_config.get("image_token_id")
     video_token_id = source_config.get("video_token_id")
 
@@ -108,17 +189,38 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         warnings.append("Qwen3.5 export currently expects head_dim > 0")
     if image_token_id is None:
         warnings.append("config.json does not define image_token_id; sample multimodal trace may be incomplete")
-    if isinstance(layer_types, list):
-        linear_attention_layers = sum(1 for layer_type in layer_types if layer_type == "linear_attention")
-    else:
-        linear_attention_layers = 0
-    if linear_attention_layers > 0:
+
+    if len(layer_types) != num_hidden_layers:
         ok = False
         warnings.append(
-            "current Qwen browser export contract only models flat attention KV caches, but this checkpoint "
-            f"contains {linear_attention_layers} linear_attention layer(s) that require additional recurrent "
-            "state (for example conv/linear-attention cache state) in the decoder session contract"
+            f"Qwen3.5 export expected {num_hidden_layers} layer_types entries, got {len(layer_types)}"
         )
+
+    unknown_layer_types = sorted({layer_type for layer_type in layer_types if layer_type not in {"full_attention", "linear_attention"}})
+    if unknown_layer_types:
+        ok = False
+        warnings.append("unsupported Qwen3.5 layer_types: " + ", ".join(unknown_layer_types))
+
+    if any(layer_type == "linear_attention" for layer_type in layer_types):
+        if linear_conv_kernel_dim <= 0:
+            ok = False
+            warnings.append("Qwen3.5 export currently expects linear_conv_kernel_dim > 0 when linear_attention layers are present")
+        if linear_num_key_heads <= 0:
+            ok = False
+            warnings.append("Qwen3.5 export currently expects linear_num_key_heads > 0 when linear_attention layers are present")
+        if linear_num_value_heads <= 0:
+            ok = False
+            warnings.append("Qwen3.5 export currently expects linear_num_value_heads > 0 when linear_attention layers are present")
+        if linear_key_head_dim <= 0:
+            ok = False
+            warnings.append("Qwen3.5 export currently expects linear_key_head_dim > 0 when linear_attention layers are present")
+        if linear_value_head_dim <= 0:
+            ok = False
+            warnings.append("Qwen3.5 export currently expects linear_value_head_dim > 0 when linear_attention layers are present")
+
+    decoder_cache_entries: list[DecoderCacheEntry] = []
+    if not unknown_layer_types and len(layer_types) == num_hidden_layers:
+        decoder_cache_entries = _build_qwen3_5_decoder_cache_entries(layer_types)
 
     sessions = [
         SessionSpec(
@@ -167,17 +269,23 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         "logits": {0: "batch", 1: "sequence"},
     }
 
-    for layer_index in range(num_hidden_layers):
-        key_name = f"past_key_values.{layer_index}.key"
-        value_name = f"past_key_values.{layer_index}.value"
-        present_key_name = f"present.{layer_index}.key"
-        present_value_name = f"present.{layer_index}.value"
-        decoder_inputs.extend([key_name, value_name])
-        decoder_outputs.extend([present_key_name, present_value_name])
-        decoder_dynamic_axes[key_name] = {0: "batch", 2: "past_sequence"}
-        decoder_dynamic_axes[value_name] = {0: "batch", 2: "past_sequence"}
-        decoder_dynamic_axes[present_key_name] = {0: "batch", 2: "present_sequence"}
-        decoder_dynamic_axes[present_value_name] = {0: "batch", 2: "present_sequence"}
+    for cache_entry in decoder_cache_entries:
+        decoder_inputs.extend(cache_entry.input_names)
+        decoder_outputs.extend(cache_entry.output_names)
+        if cache_entry.layer_type == "full_attention":
+            key_name, value_name = cache_entry.input_names
+            present_key_name, present_value_name = cache_entry.output_names
+            decoder_dynamic_axes[key_name] = {0: "batch", 2: "past_sequence"}
+            decoder_dynamic_axes[value_name] = {0: "batch", 2: "past_sequence"}
+            decoder_dynamic_axes[present_key_name] = {0: "batch", 2: "present_sequence"}
+            decoder_dynamic_axes[present_value_name] = {0: "batch", 2: "present_sequence"}
+        else:
+            conv_name, recurrent_name = cache_entry.input_names
+            present_conv_name, present_recurrent_name = cache_entry.output_names
+            decoder_dynamic_axes[conv_name] = {0: "batch"}
+            decoder_dynamic_axes[recurrent_name] = {0: "batch"}
+            decoder_dynamic_axes[present_conv_name] = {0: "batch"}
+            decoder_dynamic_axes[present_recurrent_name] = {0: "batch"}
 
     sessions.append(
         SessionSpec(
@@ -189,6 +297,7 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
             dynamic_axes=decoder_dynamic_axes,
             notes=[
                 "Cache names follow the flat Transformers.js convention (`past_key_values.*` in, `present.*` out).",
+                "Full-attention layers expose KV tensors; linear-attention layers expose conv/recurrent state tensors.",
                 "The merged decoder uses precomputed image features plus mm_token_type_ids to preserve the multimodal path.",
             ],
         )
@@ -199,8 +308,15 @@ def build_qwen3_5_export_contract(manifest: Manifest, source_path: str | Path) -
         model_type=str(source_config.get("model_type", "")),
         architecture=architecture,
         num_hidden_layers=num_hidden_layers,
+        layer_types=layer_types,
         num_key_value_heads=num_key_value_heads,
         head_dim=head_dim,
+        linear_conv_kernel_dim=linear_conv_kernel_dim,
+        linear_num_key_heads=linear_num_key_heads,
+        linear_num_value_heads=linear_num_value_heads,
+        linear_key_head_dim=linear_key_head_dim,
+        linear_value_head_dim=linear_value_head_dim,
+        decoder_cache_entries=decoder_cache_entries,
         image_token_id=int(image_token_id) if image_token_id is not None else None,
         video_token_id=int(video_token_id) if video_token_id is not None else None,
         sessions=sessions,
@@ -463,21 +579,95 @@ def render_qwen3_5_export_runner(
             __setattr__ = dict.__setitem__
 
 
+        def _linear_conv_dim_from_contract():
+            return (
+                CONTRACT["linear_num_key_heads"] * CONTRACT["linear_key_head_dim"] * 2
+                + CONTRACT["linear_num_value_heads"] * CONTRACT["linear_value_head_dim"]
+            )
+
+
+        class FlatQwen35CacheLayer(AttrDict):
+            def __init__(
+                self,
+                *,
+                layer_type,
+                key_states=None,
+                value_states=None,
+                conv_states=None,
+                recurrent_states=None,
+            ):
+                super().__init__(
+                    layer_type=layer_type,
+                    key_states=key_states,
+                    value_states=value_states,
+                    conv_states=conv_states,
+                    recurrent_states=recurrent_states,
+                )
+
+
         class FlatQwen35Cache:
-            def __init__(self, entries):
-                self.keys = [key for key, _ in entries]
-                self.values = [value for _, value in entries]
+            def __init__(self, cache_entries, tensors):
+                self.cache_entries = list(cache_entries)
+                self.layers = []
+                tensor_index = 0
+                for cache_entry in self.cache_entries:
+                    layer_type = cache_entry["layer_type"]
+                    if layer_type == "full_attention":
+                        key_states = tensors[tensor_index]
+                        value_states = tensors[tensor_index + 1]
+                        tensor_index += 2
+                        self.layers.append(
+                            FlatQwen35CacheLayer(
+                                layer_type=layer_type,
+                                key_states=key_states,
+                                value_states=value_states,
+                            )
+                        )
+                    elif layer_type == "linear_attention":
+                        conv_states = tensors[tensor_index]
+                        recurrent_states = tensors[tensor_index + 1]
+                        tensor_index += 2
+                        self.layers.append(
+                            FlatQwen35CacheLayer(
+                                layer_type=layer_type,
+                                conv_states=conv_states,
+                                recurrent_states=recurrent_states,
+                            )
+                        )
+                    else:
+                        raise ValueError(f"unsupported Qwen3.5 cache layer type: {{layer_type!r}}")
+
+                if tensor_index != len(tensors):
+                    raise ValueError(
+                        "decoder cache tensor count does not match contract metadata: "
+                        f"consumed={{tensor_index}} provided={{len(tensors)}}"
+                    )
                 self.is_initialized = True
 
-            def get_seq_length(self, layer_idx: int = 0):
-                if not self.keys:
-                    return 0
-                return self.keys[layer_idx].shape[-2]
+            def _layer_has_previous_state(self, layer_idx: int):
+                layer = self.layers[layer_idx]
+                if layer.layer_type == "full_attention":
+                    return layer.key_states is not None and layer.key_states.shape[-2] > 0
+                return layer.conv_states is not None and layer.recurrent_states is not None
 
-            def has_previous_state(self, layer_idx: int = 0):
-                return self.get_seq_length(layer_idx) > 0
+            def get_seq_length(self, layer_idx: int = 0):
+                if not self.layers:
+                    return 0
+                layer = self.layers[layer_idx]
+                if layer.layer_type == "full_attention":
+                    return layer.key_states.shape[-2]
+                return 1 if self._layer_has_previous_state(layer_idx) else 0
+
+            def has_previous_state(self, layer_idx: int | None = None):
+                if layer_idx is None:
+                    return any(self._layer_has_previous_state(index) for index in range(len(self.layers)))
+                return self._layer_has_previous_state(layer_idx)
 
             def get_mask_sizes(self, q_length, layer_idx: int = 0):
+                if self.layers[layer_idx].layer_type != "full_attention":
+                    if torch.is_tensor(q_length):
+                        return q_length, 0
+                    return int(q_length), 0
                 kv_offset = self.get_seq_length(layer_idx)
                 if torch.is_tensor(q_length):
                     kv_length = q_length + kv_offset
@@ -486,16 +676,38 @@ def render_qwen3_5_export_runner(
                 return kv_length, kv_offset
 
             def update(self, key_states, value_states, layer_idx: int):
-                next_key_states = torch.cat([self.keys[layer_idx], key_states], dim=-2)
-                next_value_states = torch.cat([self.values[layer_idx], value_states], dim=-2)
-                self.keys[layer_idx] = next_key_states
-                self.values[layer_idx] = next_value_states
+                layer = self.layers[layer_idx]
+                if layer.layer_type != "full_attention":
+                    raise TypeError("update() is only valid for Qwen3.5 full_attention cache layers")
+                next_key_states = torch.cat([layer.key_states, key_states], dim=-2)
+                next_value_states = torch.cat([layer.value_states, value_states], dim=-2)
+                layer.key_states = next_key_states
+                layer.value_states = next_value_states
                 return next_key_states, next_value_states
+
+            def update_conv_state(self, conv_state, layer_idx: int):
+                layer = self.layers[layer_idx]
+                if layer.layer_type != "linear_attention":
+                    raise TypeError("update_conv_state() is only valid for Qwen3.5 linear_attention cache layers")
+                layer.conv_states = conv_state
+                return conv_state
+
+            def update_recurrent_state(self, recurrent_state, layer_idx: int):
+                layer = self.layers[layer_idx]
+                if layer.layer_type != "linear_attention":
+                    raise TypeError(
+                        "update_recurrent_state() is only valid for Qwen3.5 linear_attention cache layers"
+                    )
+                layer.recurrent_states = recurrent_state
+                return recurrent_state
 
             def flatten(self):
                 values = []
-                for key_states, value_states in zip(self.keys, self.values):
-                    values.extend([key_states, value_states])
+                for cache_entry, layer in zip(self.cache_entries, self.layers):
+                    if cache_entry["layer_type"] == "full_attention":
+                        values.extend([layer.key_states, layer.value_states])
+                    else:
+                        values.extend([layer.conv_states, layer.recurrent_states])
                 return tuple(values)
 
 
@@ -589,10 +801,7 @@ def render_qwen3_5_export_runner(
                 position_ids,
                 *past_key_values,
             ):
-                cache_entries = []
-                for index in range(0, len(past_key_values), 2):
-                    cache_entries.append((past_key_values[index], past_key_values[index + 1]))
-                flat_cache = FlatQwen35Cache(cache_entries)
+                flat_cache = FlatQwen35Cache(CONTRACT["decoder_cache_entries"], past_key_values)
 
                 merged_inputs_embeds = inputs_embeds.clone()
                 image_mask = mm_token_type_ids == 1
@@ -728,10 +937,24 @@ def render_qwen3_5_export_runner(
             inputs_embeds = embed_wrapper(input_ids)
 
             cache_tensors = []
-            for _ in range(CONTRACT["num_hidden_layers"]):
-                cache_shape = (1, CONTRACT["num_key_value_heads"], 1, CONTRACT["head_dim"])
-                cache_tensors.append(torch.zeros(cache_shape, dtype=hidden_dtype, device=device))
-                cache_tensors.append(torch.zeros(cache_shape, dtype=hidden_dtype, device=device))
+            linear_conv_dim = _linear_conv_dim_from_contract()
+            for cache_entry in CONTRACT["decoder_cache_entries"]:
+                if cache_entry["layer_type"] == "full_attention":
+                    cache_shape = (1, CONTRACT["num_key_value_heads"], 1, CONTRACT["head_dim"])
+                    cache_tensors.append(torch.zeros(cache_shape, dtype=hidden_dtype, device=device))
+                    cache_tensors.append(torch.zeros(cache_shape, dtype=hidden_dtype, device=device))
+                elif cache_entry["layer_type"] == "linear_attention":
+                    conv_state_shape = (1, linear_conv_dim, CONTRACT["linear_conv_kernel_dim"])
+                    recurrent_state_shape = (
+                        1,
+                        CONTRACT["linear_num_value_heads"],
+                        CONTRACT["linear_key_head_dim"],
+                        CONTRACT["linear_value_head_dim"],
+                    )
+                    cache_tensors.append(torch.zeros(conv_state_shape, dtype=hidden_dtype, device=device))
+                    cache_tensors.append(torch.zeros(recurrent_state_shape, dtype=hidden_dtype, device=device))
+                else:
+                    raise ValueError(f"unsupported Qwen3.5 cache layer type: {{cache_entry['layer_type']!r}}")
 
             return {{
                 "vision_encoder": (pixel_values, image_grid_thw),
