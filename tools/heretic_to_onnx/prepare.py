@@ -39,7 +39,19 @@ def _download_repo(repo_id: str, destination: Path, extra_args: list[str]) -> di
 
 
 def _has_all_files(root: Path, required_files: list[str]) -> bool:
-    return all((root / relative_path).exists() for relative_path in required_files)
+    return root.exists() and all((root / relative_path).exists() for relative_path in required_files)
+
+
+def _can_reuse_base_snapshot(root: Path, required_files: list[str]) -> bool:
+    if not root.exists():
+        return False
+    for relative_path in required_files:
+        if (root / relative_path).exists():
+            continue
+        if relative_path == "preprocessor_config.json" and (root / "processor_config.json").exists():
+            continue
+        return False
+    return True
 
 
 def _has_full_source_weights(root: Path) -> bool:
@@ -86,10 +98,17 @@ def prepare_repos(
     else:
         base_path = layout.base_snapshot
         extra_files = manifest.inherit_assets.from_base_if_missing or ["processor_config.json", "preprocessor_config.json"]
-        if _has_all_files(base_path, [asset for asset in extra_files if asset != "preprocessor_config.json"]):
+        download_files = list(dict.fromkeys(extra_files))
+        if "preprocessor_config.json" in download_files and "processor_config.json" not in download_files:
+            try:
+                if not base_repo.exists("preprocessor_config.json") and base_repo.exists("processor_config.json"):
+                    download_files.append("processor_config.json")
+            except Exception:
+                pass
+        if _can_reuse_base_snapshot(base_path, extra_files):
             notes.append(f"reused existing base snapshot at {base_path}")
         else:
-            commands.append(_download_repo(manifest.base_model_id, base_path, extra_files))
+            commands.append(_download_repo(manifest.base_model_id, base_path, download_files))
 
     report = PrepareReport(
         ok=True,
