@@ -322,6 +322,14 @@ def render_qwen3_5_export_runner(
                     return 0
                 return self.keys[layer_idx].shape[-2]
 
+            def get_mask_sizes(self, q_length, layer_idx: int = 0):
+                kv_offset = self.get_seq_length(layer_idx)
+                if torch.is_tensor(q_length):
+                    kv_length = q_length + kv_offset
+                else:
+                    kv_length = int(q_length) + kv_offset
+                return kv_length, kv_offset
+
             def update(self, key_states, value_states, layer_idx: int):
                 next_key_states = torch.cat([self.keys[layer_idx], key_states], dim=-2)
                 next_value_states = torch.cat([self.values[layer_idx], value_states], dim=-2)

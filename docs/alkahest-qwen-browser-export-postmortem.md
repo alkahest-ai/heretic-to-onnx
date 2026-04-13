@@ -253,6 +253,22 @@ That is not how the Qwen multimodal path behaves in practice:
 
 That is more stable than depending on private Hugging Face reinjection hooks during ONNX export.
 
+### 10. The flat cache shim also has to implement the newer masking helper API
+
+Once the merged decoder sample moved far enough into the text stack, the next traceback came from the cache shim itself:
+
+- `AttributeError: 'FlatQwen35Cache' object has no attribute 'get_mask_sizes'`
+
+That is not a model-graph issue.
+
+It means newer Transformers masking utilities expect the export-time KV cache adapter to provide:
+
+- `get_seq_length(...)`
+- `get_mask_sizes(...)`
+- `update(...)`
+
+So the direct Qwen export shim has to match not just the cache tensor shapes, but the cache helper interface expected by current masking code.
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -297,6 +313,7 @@ What is true right now:
 - Qwen image understanding exists upstream
 - current `alkahest-*` browser export is intended to ship only `text + image`
 - the direct Qwen export lane is still blocked, but the blocker has moved from synthetic vision sample sizing into the merged decoder export shim
+- the direct Qwen export lane is still blocked, but the blocker is now in narrow compatibility shims around the merged decoder export path
 
 What is likely true next:
 
@@ -313,4 +330,5 @@ It is:
 - patch or bypass the Qwen vision SDPA/GQA path so ONNX export can lower it safely
 - reserve one image placeholder slot per merged image feature token
 - merge image features back into `inputs_embeds` directly from `mm_token_type_ids`
+- keep the flat KV cache shim aligned with the current Transformers masking helper interface
 - then resume ONNX export from there
