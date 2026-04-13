@@ -266,6 +266,7 @@ def render_gemma4_export_runner(
         import argparse
         import inspect
         import json
+        import types
         from pathlib import Path
 
         import numpy as np
@@ -706,6 +707,34 @@ def render_gemma4_export_runner(
             return model
 
 
+        def _patch_audio_attention_for_onnx_export(model):
+            audio_tower = getattr(model.model, "audio_tower", None)
+            layers = getattr(audio_tower, "layers", None)
+            if layers is None:
+                return
+
+            def _extract_block_context_export_safe(self, hidden_states: torch.Tensor) -> torch.Tensor:
+                batch_size, seq_len, num_heads, head_dim = hidden_states.shape
+                hidden_states = torch.nn.functional.pad(
+                    hidden_states,
+                    (0, 0, 0, 0, self.max_past_horizon, self.max_future_horizon + self.chunk_size - 1),
+                )
+                num_blocks = (seq_len + self.chunk_size - 1) // self.chunk_size
+                blocks = []
+                for block_index in range(num_blocks):
+                    start = block_index * self.chunk_size
+                    end = start + self.context_size
+                    blocks.append(hidden_states[:, start:end, :, :])
+                return torch.stack(blocks, dim=1).contiguous()
+
+            for layer in layers:
+                self_attn = getattr(layer, "self_attn", None)
+                if self_attn is None or getattr(self_attn, "_onnx_extract_block_context_patched", False):
+                    continue
+                self_attn._extract_block_context = types.MethodType(_extract_block_context_export_safe, self_attn)
+                self_attn._onnx_extract_block_context_patched = True
+
+
         def _build_sample_inputs(model, image_processor, feature_extractor, video_processor, processor_config: dict):
             text_config = model.config.text_config
             hidden_dtype = model.model.language_model.embed_tokens.weight.dtype
@@ -864,6 +893,8 @@ def render_gemma4_export_runner(
             video_processor = _load_video_processor(source_path, base_path) if CONTRACT.get("supports_video") else None
             processor_config = _resolve_processor_config(source_path, base_path)
             model = _load_model(source_path, args.torch_dtype, args.device)
+            if CONTRACT.get("supports_audio"):
+                _patch_audio_attention_for_onnx_export(model)
             sample_inputs = _build_sample_inputs(model, image_processor, feature_extractor, video_processor, processor_config)
 
             wrappers = {{

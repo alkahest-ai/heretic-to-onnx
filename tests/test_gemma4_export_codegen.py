@@ -157,8 +157,12 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         self.assertIn('video_processor = processor_config.get("video_processor")', runner)
         self.assertIn("def _build_video_sample_inputs(video_processor, image_height: int, image_width: int, device):", runner)
         self.assertIn('processed.get("pixel_values_videos")', runner)
+        self.assertIn("def _patch_audio_attention_for_onnx_export(model):", runner)
+        self.assertIn("def _extract_block_context_export_safe(self, hidden_states: torch.Tensor) -> torch.Tensor:", runner)
+        self.assertIn("self_attn._extract_block_context = types.MethodType(_extract_block_context_export_safe, self_attn)", runner)
         self.assertIn('if CONTRACT.get("supports_video"):', runner)
         self.assertIn('if CONTRACT.get("supports_audio"):', runner)
+        self.assertIn('_patch_audio_attention_for_onnx_export(model)', runner)
         self.assertIn('wrappers["audio_encoder"] = Gemma4AudioEncoderWrapper(model)', runner)
 
 
