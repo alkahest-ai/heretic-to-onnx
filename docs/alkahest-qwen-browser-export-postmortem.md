@@ -286,6 +286,21 @@ That is already handled in the Gemma export lane with a compatibility shim that:
 
 So the Qwen export lane needs the same style of masking-utils patch, not a different model-specific workaround.
 
+### 12. The flat cache shim also needs `has_previous_state()`
+
+After the masking-utils shim was added, the next traceback stayed in the same area:
+
+- `AttributeError: 'FlatQwen35Cache' object has no attribute 'has_previous_state'`
+
+That confirms the remaining work is still cache-interface compatibility, not model export structure.
+
+For the current Qwen text stack, the export-time cache adapter has to satisfy not only tensor-shape expectations, but also helper methods like:
+
+- `get_seq_length(...)`
+- `get_mask_sizes(...)`
+- `has_previous_state()`
+- `update(...)`
+
 ## Operational Nuance: Failed Pulls Can Make New Logs Look Old
 
 One concrete trap showed up during debugging:
@@ -332,6 +347,7 @@ What is true right now:
 - the direct Qwen export lane is still blocked, but the blocker has moved from synthetic vision sample sizing into the merged decoder export shim
 - the direct Qwen export lane is still blocked, but the blocker is now in narrow compatibility shims around the merged decoder export path
 - the direct Qwen export lane is still blocked, but the remaining blockers are now narrow compatibility shims around the merged decoder and masking helper paths
+- the direct Qwen export lane is still blocked, but the remaining blockers are now narrow cache and masking compatibility shims around the merged decoder path
 
 What is likely true next:
 
@@ -350,4 +366,5 @@ It is:
 - merge image features back into `inputs_embeds` directly from `mm_token_type_ids`
 - keep the flat KV cache shim aligned with the current Transformers masking helper interface
 - patch the newer Transformers SDPA masking helper for ONNX export just like the Gemma lane already does
+- keep the flat KV cache shim aligned with helper methods like `has_previous_state()`
 - then resume ONNX export from there

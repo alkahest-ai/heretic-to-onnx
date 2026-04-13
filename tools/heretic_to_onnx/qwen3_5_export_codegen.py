@@ -462,6 +462,9 @@ def render_qwen3_5_export_runner(
                     return 0
                 return self.keys[layer_idx].shape[-2]
 
+            def has_previous_state(self):
+                return self.get_seq_length() > 0
+
             def get_mask_sizes(self, q_length, layer_idx: int = 0):
                 kv_offset = self.get_seq_length(layer_idx)
                 if torch.is_tensor(q_length):
