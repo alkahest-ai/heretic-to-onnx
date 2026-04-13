@@ -98,6 +98,21 @@ class PublishHFTests(unittest.TestCase):
         self.assertIn("# alkahest-2b-v2", content)
         self.assertIn("Supported inputs: `text`, `image`, `video`", content)
 
+    def test_local_source_model_id_is_not_emitted_as_base_model_metadata(self) -> None:
+        manifest = _manifest(
+            target_repo_id="thomasjvu/alkahest-4b-v2",
+            modalities=["text", "image", "video"],
+            architecture="qwen3_5_conditional_generation",
+        )
+        manifest.source_model_id = "/home/jovyan/work/heretic-to-onnx/build/phala_gpu_tee/alkahest-4b-direct/inputs/source"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "README.md"
+            written_path = write_model_card(manifest, output_path=output_path)
+            content = written_path.read_text(encoding="utf-8")
+
+        self.assertNotIn("base_model: /home/jovyan/work/heretic-to-onnx/build/phala_gpu_tee/alkahest-4b-direct/inputs/source", content)
+        self.assertIn("tags:", content)
+
 
 if __name__ == "__main__":
     unittest.main()
