@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from tools.heretic_to_onnx.config import InheritAssets, Manifest, ValidationConfig
-from tools.heretic_to_onnx.publish_hf import _ensure_model_card
+from tools.heretic_to_onnx.publish_hf import _ensure_model_card, write_model_card
 
 
 def _manifest(*, target_repo_id: str, modalities: list[str], architecture: str) -> Manifest:
@@ -82,6 +82,21 @@ class PublishHFTests(unittest.TestCase):
         self.assertNotIn("stale", content)
         self.assertIn("Supported inputs: `text`, `image`, `audio`, `video`", content)
         self.assertIn("The lighter v1 package remains available", content)
+
+    def test_write_model_card_renders_to_explicit_output_path(self) -> None:
+        manifest = _manifest(
+            target_repo_id="thomasjvu/alkahest-2b-v2",
+            modalities=["text", "image", "video"],
+            architecture="qwen3_5_conditional_generation",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "README.md"
+            written_path = write_model_card(manifest, output_path=output_path)
+            content = written_path.read_text(encoding="utf-8")
+
+        self.assertEqual(written_path, output_path.resolve())
+        self.assertIn("# alkahest-2b-v2", content)
+        self.assertIn("Supported inputs: `text`, `image`, `video`", content)
 
 
 if __name__ == "__main__":
