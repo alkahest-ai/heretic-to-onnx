@@ -40,6 +40,14 @@ def _format_row(row: dict, tokenizer, *, enable_thinking: bool) -> dict:
     return {"text": rendered}
 
 
+def _save_generation_config(model, output_dir: Path) -> None:
+    generation_config = getattr(model, "generation_config", None)
+    if generation_config is None:
+        return
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generation_config.save_pretrained(str(output_dir))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-name", default="p-e-w/gemma-4-E2B-it-heretic-ara")
@@ -156,6 +164,7 @@ def main() -> int:
         merged_dir = Path(args.merged_output_dir).expanduser().resolve()
         merged_dir.mkdir(parents=True, exist_ok=True)
         model.save_pretrained_merged(str(merged_dir), tokenizer, save_method="merged_16bit")
+        _save_generation_config(model, merged_dir)
 
     dataset_manifest_path = Path(args.dataset_manifest).expanduser().resolve()
     dataset_manifest = None
