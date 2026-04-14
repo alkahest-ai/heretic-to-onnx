@@ -1,11 +1,11 @@
 import {
-  clearBrowserModelCache,
-  createBrowserChatRuntime,
   DEFAULT_MODEL_ID,
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
 } from "../examples/browser-loader.mjs";
+import { formatRuntimeError } from "./runtime-errors.mjs";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
@@ -24,6 +24,11 @@ const elements = {
   clearChat: document.querySelector("#clear-chat"),
   clearCache: document.querySelector("#clear-cache"),
   runtimeStatus: document.querySelector("#runtime-status"),
+  runtimePercent: document.querySelector("#runtime-percent"),
+  runtimeAge: document.querySelector("#runtime-age"),
+  runtimeProgressBar: document.querySelector("#runtime-progress-bar"),
+  runtimeDetail: document.querySelector("#runtime-detail"),
+  runtimeLog: document.querySelector("#runtime-log"),
   messages: document.querySelector("#messages"),
   chatForm: document.querySelector("#chat-form"),
   promptInput: document.querySelector("#prompt-input"),
@@ -31,11 +36,12 @@ const elements = {
 };
 
 const state = {
-  runtime: createBrowserChatRuntime(),
+  runtime: createBrowserChatRuntimeClient(),
   messages: [],
   loading: false,
   generating: false,
   loadedModelId: null,
+  loadedTextOnly: null,
   composerMedia: {
     image: null,
     audio: null,
@@ -43,33 +49,308 @@ const state = {
   },
 };
 
+const statusState = {
+  timer: null,
+  pending: null,
+  lastRendered: "",
+};
+
+const runtimeState = {
+  percent: null,
+  detail: "Waiting for model activity.",
+  lastUpdateAt: null,
+  logEntries: [],
+  lastLogKey: "",
+};
+
+const pendingDotsState = {
+  frame: 0,
+  timer: null,
+};
+
 function initialModelId() {
   const url = new URL(window.location.href);
   return url.searchParams.get("model") || DEFAULT_MODEL_ID;
 }
 
-function setStatus(message) {
-  elements.runtimeStatus.textContent = message;
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatRuntimePercent(percent) {
+  return percent == null ? "--%" : `${Math.round(clampPercent(percent))}%`;
+}
+
+function formatByteCount(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return null;
+  }
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const digits = value >= 100 || unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function formatRuntimeAge(timestamp) {
+  if (!timestamp) {
+    return "No transfers yet.";
+  }
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 2) {
+    return "Updated just now.";
+  }
+  if (seconds < 60) {
+    return `Updated ${seconds}s ago.`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder > 0 ? `Updated ${minutes}m ${remainder}s ago.` : `Updated ${minutes}m ago.`;
+}
+
+function formatLogTime(date) {
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function renderRuntimeLog() {
+  elements.runtimeLog.innerHTML = "";
+
+  if (runtimeState.logEntries.length === 0) {
+    const line = document.createElement("p");
+    line.className = "runtime-log-entry";
+    line.textContent = "No runtime events yet.";
+    elements.runtimeLog.append(line);
+    return;
+  }
+
+  for (const entry of runtimeState.logEntries) {
+    const line = document.createElement("p");
+    line.className = "runtime-log-entry";
+
+    const stamp = document.createElement("strong");
+    stamp.textContent = formatLogTime(entry.time);
+    line.append(stamp);
+    line.append(` ${entry.text}`);
+    elements.runtimeLog.append(line);
+  }
+}
+
+function renderRuntimeAge() {
+  elements.runtimeAge.textContent = formatRuntimeAge(runtimeState.lastUpdateAt);
+}
+
+function renderRuntimePanel() {
+  const statusText = (statusState.pending ?? statusState.lastRendered) || "Waiting for model activity.";
+  elements.runtimeStatus.textContent = statusText;
+  elements.runtimePercent.textContent = formatRuntimePercent(runtimeState.percent);
+  renderRuntimeAge();
+  elements.runtimeProgressBar.style.width =
+    runtimeState.percent == null ? "0%" : `${clampPercent(runtimeState.percent)}%`;
+  elements.runtimeDetail.textContent = runtimeState.detail;
+}
+
+function pushRuntimeLog(text, key = text) {
+  if (!text || key === runtimeState.lastLogKey) {
+    return;
+  }
+  runtimeState.lastLogKey = key;
+  runtimeState.logEntries = [{ time: new Date(), text }, ...runtimeState.logEntries].slice(0, 12);
+  renderRuntimeLog();
+}
+
+function beginRuntimeActivity(statusMessage, { detail = statusMessage, resetProgress = false } = {}) {
+  if (resetProgress) {
+    runtimeState.percent = 0;
+  }
+  runtimeState.detail = detail;
+  runtimeState.lastUpdateAt = Date.now();
+  pushRuntimeLog(statusMessage);
+  setStatus(statusMessage, { immediate: true });
+  renderRuntimePanel();
+}
+
+function finishRuntimeActivity(statusMessage, { detail = statusMessage, percent = 100 } = {}) {
+  runtimeState.percent = percent;
+  runtimeState.detail = detail;
+  runtimeState.lastUpdateAt = Date.now();
+  pushRuntimeLog(statusMessage);
+  setStatus(statusMessage, { immediate: true });
+  renderRuntimePanel();
+}
+
+function failRuntimeActivity(statusMessage) {
+  runtimeState.detail = statusMessage;
+  runtimeState.lastUpdateAt = Date.now();
+  pushRuntimeLog(statusMessage);
+  setStatus(statusMessage, { immediate: true });
+  renderRuntimePanel();
+}
+
+function extractProgressPercent(info) {
+  if (typeof info?.progress === "number") {
+    return clampPercent(info.progress);
+  }
+  if (typeof info?.loaded === "number" && typeof info?.total === "number" && info.total > 0) {
+    return clampPercent((info.loaded / info.total) * 100);
+  }
+  return null;
+}
+
+function buildRuntimeDetail(info, message) {
+  const percent = extractProgressPercent(info);
+  const file = typeof info?.file === "string" ? info.file : "";
+  const loaded = formatByteCount(info?.loaded);
+  const total = formatByteCount(info?.total);
+  const bytes = loaded && total ? `${loaded} / ${total}` : loaded ? `${loaded} transferred` : "";
+  const status = typeof info?.status === "string" ? info.status.replaceAll("_", " ") : "";
+
+  if (info?.status === "done") {
+    return {
+      percent: 100,
+      detail: message || "Model ready.",
+      logText: message || "Model ready.",
+      logKey: "done",
+    };
+  }
+
+  const detailParts = [];
+  if (file) {
+    detailParts.push(file);
+  }
+  if (percent != null) {
+    detailParts.push(`${Math.round(percent)}%`);
+  }
+  if (bytes) {
+    detailParts.push(bytes);
+  }
+  if (detailParts.length === 0 && status) {
+    detailParts.push(status);
+  }
+  if (detailParts.length === 0) {
+    detailParts.push(message || "Loading model...");
+  }
+
+  const bucket = percent == null ? "na" : String(Math.floor(percent / 10));
+  const logText = file
+    ? `${status || "progress"}: ${file}${percent != null ? ` (${Math.round(percent)}%)` : ""}${
+        bytes ? `, ${bytes}` : ""
+      }`
+    : message || status || "Loading model...";
+  const logKey = `${status}|${file}|${bucket}`;
+
+  return {
+    percent,
+    detail: detailParts.join(" | "),
+    logText,
+    logKey,
+  };
+}
+
+function handleRuntimeProgress(info, message) {
+  const nextStatus = message || "Loading model...";
+  const next = buildRuntimeDetail(info, nextStatus);
+  if (next.percent != null) {
+    runtimeState.percent = next.percent;
+  }
+  runtimeState.detail = next.detail;
+  runtimeState.lastUpdateAt = Date.now();
+  pushRuntimeLog(next.logText, next.logKey);
+  setStatus(nextStatus);
+  renderRuntimePanel();
+}
+
+function flushStatus() {
+  if (statusState.timer) {
+    clearTimeout(statusState.timer);
+    statusState.timer = null;
+  }
+  if (statusState.pending == null || statusState.pending === statusState.lastRendered) {
+    return;
+  }
+  statusState.lastRendered = statusState.pending;
+  renderRuntimePanel();
+}
+
+function setStatus(message, { immediate = false } = {}) {
+  statusState.pending = message;
+  if (immediate) {
+    flushStatus();
+    return;
+  }
+  if (statusState.timer) {
+    return;
+  }
+  statusState.timer = setTimeout(flushStatus, 120);
 }
 
 function setBusy({ loading = state.loading, generating = state.generating } = {}) {
   state.loading = loading;
   state.generating = generating;
   const disabled = state.loading || state.generating;
+  const modelSelectionDisabled = state.generating;
 
   elements.loadModel.disabled = disabled;
   elements.clearChat.disabled = disabled;
   elements.clearCache.disabled = disabled;
   elements.sendMessage.disabled = disabled;
   elements.promptInput.disabled = disabled;
-  elements.modelId.disabled = disabled;
-  elements.presetModel.disabled = disabled;
+  elements.modelId.disabled = modelSelectionDisabled;
+  elements.presetModel.disabled = modelSelectionDisabled;
   elements.imageInput.disabled = disabled;
   elements.audioInput.disabled = disabled || !selectedPresetSupports("audio");
   elements.videoInput.disabled = disabled || !selectedPresetSupports("video");
   elements.systemPrompt.disabled = disabled;
   elements.maxTokens.disabled = disabled;
   elements.temperature.disabled = disabled;
+}
+
+function hasComposerMedia() {
+  return Boolean(state.composerMedia.image || state.composerMedia.audio || state.composerMedia.video);
+}
+
+function makeReadyStatus(modelId, textOnly) {
+  if (!modelId) {
+    return "Ready.";
+  }
+  return textOnly
+    ? `Ready: ${modelId} (text sessions warm)`
+    : `Ready: ${modelId} (multimodal sessions warm)`;
+}
+
+function currentPendingDots() {
+  return ".".repeat((pendingDotsState.frame % 3) + 1);
+}
+
+function refreshPendingDots() {
+  for (const node of document.querySelectorAll(".bubble-body-pending")) {
+    node.textContent = currentPendingDots();
+  }
+}
+
+function syncPendingDotsTimer() {
+  const shouldAnimate = state.messages.some((message) => message.pending && !message.content);
+  if (shouldAnimate && !pendingDotsState.timer) {
+    pendingDotsState.timer = setInterval(() => {
+      pendingDotsState.frame = (pendingDotsState.frame + 1) % 3;
+      refreshPendingDots();
+    }, 360);
+    return;
+  }
+
+  if (!shouldAnimate && pendingDotsState.timer) {
+    clearInterval(pendingDotsState.timer);
+    pendingDotsState.timer = null;
+    pendingDotsState.frame = 0;
+  }
 }
 
 function truncateContext(messages, turns = 10) {
@@ -83,11 +364,16 @@ function createBubble(message) {
 
   const label = document.createElement("p");
   label.className = "bubble-label";
-  label.textContent = message.role === "assistant" ? "Model" : "User";
+  label.textContent = message.role === "assistant" ? "assistant" : "user";
 
   const body = document.createElement("p");
   body.className = "bubble-body";
-  body.textContent = message.content || (message.pending ? "..." : "");
+  if (message.pending && !message.content) {
+    body.classList.add("bubble-body-pending");
+    body.textContent = currentPendingDots();
+  } else {
+    body.textContent = message.content || "";
+  }
 
   wrapper.append(label);
 
@@ -125,7 +411,7 @@ function renderMessages() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent =
-      "Load a model, then send a prompt. The response is generated locally in the browser with WebGPU.";
+      "Choose a preset, load it, then chat or attach media. The UI stays responsive while the browser runtime downloads and compiles in the background.";
     elements.messages.append(empty);
     return;
   }
@@ -133,6 +419,7 @@ function renderMessages() {
   for (const message of state.messages) {
     elements.messages.append(createBubble(message));
   }
+  syncPendingDotsTimer();
   elements.messages.scrollTop = elements.messages.scrollHeight;
 }
 
@@ -211,7 +498,7 @@ function syncComposerMediaState() {
   elements.videoInput.disabled = state.loading || state.generating || !videoEnabled;
   elements.videoStatus.textContent = describeMediaEntry(
     state.composerMedia.video,
-    videoEnabled ? "No video selected." : "Video input is enabled only for v2 multimodal presets.",
+    videoEnabled ? "No video selected." : "Video input is enabled only for presets that ship video support.",
   );
 }
 
@@ -298,18 +585,25 @@ async function loadModel() {
 
   try {
     setBusy({ loading: true, generating: false });
-    setStatus(`Loading ${modelId}...`);
-    await state.runtime.load({
+    beginRuntimeActivity(`Loading text sessions for ${modelId}...`, {
+      detail: "Preparing text-only session warm load.",
+      resetProgress: true,
+    });
+    const result = await state.runtime.load({
       modelId,
       modelFamily: preset?.family,
       dtype: preset?.dtype,
-      onProgress: (_info, message) => setStatus(message),
+      textOnly: true,
+      onProgress: handleRuntimeProgress,
     });
     state.loadedModelId = modelId;
+    state.loadedTextOnly = result?.textOnly ?? true;
     setQueryModel(modelId);
-    setStatus(`Ready: ${modelId}`);
+    finishRuntimeActivity(result?.readyMessage ?? makeReadyStatus(modelId, state.loadedTextOnly), {
+      detail: result?.readyMessage ?? "Text sessions are ready.",
+    });
   } catch (error) {
-    setStatus(`Load failed: ${error.message}`);
+    failRuntimeActivity(`Load failed: ${formatRuntimeError(error)}`);
   } finally {
     setBusy({ loading: false, generating: false });
   }
@@ -318,18 +612,13 @@ async function loadModel() {
 async function sendMessage() {
   const typedPrompt = elements.promptInput.value.trim();
   const prompt = typedPrompt || defaultPromptForComposerMedia();
-  if (!prompt && !state.composerMedia.image && !state.composerMedia.audio && !state.composerMedia.video) {
+  const needsMultimodal = hasComposerMedia();
+  if (!prompt && !needsMultimodal) {
     return;
   }
 
   const modelId = elements.modelId.value.trim();
   const preset = findModelPreset(modelId);
-  if (!state.loadedModelId || state.loadedModelId !== modelId) {
-    await loadModel();
-    if (state.loadedModelId !== modelId) {
-      return;
-    }
-  }
 
   const userMessage = {
     role: "user",
@@ -352,7 +641,21 @@ async function sendMessage() {
 
   try {
     setBusy({ loading: false, generating: true });
-    setStatus(`Generating with ${modelId}...`);
+    const preparingStatus =
+      !state.loadedModelId || state.loadedModelId !== modelId
+        ? needsMultimodal
+          ? `Loading multimodal sessions for ${modelId}...`
+          : `Loading text sessions for ${modelId}...`
+        : state.loadedTextOnly && needsMultimodal
+          ? `Upgrading ${modelId} to multimodal sessions...`
+          : `Generating with ${modelId}...`;
+    beginRuntimeActivity(preparingStatus, {
+      detail: needsMultimodal
+        ? "Preparing multimodal runtime sessions."
+        : "Preparing text generation.",
+      resetProgress:
+        !state.loadedModelId || state.loadedModelId !== modelId || (state.loadedTextOnly && needsMultimodal),
+    });
 
     const result = await state.runtime.generate({
       modelId,
@@ -364,7 +667,7 @@ async function sendMessage() {
       ),
       maxNewTokens: Number(elements.maxTokens.value),
       temperature: Number(elements.temperature.value),
-      onProgress: (_info, message) => setStatus(message),
+      onProgress: handleRuntimeProgress,
       onToken: (fullText) => {
         assistantMessage.content = fullText;
         renderMessages();
@@ -373,10 +676,16 @@ async function sendMessage() {
 
     assistantMessage.content = result || assistantMessage.content || "No output returned.";
     assistantMessage.pending = false;
-    setStatus(`Ready: ${modelId}`);
+    state.loadedModelId = modelId;
+    state.loadedTextOnly = !needsMultimodal;
+    setQueryModel(modelId);
+    finishRuntimeActivity(makeReadyStatus(modelId, state.loadedTextOnly), {
+      detail: "Generation complete.",
+      percent: runtimeState.percent ?? 100,
+    });
   } catch (error) {
     state.messages.pop();
-    setStatus(`Generation failed: ${error.message}`);
+    failRuntimeActivity(`Generation failed: ${formatRuntimeError(error)}`);
   } finally {
     setBusy({ loading: false, generating: false });
     renderMessages();
@@ -388,27 +697,38 @@ function clearChat() {
   resetComposerMedia();
   state.messages = [];
   renderMessages();
-  setStatus(state.loadedModelId ? `Ready: ${state.loadedModelId}` : "Chat cleared.");
+  setStatus(state.loadedModelId ? `Ready: ${state.loadedModelId}` : "Chat cleared.", { immediate: true });
+  renderRuntimePanel();
 }
 
 async function clearCache() {
   try {
     setBusy({ loading: true, generating: false });
-    setStatus("Clearing browser model cache...");
-    await state.runtime.dispose();
-    const result = await clearBrowserModelCache();
+    beginRuntimeActivity("Clearing browser model cache...", {
+      detail: "Removing cached ONNX/browser artifacts.",
+      resetProgress: true,
+    });
+    const result = await state.runtime.clearCache();
     state.loadedModelId = null;
+    state.loadedTextOnly = null;
     if (!result.supported) {
-      setStatus("Browser cache API is not available in this environment.");
+      failRuntimeActivity("Browser cache API is not available in this environment.");
       return;
     }
-    setStatus(
+    finishRuntimeActivity(
       result.deleted.length > 0
         ? `Cleared ${result.deleted.length} browser cache entr${result.deleted.length === 1 ? "y" : "ies"}.`
         : "No cached Transformers.js model files were found.",
+      {
+        detail:
+          result.deleted.length > 0
+            ? `Removed ${result.deleted.length} cached browser entries.`
+            : "No cached browser entries were present.",
+        percent: null,
+      },
     );
   } catch (error) {
-    setStatus(`Cache clear failed: ${error.message}`);
+    failRuntimeActivity(`Cache clear failed: ${formatRuntimeError(error)}`);
   } finally {
     setBusy({ loading: false, generating: false });
   }
@@ -488,13 +808,15 @@ function bindEvents() {
 
 function initializeRuntimeStatus() {
   if (!navigator.gpu) {
-    setStatus("WebGPU is not available. Use a modern desktop browser with WebGPU enabled.");
+    runtimeState.detail = "WebGPU is unavailable in this browser.";
+    setStatus("WebGPU is not available. Use a modern desktop browser with WebGPU enabled.", { immediate: true });
     setBusy({ loading: false, generating: false });
     elements.loadModel.disabled = true;
     elements.sendMessage.disabled = true;
     return;
   }
-  setStatus("WebGPU detected. Load a model to start.");
+  runtimeState.detail = "Waiting for model activity.";
+  setStatus("WebGPU detected. Load a model to start.", { immediate: true });
 }
 
 initializePresets();
@@ -502,3 +824,10 @@ bindEvents();
 renderMessages();
 initializeRuntimeStatus();
 syncComposerMediaState();
+renderRuntimeLog();
+renderRuntimePanel();
+setInterval(() => {
+  if (runtimeState.lastUpdateAt) {
+    renderRuntimeAge();
+  }
+}, 1000);

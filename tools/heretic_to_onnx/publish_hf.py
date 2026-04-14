@@ -7,6 +7,7 @@ from typing import Any
 
 from .config import Manifest
 from .runtime import resolve_hf_command, run_command
+from .validate_repo import validate_package
 
 
 @dataclass(slots=True)
@@ -18,6 +19,7 @@ class PublishHFReport:
     commands: list[list[str]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    validation: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -146,6 +148,9 @@ def _default_model_card(manifest: Manifest, repo_id: str) -> str:
             "",
             *_capability_section(manifest, repo_id),
             "",
+            "## Browser Release Gate",
+            "- Treat the capability list above as a browser contract only after this package passes packaged ONNX session validation and a manual browser smoke.",
+            "",
             "## Provenance",
             f"- Source model: `{manifest.source_model_id}`",
             f"- Base model for inherited processor assets: `{manifest.base_model_id}`",
@@ -235,6 +240,12 @@ def publish_hf(
     resolved_repo_id = repo_id or manifest.target_repo_id
     model_card_path = _ensure_model_card(manifest, resolved_package_dir, resolved_repo_id)
     hf_command = resolve_hf_command()
+    validation_report = validate_package(
+        manifest,
+        resolved_package_dir,
+        strict_onnx=True,
+        runtime_smoke=True,
+    )
 
     create_command = [*hf_command, "repos", "create", resolved_repo_id, "--type", "model", "--exist-ok"]
     if private:
@@ -258,7 +269,13 @@ def publish_hf(
         package_dir=str(resolved_package_dir),
         model_card_path=str(model_card_path),
         commands=[create_command, upload_command],
+        validation=validation_report.to_dict(),
     )
+
+    if not validation_report.ok:
+        report.ok = False
+        report.warnings.append("package failed pre-publish validation; refusing Hugging Face upload")
+        return report
 
     if not os.environ.get("HF_TOKEN"):
         report.ok = False

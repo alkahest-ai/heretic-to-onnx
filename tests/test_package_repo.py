@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tools.heretic_to_onnx.config import InheritAssets, Manifest, ValidationConfig
 from tools.heretic_to_onnx.package_repo import package_repo
+from tools.heretic_to_onnx.validate_repo import validate_package
 
 
 def _write_json(path: Path, data: dict) -> None:
@@ -15,6 +16,69 @@ def _write_json(path: Path, data: dict) -> None:
 
 
 class PackageRepoTests(unittest.TestCase):
+    def test_package_repo_normalizes_bfloat16_config_fields_for_q4f16_browser_packages(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_dir = root / "source"
+            base_dir = root / "base"
+            output_dir = root / "out"
+
+            _write_json(
+                source_dir / "config.json",
+                {
+                    "architectures": ["Gemma4ForConditionalGeneration"],
+                    "dtype": "bfloat16",
+                    "audio_config": {"dtype": "bfloat16"},
+                    "text_config": {"dtype": "bfloat16", "torch_dtype": "bfloat16"},
+                    "vision_config": {"dtype": "bfloat16"},
+                },
+            )
+            _write_json(source_dir / "generation_config.json", {})
+            _write_json(source_dir / "tokenizer.json", {})
+            _write_json(source_dir / "tokenizer_config.json", {})
+            (source_dir / "chat_template.jinja").write_text("{{ messages }}\n", encoding="utf-8")
+            _write_json(base_dir / "processor_config.json", {"image_processor": {"size": 224}})
+
+            manifest = Manifest(
+                source_model_id=str(source_dir),
+                base_model_id=str(base_dir),
+                architecture="gemma4_conditional_generation",
+                target_repo_id="alkahest-ai/rally-2b",
+                target_dtype="q4f16",
+                target_device="webgpu",
+                modalities=["text", "image"],
+                inherit_assets=InheritAssets(
+                    from_source=[
+                        "config.json",
+                        "generation_config.json",
+                        "tokenizer.json",
+                        "tokenizer_config.json",
+                        "chat_template.jinja",
+                    ],
+                    from_base_if_missing=["preprocessor_config.json"],
+                ),
+                expected_architecture="Gemma4ForConditionalGeneration",
+                expected_onnx_files=["onnx/decoder_model_merged_q4f16.onnx"],
+                validation=ValidationConfig(),
+                manifest_path=root / "manifest.yaml",
+            )
+
+            report = package_repo(
+                manifest,
+                output_dir=output_dir,
+                allow_missing_onnx=True,
+            )
+
+            self.assertTrue(report.ok)
+            config = json.loads((output_dir / "config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["dtype"], "float16")
+            self.assertEqual(config["audio_config"]["dtype"], "float16")
+            self.assertEqual(config["text_config"]["dtype"], "float16")
+            self.assertEqual(config["text_config"]["torch_dtype"], "float16")
+            self.assertEqual(config["vision_config"]["dtype"], "float16")
+            validation = validate_package(manifest, output_dir)
+            self.assertTrue(validation.ok, validation.errors)
+
     def test_package_repo_copies_video_preprocessor_from_base_when_requested(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

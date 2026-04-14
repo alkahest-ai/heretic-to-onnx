@@ -105,6 +105,7 @@ def run_convert(
     *,
     force: bool = False,
     strict_onnx: bool = False,
+    runtime_smoke: bool | None = None,
     work_dir: str | Path | None = None,
     onnx_source_dir: str | Path | None = None,
     export_mode: str = "plan",
@@ -113,6 +114,11 @@ def run_convert(
     opset_version: int = 17,
     block_size: int = 32,
 ) -> ConvertReport:
+    resolved_runtime_smoke = (
+        runtime_smoke
+        if runtime_smoke is not None
+        else strict_onnx or export_mode == "execute" or quantize_mode == "execute"
+    )
     layout = resolve_work_dir(manifest, work_dir).ensure()
     prepare_report = prepare_repos(manifest, layout.root, source_mode="metadata")
     inspect_report = inspect_manifest(
@@ -165,7 +171,12 @@ def run_convert(
         source_spec=prepare_report.source_path,
         base_spec=prepare_report.base_path,
     )
-    validation_report = validate_package(manifest, package_report.output_dir, strict_onnx=strict_onnx)
+    validation_report = validate_package(
+        manifest,
+        package_report.output_dir,
+        strict_onnx=strict_onnx,
+        runtime_smoke=resolved_runtime_smoke,
+    )
 
     return ConvertReport(
         ok=export_report.ok and quantize_report.ok and package_report.ok and validation_report.ok,

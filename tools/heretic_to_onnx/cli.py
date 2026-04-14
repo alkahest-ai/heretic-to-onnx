@@ -66,6 +66,11 @@ def _base_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument("--config", required=True, help="Path to manifest YAML")
     validate_parser.add_argument("--package-dir", required=True, help="Path to a packaged repo directory")
     validate_parser.add_argument("--strict-onnx", action="store_true", help="Treat missing ONNX files as errors")
+    validate_parser.add_argument(
+        "--skip-runtime-smoke",
+        action="store_true",
+        help="Skip packaged ONNX session instantiation checks",
+    )
 
     convert_parser = subparsers.add_parser("convert", help="Run inspect -> package -> validate")
     convert_parser.add_argument("--config", required=True, help="Path to manifest YAML")
@@ -74,6 +79,11 @@ def _base_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument("--onnx-source-dir", help="Directory containing exported ONNX artifacts")
     convert_parser.add_argument("--force", action="store_true", help="Replace an existing output directory")
     convert_parser.add_argument("--strict-onnx", action="store_true", help="Require final ONNX artifacts")
+    convert_parser.add_argument(
+        "--skip-runtime-smoke",
+        action="store_true",
+        help="Skip packaged ONNX session instantiation checks",
+    )
     convert_parser.add_argument(
         "--export-mode",
         choices=["plan", "script", "execute"],
@@ -291,7 +301,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.ok else 2
 
     if args.command == "validate":
-        report = validate_package(manifest, args.package_dir, strict_onnx=args.strict_onnx)
+        report = validate_package(
+            manifest,
+            args.package_dir,
+            strict_onnx=args.strict_onnx,
+            runtime_smoke=not args.skip_runtime_smoke,
+        )
         _dump_json(report.to_dict())
         return 0 if report.ok else 2
 
@@ -301,6 +316,7 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=args.output_dir,
             force=args.force,
             strict_onnx=args.strict_onnx,
+            runtime_smoke=False if args.skip_runtime_smoke else None,
             work_dir=args.work_dir,
             onnx_source_dir=args.onnx_source_dir,
             export_mode=args.export_mode,

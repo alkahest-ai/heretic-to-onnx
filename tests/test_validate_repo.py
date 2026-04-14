@@ -1,0 +1,137 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import struct
+import tempfile
+import unittest
+from pathlib import Path
+
+from tools.heretic_to_onnx.config import InheritAssets, Manifest, ValidationConfig
+from tools.heretic_to_onnx.validate_repo import validate_package
+
+
+def _write_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _manifest(root: Path, *, expected_onnx_files: list[str]) -> Manifest:
+    return Manifest(
+        source_model_id="example/source",
+        base_model_id="example/base",
+        architecture="gemma4_conditional_generation",
+        target_repo_id="alkahest-ai/runtime-smoke",
+        target_dtype="q4f16",
+        target_device="webgpu",
+        modalities=["text"],
+        inherit_assets=InheritAssets(),
+        expected_architecture="Gemma4ForConditionalGeneration",
+        expected_onnx_files=expected_onnx_files,
+        validation=ValidationConfig(),
+        manifest_path=root / "manifest.yaml",
+    )
+
+
+@unittest.skipUnless(
+    importlib.util.find_spec("onnx") is not None and importlib.util.find_spec("onnxruntime") is not None,
+    "onnx + onnxruntime are required for packaged runtime smoke tests",
+)
+class ValidateRepoRuntimeSmokeTests(unittest.TestCase):
+    def _write_package_config(self, package_dir: Path) -> None:
+        _write_json(
+            package_dir / "config.json",
+            {
+                "architectures": ["Gemma4ForConditionalGeneration"],
+                "dtype": "float16",
+                "transformers.js_config": {
+                    "use_external_data_format": True,
+                    "kv_cache_dtype": {"q4f16": "float16"},
+                },
+            },
+        )
+
+    def _write_add_model(self, path: Path, *, input_type: int, weight_type: int, output_type: int) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        def make_initializer(name: str, data_type: int) -> onnx.TensorProto:
+            if data_type == TensorProto.FLOAT:
+                return helper.make_tensor(name, data_type, [1], [1.0])
+            if data_type == TensorProto.FLOAT16:
+                return helper.make_tensor(name, data_type, [1], struct.pack("<e", 1.0), raw=True)
+            raise AssertionError(f"unsupported data type for test initializer: {data_type}")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        input_info = helper.make_tensor_value_info("input", input_type, [1])
+        output_info = helper.make_tensor_value_info("output", output_type, [1])
+        node = helper.make_node("Add", ["input", "weight"], ["output"])
+        graph = helper.make_graph(
+            [node],
+            "runtime_smoke_graph",
+            [input_info],
+            [output_info],
+            [make_initializer("weight", weight_type)],
+        )
+        model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+        onnx.save_model(model, path)
+
+    def test_runtime_smoke_passes_for_a_valid_packaged_session(self) -> None:
+        import onnx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            onnx_path = package_dir / "onnx" / "decoder_model_merged_q4f16.onnx"
+            self._write_package_config(package_dir)
+            self._write_add_model(
+                onnx_path,
+                input_type=onnx.TensorProto.FLOAT,
+                weight_type=onnx.TensorProto.FLOAT,
+                output_type=onnx.TensorProto.FLOAT,
+            )
+
+            report = validate_package(
+                _manifest(root, expected_onnx_files=["onnx/decoder_model_merged_q4f16.onnx"]),
+                package_dir,
+                strict_onnx=True,
+                runtime_smoke=True,
+            )
+
+        self.assertTrue(report.ok, report.errors)
+        self.assertTrue(report.runtime_smoke_enabled)
+        self.assertEqual(len(report.runtime_smoke), 1)
+        self.assertTrue(report.runtime_smoke[0].ok)
+        self.assertEqual(report.runtime_smoke[0].onnx_path, "onnx/decoder_model_merged_q4f16.onnx")
+
+    def test_runtime_smoke_fails_for_mixed_float_and_float16_add(self) -> None:
+        import onnx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            onnx_path = package_dir / "onnx" / "decoder_model_merged_q4f16.onnx"
+            self._write_package_config(package_dir)
+            self._write_add_model(
+                onnx_path,
+                input_type=onnx.TensorProto.FLOAT16,
+                weight_type=onnx.TensorProto.FLOAT,
+                output_type=onnx.TensorProto.FLOAT16,
+            )
+
+            report = validate_package(
+                _manifest(root, expected_onnx_files=["onnx/decoder_model_merged_q4f16.onnx"]),
+                package_dir,
+                strict_onnx=True,
+                runtime_smoke=True,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertEqual(len(report.runtime_smoke), 1)
+        self.assertFalse(report.runtime_smoke[0].ok)
+        self.assertIn("decoder_model_merged_q4f16.onnx", report.runtime_smoke[0].onnx_path)
+        self.assertIn("float", report.runtime_smoke[0].error.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -35,7 +35,7 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
     q4_model = quantizer.model.model
     q4f16_model = onnx_float16.convert_float_to_float16(
         q4_model,
-        keep_io_types=True,
+        keep_io_types=False,
         disable_shape_infer=True,
     )
 

@@ -45,8 +45,30 @@ def _external_data_mapping(manifest: Manifest) -> dict[str, int]:
     return {name: 1 for name in _expected_session_names(manifest)}
 
 
+def _normalize_browser_config_dtypes(value: Any, manifest: Manifest) -> Any:
+    target_dtype = "float16" if manifest.target_dtype in {"q4f16", "fp16"} else None
+    if target_dtype is None:
+        return value
+
+    def _walk(node: Any) -> Any:
+        if isinstance(node, dict):
+            updated: dict[str, Any] = {}
+            for key, child in node.items():
+                if key in {"dtype", "torch_dtype"} and child == "bfloat16":
+                    updated[key] = target_dtype
+                else:
+                    updated[key] = _walk(child)
+            return updated
+        if isinstance(node, list):
+            return [_walk(item) for item in node]
+        return node
+
+    return _walk(value)
+
+
 def _patch_config(config_path: Path, manifest: Manifest) -> None:
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    config = _normalize_browser_config_dtypes(config, manifest)
     config["architectures"] = [manifest.expected_architecture]
     transformers_js_config = config.setdefault("transformers.js_config", {})
     transformers_js_config["use_external_data_format"] = _external_data_mapping(manifest)

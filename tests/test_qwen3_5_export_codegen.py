@@ -13,6 +13,7 @@ from tools.heretic_to_onnx.qwen3_5_export_codegen import (
     build_qwen3_5_export_contract,
     render_qwen3_5_export_runner,
 )
+from tools.heretic_to_onnx.qwen3_5_quantize_codegen import render_qwen3_5_quantize_runner
 
 
 def _sample_manifest(*, include_video: bool = False) -> Manifest:
@@ -225,6 +226,18 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
             ["present.1.conv_state", "present.1.recurrent_state"],
         )
         self.assertEqual(contract.warnings, [])
+
+    def test_quantize_runner_converts_full_graph_to_float16(self) -> None:
+        runner = render_qwen3_5_quantize_runner(
+            _sample_contract(),
+            input_dir="/tmp/input",
+            output_dir="/tmp/output",
+            report_path="/tmp/report.json",
+            block_size=32,
+        )
+
+        self.assertIn("keep_io_types=False", runner)
+        self.assertIn("disable_shape_infer=True", runner)
 
     def test_build_contract_derives_layer_types_from_full_attention_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

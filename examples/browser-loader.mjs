@@ -1,191 +1,119 @@
-import * as Transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+import * as Transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.1";
 
-const { AutoModelForVision2Seq, AutoProcessor, TextStreamer, env, load_image, read_audio } =
+const { AutoConfig, AutoModelForVision2Seq, AutoProcessor, TextStreamer, env, load_image, read_audio } =
   Transformers;
 
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = true;
 
-const QWEN_PUBLIC_DTYPE = {
-  embed_tokens: "q4",
-  vision_encoder: "fp16",
-  decoder_model_merged: "q4",
-};
+export const PUBLIC_MODEL_OWNER = "thomasjvu";
 
-export const DEFAULT_MODEL_ID = "onnx-community/Qwen3.5-0.8B-ONNX";
+function ownedModel(modelName) {
+  return `${PUBLIC_MODEL_OWNER}/${modelName}`;
+}
+
+export const DEFAULT_MODEL_ID = ownedModel("rally-2b-rp");
 
 export const DEFAULT_MODEL_PRESETS = [
   {
-    label: "Qwen 3.5 0.8B ONNX",
-    modelId: "onnx-community/Qwen3.5-0.8B-ONNX",
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~0.9-1.1 GB",
-    dtype: QWEN_PUBLIC_DTYPE,
-    note: "Best default consumer browser tier in this lineup.",
-  },
-  {
     label: "Alkahest 0.8B",
-    modelId: "alkahest-ai/alkahest-0.8b",
+    modelId: ownedModel("alkahest-0.8b"),
     family: "qwen3_5",
     modalities: "text + image",
-    approxDownload: "~0.9-1.1 GB",
+    approxDownload: "~1.9 GB",
     dtype: "q4f16",
-    note: "Direct Alkahest-branded Qwen 0.8B browser package.",
+    note: "Direct Alkahest browser package.",
   },
   {
     label: "Alkahest 0.8B V2",
-    modelId: "alkahest-ai/alkahest-0.8b-v2",
+    modelId: ownedModel("alkahest-0.8b-v2"),
     family: "qwen3_5",
     modalities: "text + image + video",
-    approxDownload: "~0.9-1.1 GB",
+    approxDownload: "~1.9 GB",
     dtype: "q4f16",
-    note: "V2 Qwen browser package with video understanding.",
-  },
-  {
-    label: "Alkahest 0.8B RP",
-    modelId: "alkahest-ai/alkahest-0.8b-rp",
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~0.9-1.1 GB",
-    dtype: "q4f16",
-    note: "Roleplay-tuned Alkahest Qwen 0.8B browser package.",
-  },
-  {
-    label: "Qwen 3.5 2B ONNX",
-    modelId: "onnx-community/Qwen3.5-2B-ONNX",
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~1.5-1.8 GB",
-    dtype: QWEN_PUBLIC_DTYPE,
-    note: "Stronger desktop-tier Qwen preset with a materially larger first load.",
+    note: "Enhanced Alkahest browser package with video understanding.",
   },
   {
     label: "Alkahest 2B",
-    modelId: "alkahest-ai/alkahest-2b",
+    modelId: ownedModel("alkahest-2b"),
     family: "qwen3_5",
     modalities: "text + image",
-    approxDownload: "~1.5-1.8 GB",
+    approxDownload: "~3.3-3.4 GB",
     dtype: "q4f16",
-    note: "Direct Alkahest-branded Qwen 2B browser package.",
+    note: "Direct Alkahest browser package.",
   },
   {
     label: "Alkahest 2B V2",
-    modelId: "alkahest-ai/alkahest-2b-v2",
+    modelId: ownedModel("alkahest-2b-v2"),
     family: "qwen3_5",
     modalities: "text + image + video",
-    approxDownload: "~1.5-1.8 GB",
+    approxDownload: "~3.3-3.4 GB",
     dtype: "q4f16",
-    note: "V2 Qwen browser package with video understanding.",
-  },
-  {
-    label: "Alkahest 2B RP",
-    modelId: "alkahest-ai/alkahest-2b-rp",
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~1.5-1.8 GB",
-    dtype: "q4f16",
-    note: "Roleplay-tuned Alkahest Qwen 2B browser package.",
-  },
-  {
-    label: "Gemma 4 E2B ONNX",
-    modelId: "onnx-community/gemma-4-E2B-it-ONNX",
-    family: "gemma4",
-    modalities: "text + image",
-    approxDownload: "~3.4-3.5 GB",
-    dtype: "q4f16",
-    note: "Public Gemma 4 E2B baseline. Current browser lane is text + image only.",
-  },
-  {
-    label: "Alkahest Rally 2B",
-    modelId: "alkahest-ai/rally-2b",
-    family: "gemma4",
-    modalities: "text + image",
-    approxDownload: "~3.4-3.5 GB",
-    dtype: "q4f16",
-    note: "Direct Gemma Rally browser package. Audio is currently disabled in this lane.",
-  },
-  {
-    label: "Alkahest Rally 2B V2",
-    modelId: "alkahest-ai/rally-2b-v2",
-    family: "gemma4",
-    modalities: "text + image + audio + video",
-    approxDownload: "~3.4-3.5 GB",
-    dtype: "q4f16",
-    note: "V2 Gemma Rally browser package with audio and video understanding.",
-  },
-  {
-    label: "Alkahest Rally 2B RP",
-    modelId: "alkahest-ai/rally-2b-rp",
-    family: "gemma4",
-    modalities: "text + image",
-    approxDownload: "~3.4-3.5 GB",
-    dtype: "q4f16",
-    note: "Roleplay-tuned Rally 2B browser package. Audio is currently disabled in this lane.",
-  },
-  {
-    label: "Qwen 3.5 4B ONNX",
-    modelId: "onnx-community/Qwen3.5-4B-ONNX",
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~3.1 GB",
-    dtype: QWEN_PUBLIC_DTYPE,
-    note: "High-quality desktop Qwen preset. Too large for broad mobile/browser use.",
+    note: "Enhanced Alkahest browser package with video understanding.",
   },
   {
     label: "Alkahest 4B",
-    modelId: "alkahest-ai/alkahest-4b",
+    modelId: ownedModel("alkahest-4b"),
     family: "qwen3_5",
     modalities: "text + image",
-    approxDownload: "~3.1 GB",
+    approxDownload: "~5.1-5.2 GB",
     dtype: "q4f16",
-    note: "Direct Alkahest-branded Qwen 4B browser package.",
+    note: "Desktop-only Alkahest tier.",
   },
   {
     label: "Alkahest 4B V2",
-    modelId: "alkahest-ai/alkahest-4b-v2",
+    modelId: ownedModel("alkahest-4b-v2"),
     family: "qwen3_5",
     modalities: "text + image + video",
-    approxDownload: "~3.1 GB",
+    approxDownload: "~5.1-5.2 GB",
     dtype: "q4f16",
-    note: "V2 Qwen browser package with video understanding.",
+    note: "Desktop-only enhanced Alkahest tier with video understanding.",
   },
   {
-    label: "Alkahest 4B RP",
-    modelId: "alkahest-ai/alkahest-4b-rp",
-    family: "qwen3_5",
+    label: "Rally 2B",
+    modelId: ownedModel("rally-2b"),
+    family: "gemma4",
     modalities: "text + image",
-    approxDownload: "~3.1 GB",
+    approxDownload: "~3.4-3.5 GB",
     dtype: "q4f16",
-    note: "Roleplay-tuned Alkahest Qwen 4B browser package.",
+    note: "Direct Rally browser package.",
   },
   {
-    label: "Alkahest Rally 4B",
-    modelId: "alkahest-ai/rally-4b",
+    label: "Rally 2B V2",
+    modelId: ownedModel("rally-2b-v2"),
+    family: "gemma4",
+    modalities: "text + image + audio + video",
+    approxDownload: "~3.4-3.5 GB",
+    dtype: "q4f16",
+    note: "Enhanced Rally browser package with audio and video understanding.",
+  },
+  {
+    label: "Rally 2B RP",
+    modelId: ownedModel("rally-2b-rp"),
+    family: "gemma4",
+    modalities: "text + image + audio + video",
+    approxDownload: "~3.4-3.5 GB",
+    dtype: "q4f16",
+    note: "Roleplay-tuned Rally browser package on the Gemma v2 multimodal contract.",
+  },
+  {
+    label: "Rally 4B",
+    modelId: ownedModel("rally-4b"),
     family: "gemma4",
     modalities: "text + image",
     approxDownload: "~5.2 GB",
     dtype: "q4f16",
-    note: "Desktop-only Gemma tier. Current browser lane is text + image only.",
+    note: "Desktop-only Rally tier.",
   },
   {
-    label: "Alkahest Rally 4B V2",
-    modelId: "alkahest-ai/rally-4b-v2",
+    label: "Rally 4B V2",
+    modelId: ownedModel("rally-4b-v2"),
     family: "gemma4",
     modalities: "text + image + audio + video",
     approxDownload: "~5.2 GB",
     dtype: "q4f16",
-    note: "Desktop-only Gemma v2 tier with audio and video understanding.",
-  },
-  {
-    label: "Alkahest Rally 4B RP",
-    modelId: "alkahest-ai/rally-4b-rp",
-    family: "gemma4",
-    modalities: "text + image",
-    approxDownload: "~5.2 GB",
-    dtype: "q4f16",
-    note: "Roleplay-tuned Rally 4B browser package. Audio is currently disabled in this lane.",
+    note: "Desktop-only enhanced Rally tier with audio and video understanding.",
   },
 ];
 
@@ -278,18 +206,73 @@ function makeProgressMessage(info) {
   return "Loading model...";
 }
 
-function resolveModelClass(family) {
-  const specific =
+function sanitizeBrowserConfig(config, dtype) {
+  if (!config || typeof config !== "object") {
+    return config;
+  }
+  if (!["q4f16", "fp16"].includes(dtype)) {
+    return config;
+  }
+
+  const replaceNode = (node) => {
+    if (Array.isArray(node)) {
+      return node.map(replaceNode);
+    }
+    if (node && typeof node === "object") {
+      const next = {};
+      for (const [key, value] of Object.entries(node)) {
+        if ((key === "dtype" || key === "torch_dtype") && value === "bfloat16") {
+          next[key] = "float16";
+        } else {
+          next[key] = replaceNode(value);
+        }
+      }
+      return next;
+    }
+    return node;
+  };
+
+  return replaceNode(config);
+}
+
+function resolveModelClass(family, { textOnly = false } = {}) {
+  const candidates =
     family === "gemma4"
-      ? Transformers.Gemma4ForConditionalGeneration
-      : Transformers.Qwen3_5ForConditionalGeneration;
-  if (typeof specific?.from_pretrained === "function") {
-    return specific;
+      ? textOnly
+        ? [Transformers.Gemma4ForCausalLM, Transformers.Gemma4ForConditionalGeneration]
+        : [Transformers.Gemma4ForConditionalGeneration]
+      : textOnly
+        ? [Transformers.Qwen3_5ForCausalLM, Transformers.Qwen3ForCausalLM]
+        : [
+            Transformers.Qwen3_5ForConditionalGeneration,
+            Transformers.Qwen3VLForConditionalGeneration,
+            Transformers.Qwen2_5_VLForConditionalGeneration,
+          ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate?.from_pretrained === "function") {
+      return candidate;
+    }
   }
   if (typeof AutoModelForVision2Seq?.from_pretrained === "function") {
     return AutoModelForVision2Seq;
   }
   throw new Error(`No compatible Transformers.js class is available for ${family}.`);
+}
+
+function resolveProcessorClass(family) {
+  const candidates =
+    family === "gemma4"
+      ? [Transformers.Gemma4Processor, AutoProcessor]
+      : [Transformers.Qwen3VLProcessor, Transformers.Qwen2_5_VLProcessor, AutoProcessor];
+
+  for (const candidate of candidates) {
+    if (typeof candidate?.from_pretrained === "function") {
+      return candidate;
+    }
+  }
+
+  throw new Error(`No compatible Transformers.js processor is available for ${family}.`);
 }
 
 async function buildProcessorInputs(processor, family, prompt, imageArg, audioArg, videoArg) {
@@ -353,7 +336,7 @@ export function findModelPreset(modelId) {
 
 export function formatPresetSummary(preset) {
   if (!preset) {
-    return "Custom model ID. Use a public ONNX repo with a Transformers.js-compatible package layout.";
+    return "Custom model ID. Use a public Alkahest or Rally ONNX repo with a Transformers.js-compatible package layout.";
   }
   return `${preset.label} | ${preset.modalities} | ${preset.approxDownload} first load | ${preset.note}`;
 }
@@ -389,17 +372,21 @@ export function createBrowserChatRuntime({
   defaultDtype = "q4f16",
 } = {}) {
   let activeModelId = null;
+  let configPromise = null;
   let processorPromise = null;
   let modelPromise = null;
   let activeFamily = null;
   let activeDtype = null;
+  let activeTextOnly = null;
 
-  function reset(modelId, family, dtype) {
+  function reset(modelId, family, dtype, textOnly) {
     const sameDtype = JSON.stringify(dtype) === JSON.stringify(activeDtype);
-    if (modelId !== activeModelId || family !== activeFamily || !sameDtype) {
+    if (modelId !== activeModelId || family !== activeFamily || !sameDtype || textOnly !== activeTextOnly) {
       activeModelId = modelId;
       activeFamily = family;
       activeDtype = dtype;
+      activeTextOnly = textOnly;
+      configPromise = null;
       processorPromise = null;
       modelPromise = null;
     }
@@ -410,6 +397,7 @@ export function createBrowserChatRuntime({
     modelFamily,
     dtype,
     device = defaultDevice,
+    textOnly = true,
     onProgress,
   } = {}) {
     if (!globalThis.navigator?.gpu && device === "webgpu") {
@@ -419,28 +407,42 @@ export function createBrowserChatRuntime({
     const preset = findModelPreset(modelId);
     const family = modelFamily ?? preset?.family ?? "gemma4";
     const resolvedDtype = dtype ?? preset?.dtype ?? defaultDtype;
-    const ModelClass = resolveModelClass(family);
+    const ProcessorClass = resolveProcessorClass(family);
+    const ModelClass = resolveModelClass(family, { textOnly });
+    const readyMessage = textOnly
+      ? "Text chat ready. Multimodal sessions will load on first media prompt."
+      : "Multimodal sessions ready.";
 
-    reset(modelId, family, resolvedDtype);
-    onProgress?.({ status: "loading" }, "Loading model...");
+    reset(modelId, family, resolvedDtype, textOnly);
+    onProgress?.(
+      { status: textOnly ? "loading_text" : "loading_multimodal" },
+      textOnly ? "Loading text sessions..." : "Loading multimodal sessions...",
+    );
 
-    processorPromise ||= AutoProcessor.from_pretrained(modelId);
-    modelPromise ||= ModelClass.from_pretrained(modelId, {
-      device,
-      dtype: resolvedDtype,
-      progress_callback: (info) => {
-        onProgress?.(info, makeProgressMessage(info));
-      },
-    });
+    processorPromise ||= ProcessorClass.from_pretrained(modelId);
+    configPromise ||= AutoConfig.from_pretrained(modelId).then((config) => sanitizeBrowserConfig(config, resolvedDtype));
+    modelPromise ||= (async () => {
+      const config = await configPromise;
+      return ModelClass.from_pretrained(modelId, {
+        config,
+        device,
+        dtype: resolvedDtype,
+        progress_callback: (info) => {
+          onProgress?.(info, makeProgressMessage(info));
+        },
+      });
+    })();
 
     const [processor, model] = await Promise.all([processorPromise, modelPromise]);
-    onProgress?.({ status: "done" }, "Model ready.");
+    onProgress?.({ status: "done", textOnly }, readyMessage);
     return {
       processor,
       model,
       modelId: activeModelId,
       family: activeFamily,
       dtype: activeDtype,
+      textOnly: activeTextOnly,
+      readyMessage,
       preset,
     };
   }
@@ -463,11 +465,13 @@ export function createBrowserChatRuntime({
       ...(systemPrompt.trim() ? [{ role: "system", content: systemPrompt.trim() }] : []),
       ...(messages ?? []),
     ]);
+    const textOnly = imageSources.length === 0 && audioSources.length === 0 && videoSources.length === 0;
 
     const { family, processor, model } = await load({
       modelId,
       modelFamily,
       dtype,
+      textOnly,
       onProgress,
     });
     const promptOptions = {
@@ -535,6 +539,9 @@ export function createBrowserChatRuntime({
     load,
     generate,
     dispose,
+    get textOnly() {
+      return activeTextOnly;
+    },
     get modelId() {
       return activeModelId ?? defaultModelId;
     },

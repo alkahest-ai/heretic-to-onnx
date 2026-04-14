@@ -3,135 +3,154 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Alkahest Browser Chat</title>
+    <title>Heretic Browser Chat</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://huggingface.co" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="page-shell">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Client-Side LLM</p>
-          <h1>Alkahest Browser Chat</h1>
-          <p class="hero-copy">
-            Free chat on the user’s device with Transformers.js, WebGPU, and ONNX model repos.
-          </p>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-panel">
+          <p class="kicker">browser chat</p>
+          <h1>Heretic ONNX</h1>
+          <p class="subhead">Local WebGPU chat for public ONNX repos. No server-side inference.</p>
         </div>
-        <div class="hero-note">
-          <p>Desktop-first.</p>
-          <p>Use public ONNX repos or self-hosted public model files.</p>
+
+        <div class="status-grid">
+          <section class="status-panel">
+            <p class="status-label">runtime</p>
+            <p id="runtime-status">Checking WebGPU support...</p>
+            <div class="runtime-metrics">
+              <p id="runtime-percent" class="runtime-percent">--%</p>
+              <p id="runtime-age" class="runtime-age">No transfers yet.</p>
+            </div>
+            <div class="runtime-progress-track" aria-hidden="true">
+              <div id="runtime-progress-bar" class="runtime-progress-bar"></div>
+            </div>
+            <p id="runtime-detail" class="runtime-detail">Waiting for model activity.</p>
+            <div id="runtime-log" class="runtime-log" aria-live="polite"></div>
+          </section>
+
+          <section class="status-panel">
+            <p class="status-label">selected model</p>
+            <p id="preset-note">
+              Rally 2B RP | text + image + audio + video | ~3.4-3.5 GB full load | Roleplay-tuned
+              Rally browser package on the Gemma v2 multimodal contract.
+            </p>
+          </section>
         </div>
       </header>
 
-      <main class="layout">
-        <section class="control-panel">
-          <div class="panel-card">
+      <main class="workspace">
+        <aside class="sidebar">
+          <section class="panel-section">
+            <p class="section-title">model</p>
+
             <label class="field">
-              <span>Preset</span>
+              <span>preset</span>
               <select id="preset-model"></select>
             </label>
 
             <label class="field">
-              <span>Model ID</span>
+              <span>model id</span>
               <input
                 id="model-id"
                 type="text"
                 spellcheck="false"
-                value="onnx-community/Qwen3.5-0.8B-ONNX"
+                value="thomasjvu/rally-2b-rp"
               />
             </label>
 
             <label class="field">
-              <span>System Prompt</span>
+              <span>system prompt</span>
               <textarea
                 id="system-prompt"
-                rows="5"
-              >You are Alkahest. Reply directly, stay coherent across turns, and keep answers useful and concise.</textarea>
+                rows="4"
+              >Reply directly, stay coherent across turns, and keep answers useful and concise.</textarea>
             </label>
+          </section>
+
+          <section class="panel-section">
+            <p class="section-title">inputs</p>
 
             <div class="media-grid">
               <label class="field">
-                <span>Image Input</span>
+                <span>image</span>
                 <input id="image-input" type="file" accept="image/*" />
                 <small id="image-status" class="field-hint">No image selected.</small>
               </label>
 
               <label class="field">
-                <span>Audio Input</span>
+                <span>audio</span>
                 <input id="audio-input" type="file" accept="audio/*" />
                 <small id="audio-status" class="field-hint">
-                  Audio input is enabled only for Rally / Gemma presets.
+                  Audio input is enabled only for presets that ship audio support.
                 </small>
               </label>
 
               <label class="field">
-                <span>Video Input</span>
+                <span>video</span>
                 <input id="video-input" type="file" accept="video/*" />
                 <small id="video-status" class="field-hint">
-                  Video input is enabled only for v2 multimodal presets.
+                  Video input is enabled only for presets that ship video support.
                 </small>
               </label>
             </div>
+          </section>
+
+          <section class="panel-section">
+            <p class="section-title">generation</p>
 
             <div class="parameter-grid">
               <label class="field">
-                <span>Max Tokens</span>
+                <span>max tokens</span>
                 <input id="max-tokens" type="number" min="32" max="512" step="16" value="160" />
               </label>
+
               <label class="field">
-                <span>Temperature</span>
+                <span>temperature</span>
                 <input id="temperature" type="number" min="0" max="1.5" step="0.05" value="0.85" />
               </label>
             </div>
 
             <div class="action-row">
-              <button id="load-model" class="primary">Load Model</button>
-              <button id="clear-chat" class="secondary">Clear Chat</button>
-              <button id="clear-cache" class="secondary">Clear Browser Cache</button>
+              <button id="load-model" class="primary">Load model</button>
+              <button id="clear-chat" class="secondary">Clear chat</button>
+              <button id="clear-cache" class="secondary">Clear cache</button>
             </div>
+          </section>
 
-            <div class="status-card">
-              <p class="status-label">Runtime</p>
-              <p id="runtime-status">Checking WebGPU support...</p>
-            </div>
+          <section class="panel-section notes-panel">
+            <p class="section-title">notes</p>
+            <ul class="note-list">
+              <li>Use current public repos until ownership moves to the org namespace.</li>
+              <li>Text-only warm loads stay lighter; image, audio, and video sessions load on first media prompt.</li>
+              <li>Full multimodal loads are still large and may take several minutes on consumer hardware.</li>
+              <li>Best results are desktop Safari or Chromium with WebGPU enabled.</li>
+              <li>This picker covers the published Alkahest and Rally browser repos only.</li>
+            </ul>
+          </section>
+        </aside>
 
-            <div class="status-card subtle">
-              <p class="status-label">Selected Model</p>
-              <p id="preset-note">
-                Qwen 3.5 0.8B ONNX | text + image | ~0.9-1.1 GB first load | Best default
-                consumer browser tier in this lineup.
-              </p>
-            </div>
-
-            <div class="status-card subtle">
-              <p class="status-label">Notes</p>
-              <ul class="note-list">
-                <li>First load can still be large and may take several minutes.</li>
-                <li>Private Hugging Face repos are not suitable for direct browser loading.</li>
-                <li>Best experience is desktop Safari or Chromium on modern hardware.</li>
-                <li>Audio input is supported only on v2 Rally / Gemma presets.</li>
-                <li>Video input is supported only on v2 multimodal presets.</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section class="chat-panel">
+        <section class="chat-stage">
           <div id="messages" class="messages" aria-live="polite"></div>
 
           <form id="chat-form" class="composer">
             <textarea
               id="prompt-input"
-              rows="4"
-              placeholder="Ask something. The model runs in the browser on the user’s device."
+              rows="3"
+              placeholder="Ask something, or attach image, audio, or video. Text warms the decoder first; media prompts upgrade to full multimodal sessions."
             ></textarea>
+
             <div class="composer-row">
-              <p class="composer-hint">Shift+Enter for a new line.</p>
+              <p class="composer-hint">Enter to send. Shift+Enter for a new line.</p>
               <button id="send-message" class="primary" type="submit">Send</button>
             </div>
           </form>

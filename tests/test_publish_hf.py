@@ -97,6 +97,7 @@ class PublishHFTests(unittest.TestCase):
         self.assertIn("enhanced browser `v2` multimodal contract", content)
         self.assertIn("repo name does not carry a `-v2` suffix", content)
         self.assertIn("this package itself is the multimodal variant", content)
+        self.assertIn("passes packaged ONNX session validation and a manual browser smoke", content)
         self.assertNotIn("stable v1 browser package", content)
         self.assertNotIn("thomasjvu/rally-2b-rp-v2", content)
 

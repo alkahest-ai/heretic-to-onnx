@@ -15,6 +15,15 @@ Current status:
 - Qwen3.5 export and q4f16 quantization support `plan`, `script`, and `execute`
 - Gemma 4 is the more proven lane today
 
+## Browser Release Gate
+
+Treat browser capability claims as shipped only after both of these pass:
+
+- `validate --strict-onnx` with packaged ONNX runtime smoke enabled
+- a manual browser-chat smoke on the published repo
+
+Already-published `q4f16` repos built before the latest quantizer and config fixes should be treated as suspect until they are rebuilt and republished through that gate.
+
 ## Quick Start
 
 Run the local smoke fixture from the repo root:
@@ -101,11 +110,20 @@ It uses:
 
 - Transformers.js
 - WebGPU
-- a built-in model picker for Gemma and Qwen browser ONNX repos
-- image input for Gemma and Qwen browser lanes
-- `onnx-community/Qwen3.5-0.8B-ONNX` by default
+- a worker-backed runtime so large model downloads and WebGPU setup do not block the page
+- a built-in model picker for the published Alkahest and Rally browser ONNX repos
+- image input for all shipped lanes
+- video input for Alkahest `v2` lanes
+- audio and video input for Rally `v2` lanes, including `rally-2b-rp`
+- `thomasjvu/rally-2b-rp` by default
+- text-first lazy session loading: decoder sessions warm first, then image/audio/video sessions load on first media prompt
 
-Current shipped browser exports are `text + image`. Audio is not part of the working Rally/Gemma browser path right now.
+The intended browser lineup, once a repo has passed the browser release gate, spans:
+
+- Qwen / Alkahest direct lanes: `text + image`
+- Qwen / Alkahest `v2` lanes: `text + image + video`
+- Gemma / Rally direct lanes: `text + image`
+- Gemma / Rally `v2` lanes, including `rally-2b-rp`: `text + image + audio + video`
 
 Run it locally from the repo root:
 
@@ -117,6 +135,12 @@ Then open:
 
 ```text
 http://localhost:4173/browser-chat/
+```
+
+To jump straight into the current Rally RP browser model:
+
+```text
+http://localhost:4173/
 ```
 
 Read `docs/browser-free-chat.md` before wiring private or custom model hosting.

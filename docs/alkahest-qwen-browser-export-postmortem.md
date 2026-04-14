@@ -6,6 +6,12 @@ This is the running write-up for the direct `alkahest-*` browser export lane bui
 
 This started as a bring-up postmortem for a lane that was not fully shipped yet. As of April 12, 2026, the direct `alkahest-0.8b` lane now completes export, quantization, packaging, validation, and publish successfully. The point of this document is to record what was true during bring-up, what actually fixed it, and what to carry forward to the larger Qwen checkpoints.
 
+Important scope note as of April 13, 2026:
+
+- this document is primarily about the direct Qwen browser lane
+- the separate `alkahest-*-v2` lane now targets `text + image + video`
+- no modality should be treated as truly shipped until the packaged repo passes runtime smoke validation and a manual browser-chat smoke
+
 ## Current Status
 
 Current public naming:
@@ -16,7 +22,8 @@ Current public naming:
 Current practical status:
 
 - the Qwen ONNX packaging lane exists in this repo
-- the current intended shipped browser surface is **text + image**
+- the direct `alkahest-*` browser surface targets **text + image**
+- the `alkahest-*-v2` browser surface targets **text + image + video**
 - direct `alkahest-0.8b` now completes successfully end-to-end
 - the next direct checkpoints to validate are `alkahest-2b` and `alkahest-4b`
 
@@ -73,8 +80,9 @@ It would need a real export lane for:
 So the correct statement is:
 
 - upstream Qwen video understanding exists
-- current `alkahest-*` browser export does not yet ship that path
-- shipping it would be a new implementation effort, not a small toggle
+- the direct `alkahest-*` browser export does not ship that path
+- the `alkahest-*-v2` lane is the path that targets browser video support
+- shipping claims still require runtime smoke validation plus a manual browser smoke, not just a manifest flag
 
 ## Is Qwen Image Understanding Different From Gemma Image Understanding?
 

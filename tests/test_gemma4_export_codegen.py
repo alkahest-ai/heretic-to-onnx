@@ -12,6 +12,7 @@ from tools.heretic_to_onnx.gemma4_export_codegen import (
     build_gemma4_export_contract,
     render_gemma4_export_runner,
 )
+from tools.heretic_to_onnx.gemma4_quantize_codegen import render_gemma4_quantize_runner
 
 
 def _sample_manifest(*, include_audio: bool = False, include_video: bool = False) -> Manifest:
@@ -164,6 +165,18 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         self.assertIn('if CONTRACT.get("supports_audio"):', runner)
         self.assertIn('_patch_audio_attention_for_onnx_export(model)', runner)
         self.assertIn('wrappers["audio_encoder"] = Gemma4AudioEncoderWrapper(model)', runner)
+
+    def test_quantize_runner_converts_full_graph_to_float16(self) -> None:
+        runner = render_gemma4_quantize_runner(
+            _sample_contract(),
+            input_dir="/tmp/input",
+            output_dir="/tmp/output",
+            report_path="/tmp/report.json",
+            block_size=32,
+        )
+
+        self.assertIn("keep_io_types=False", runner)
+        self.assertIn("disable_shape_infer=True", runner)
 
 
 if __name__ == "__main__":
