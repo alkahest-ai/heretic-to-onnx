@@ -34,7 +34,10 @@ try:
 except Exception:
     pass
 
-login(token=os.environ["HF_TOKEN"])
+if "HF_TOKEN" in os.environ:
+    login(token=os.environ["HF_TOKEN"])
+else:
+    print("HF_TOKEN not set; running without Hub upload")
 ```
 
 Run one model at a time. Start with Alkahest if the goal is proving the Qwen lane:
@@ -75,7 +78,7 @@ The script writes:
 
 The runner forces Kaggle/notebook prompt mode by setting `KAGGLE_KERNEL_RUN_TYPE=Interactive` unless `--native-terminal-mode` is passed. It feeds Heretic answers that select the first Pareto trial, save locally, and choose the full merge path.
 
-Pass `--upload-merged-to owner/repo` to upload the merged checkpoint before the Kaggle session can expire. In the notebook, set `HF_MERGED_REPO_ID` to enable this without editing cells.
+Pass `--upload-merged-to owner/repo` to upload the merged checkpoint before the Kaggle session can expire. In the notebook, set `HF_TOKEN` and `HF_MERGED_REPO_ID` as Kaggle secrets to enable upload without editing cells. Without `HF_TOKEN`, the run still produces the merged checkpoint in Kaggle output.
 
 The default accelerator profile is `t4x2`, which writes:
 

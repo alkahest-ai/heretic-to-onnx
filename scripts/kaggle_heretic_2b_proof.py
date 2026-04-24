@@ -85,6 +85,10 @@ def main() -> int:
     )
     print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     if report.ok and args.upload_merged_to and not args.dry_run:
+        import os
+
+        if not os.environ.get("HF_TOKEN"):
+            raise RuntimeError("--upload-merged-to requires HF_TOKEN in the environment")
         from huggingface_hub import HfApi
 
         api = HfApi()
