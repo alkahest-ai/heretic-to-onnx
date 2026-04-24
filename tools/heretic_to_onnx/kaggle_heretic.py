@@ -228,6 +228,74 @@ def build_heretic_command(heretic_exec: str = "heretic") -> list[str]:
     return [heretic_exec]
 
 
+def write_heretic_wrapper(config: KaggleHereticRunConfig) -> Path | None:
+    if "qwen3.5" not in config.base_model_id.lower():
+        return None
+    wrapper_path = config.work_dir / "run_heretic_qwen35.py"
+    wrapper_path.write_text(
+        """
+from __future__ import annotations
+
+from contextlib import suppress
+
+from torch import Tensor
+from torch.nn import Module
+
+import heretic.model as heretic_model
+
+
+def _patched_get_layer_modules(self, layer_index: int):
+    layer = self.get_layers()[layer_index]
+    modules = {}
+
+    def try_add(component, module):
+        if isinstance(module, Module):
+            modules.setdefault(component, []).append(module)
+        else:
+            assert not isinstance(module, Tensor), (
+                f"Unexpected Tensor in {component} - expected nn.Module"
+            )
+
+    with suppress(Exception):
+        try_add("attn.o_proj", layer.self_attn.o_proj)
+    with suppress(Exception):
+        try_add("attn.out_proj", layer.linear_attn.out_proj)
+    with suppress(Exception):
+        try_add("mlp.down_proj", layer.mlp.down_proj)
+    with suppress(Exception):
+        for expert in layer.mlp.experts:
+            try_add("mlp.down_proj", expert.down_proj)
+    with suppress(Exception):
+        for expert in layer.block_sparse_moe.experts:
+            try_add("mlp.down_proj", expert.w2)
+    with suppress(Exception):
+        try_add("mlp.down_proj", layer.shared_mlp.output_linear)
+    with suppress(Exception):
+        for expert in layer.moe.experts:
+            try_add("mlp.down_proj", expert.output_linear)
+
+    assert sum(len(mods) for mods in modules.values()) > 0, (
+        "No abliterable modules found in layer"
+    )
+    return modules
+
+
+def _patched_get_abliterable_components(self):
+    return ["attn.o_proj", "attn.out_proj", "mlp.down_proj"]
+
+
+heretic_model.Model.get_layer_modules = _patched_get_layer_modules
+heretic_model.Model.get_abliterable_components = _patched_get_abliterable_components
+
+from heretic.main import main
+
+raise SystemExit(main())
+""".lstrip(),
+        encoding="utf-8",
+    )
+    return wrapper_path
+
+
 def ensure_transformers_supports_base_model(base_model_id: str) -> list[str]:
     """Install a newer Transformers only when the Kaggle image lacks the model type."""
     if "qwen3.5" not in base_model_id.lower():
@@ -406,6 +474,10 @@ def run_kaggle_heretic(
         env.setdefault("KAGGLE_KERNEL_RUN_TYPE", "Interactive")
     env.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
     stdin_text = stdin_path.read_text(encoding="utf-8")
+    wrapper_path = write_heretic_wrapper(config)
+    if wrapper_path is not None:
+        command = [sys.executable, str(wrapper_path)]
+        warnings.append("patched Heretic module discovery for Qwen3.5 hybrid layers")
 
     with config.log_path.open("w", encoding="utf-8") as log_file:
         process = subprocess.run(
