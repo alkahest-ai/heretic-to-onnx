@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,7 @@ import yaml
 from tools.heretic_to_onnx.kaggle_heretic import (
     build_run_config,
     build_stdin_answers,
+    ensure_torchao_is_compatible,
     render_config_toml,
     run_kaggle_heretic,
     validate_merged_checkpoint,
@@ -51,6 +53,20 @@ class KaggleHereticTests(unittest.TestCase):
         self.assertEqual(answers[1], "1")
         self.assertEqual(answers[2], str(config.merged_output_dir))
         self.assertEqual(answers[3], "1")
+        self.assertEqual(answers[4], "4")
+        self.assertEqual(answers[5], "9")
+
+    def test_torchao_fix_can_be_skipped_explicitly(self) -> None:
+        original = os.environ.get("HERETIC_SKIP_TORCHAO_FIX")
+        self.addCleanup(self._restore_env, "HERETIC_SKIP_TORCHAO_FIX", original)
+        os.environ["HERETIC_SKIP_TORCHAO_FIX"] = "1"
+
+        warnings = ensure_torchao_is_compatible()
+
+        self.assertEqual(
+            warnings,
+            ["skipped torchao compatibility fix by HERETIC_SKIP_TORCHAO_FIX=1"],
+        )
 
     def test_validate_merged_checkpoint_reports_missing_required_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -119,6 +135,13 @@ class KaggleHereticTests(unittest.TestCase):
         self.assertEqual(data["source_model_id"], "/models/alkahest-2b-heretic-merged")
         self.assertEqual(data["base_model_id"], "Qwen/Qwen3.5-2B")
         self.assertEqual(data["target_repo_id"], "alkahest-ai/alkahest-2b-v2")
+
+    @staticmethod
+    def _restore_env(name: str, value: str | None) -> None:
+        if value is None:
+            os.environ.pop(name, None)
+            return
+        os.environ[name] = value
 
 
 if __name__ == "__main__":

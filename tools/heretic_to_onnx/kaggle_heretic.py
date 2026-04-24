@@ -220,8 +220,9 @@ def write_run_files(config: KaggleHereticRunConfig) -> Path:
 
 def build_stdin_answers(config: KaggleHereticRunConfig) -> str:
     # In Kaggle/notebook mode Heretic uses Python input() menus. The first proof
-    # selects the first Pareto trial, saves locally, and chooses the full merge.
-    return "\n".join(["1", "1", str(config.merged_output_dir), "1"]) + "\n"
+    # selects the first Pareto trial, saves locally, chooses the full merge,
+    # then returns to the trial menu and exits so EOF does not mask success.
+    return "\n".join(["1", "1", str(config.merged_output_dir), "1", "4", "9"]) + "\n"
 
 
 def build_heretic_command(heretic_exec: str = "heretic") -> list[str]:
@@ -344,6 +345,61 @@ def ensure_transformers_supports_base_model(base_model_id: str) -> list[str]:
     return ["installed latest Transformers from GitHub because qwen3_5 was unavailable"]
 
 
+def ensure_torchao_is_compatible() -> list[str]:
+    """Kaggle ships an old torchao that breaks the Heretic merge path."""
+    if os.environ.get("HERETIC_SKIP_TORCHAO_FIX") == "1":
+        return ["skipped torchao compatibility fix by HERETIC_SKIP_TORCHAO_FIX=1"]
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from importlib.metadata import PackageNotFoundError, version; "
+                "import sys; "
+                "try: v = version('torchao'); "
+                "except PackageNotFoundError: sys.exit(0); "
+                "parts = [int(p) for p in v.split('.')[:2]]; "
+                "sys.exit(0 if parts >= [0, 16] else 1)"
+            ),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if probe.returncode == 0:
+        return []
+
+    uninstall = subprocess.run(
+        [sys.executable, "-m", "pip", "uninstall", "-y", "torchao"],
+        text=True,
+        check=False,
+    )
+    if uninstall.returncode != 0:
+        raise RuntimeError("failed to remove incompatible torchao before Heretic merge")
+
+    verify = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from importlib.metadata import PackageNotFoundError, version; "
+                "import sys; "
+                "try: v = version('torchao'); "
+                "except PackageNotFoundError: sys.exit(0); "
+                "parts = [int(p) for p in v.split('.')[:2]]; "
+                "sys.exit(0 if parts >= [0, 16] else 1)"
+            ),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if verify.returncode != 0:
+        raise RuntimeError("torchao compatibility fix did not take effect")
+    return ["removed incompatible Kaggle torchao before Heretic merge"]
+
+
 def collect_environment_report() -> dict[str, Any]:
     report: dict[str, Any] = {
         "python": sys.version.split()[0],
@@ -442,12 +498,13 @@ def run_kaggle_heretic(
 ) -> KaggleHereticReport:
     stdin_path = write_run_files(config)
     command = build_heretic_command(heretic_exec)
-    environment = collect_environment_report()
+    environment: dict[str, Any]
     warnings: list[str] = []
     errors: list[str] = []
     returncode: int | None = None
 
     if dry_run:
+        environment = collect_environment_report()
         merged = validate_merged_checkpoint(config.merged_output_dir)
         return KaggleHereticReport(
             ok=True,
@@ -468,6 +525,8 @@ def run_kaggle_heretic(
         )
 
     warnings.extend(ensure_transformers_supports_base_model(config.base_model_id))
+    warnings.extend(ensure_torchao_is_compatible())
+    environment = collect_environment_report()
 
     env = os.environ.copy()
     if force_notebook_mode:
