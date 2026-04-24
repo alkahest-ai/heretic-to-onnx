@@ -228,6 +228,54 @@ def build_heretic_command(heretic_exec: str = "heretic") -> list[str]:
     return [heretic_exec]
 
 
+def ensure_transformers_supports_base_model(base_model_id: str) -> list[str]:
+    """Install a newer Transformers only when the Kaggle image lacks the model type."""
+    if "qwen3.5" not in base_model_id.lower():
+        return []
+    if os.environ.get("HERETIC_SKIP_TRANSFORMERS_BOOTSTRAP") == "1":
+        return ["skipped Transformers bootstrap by HERETIC_SKIP_TRANSFORMERS_BOOTSTRAP=1"]
+
+    check = "from transformers import AutoConfig; AutoConfig.for_model('qwen3_5')"
+    probe = subprocess.run(
+        [sys.executable, "-c", check],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if probe.returncode == 0:
+        return []
+
+    install = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-U",
+            "--no-cache-dir",
+            "git+https://github.com/huggingface/transformers.git",
+        ],
+        text=True,
+        check=False,
+    )
+    if install.returncode != 0:
+        raise RuntimeError(
+            "Qwen3.5 requires a newer Transformers build, but the automatic install failed"
+        )
+
+    verify = subprocess.run(
+        [sys.executable, "-c", check],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if verify.returncode != 0:
+        raise RuntimeError(
+            "installed latest Transformers, but qwen3_5 is still unavailable"
+        )
+    return ["installed latest Transformers from GitHub because qwen3_5 was unavailable"]
+
+
 def collect_environment_report() -> dict[str, Any]:
     report: dict[str, Any] = {
         "python": sys.version.split()[0],
@@ -350,6 +398,8 @@ def run_kaggle_heretic(
             errors=errors,
             dry_run=True,
         )
+
+    warnings.extend(ensure_transformers_supports_base_model(config.base_model_id))
 
     env = os.environ.copy()
     if force_notebook_mode:
