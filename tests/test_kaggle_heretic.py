@@ -30,9 +30,7 @@ class KaggleHereticTests(unittest.TestCase):
         self.assertIn('"1" = "14GiB"', toml)
         self.assertIn("n_trials = 20", toml)
         self.assertIn("n_startup_trials = 8", toml)
-        self.assertIn("seed = 111", toml)
         self.assertIn("max_response_length = 64", toml)
-        self.assertIn("offload_outputs_to_cpu = true", toml)
         self.assertIn('split = "train[:160]"', toml)
         self.assertIn('split = "test[:80]"', toml)
 

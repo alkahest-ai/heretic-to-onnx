@@ -51,7 +51,6 @@ class KaggleHereticRunConfig:
     eval_rows: int = 80
     max_response_length: int = 64
     max_batch_size: int = 32
-    seed: int = 111
     device_map: str = "auto"
     max_memory: dict[str, str] = field(default_factory=dict)
     good_dataset: str = "mlabonne/harmless_alpaca"
@@ -181,11 +180,9 @@ def render_config_toml(config: KaggleHereticRunConfig) -> str:
             ),
             f"n_trials = {config.n_trials}",
             f"n_startup_trials = {config.n_startup_trials}",
-            f"seed = {config.seed}",
             f"max_response_length = {config.max_response_length}",
             "batch_size = 0",
             f"max_batch_size = {config.max_batch_size}",
-            f"offload_outputs_to_cpu = {_toml_bool(True)}",
             f"study_checkpoint_dir = {_toml_string(str(config.checkpoint_dir))}",
             "",
             "[good_prompts]",
