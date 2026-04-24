@@ -350,24 +350,25 @@ def ensure_torchao_is_compatible() -> list[str]:
     if os.environ.get("HERETIC_SKIP_TORCHAO_FIX") == "1":
         return ["skipped torchao compatibility fix by HERETIC_SKIP_TORCHAO_FIX=1"]
 
-    probe = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "from importlib.metadata import PackageNotFoundError, version; "
-                "import sys; "
-                "try: v = version('torchao'); "
-                "except PackageNotFoundError: sys.exit(0); "
-                "parts = [int(p) for p in v.split('.')[:2]]; "
-                "sys.exit(0 if parts >= [0, 16] else 1)"
-            ),
-        ],
-        stdout=subprocess.DEVNULL,
+    show = subprocess.run(
+        [sys.executable, "-m", "pip", "show", "torchao"],
+        text=True,
+        stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         check=False,
     )
-    if probe.returncode == 0:
+    if show.returncode != 0:
+        return []
+    version_line = next(
+        (line for line in show.stdout.splitlines() if line.startswith("Version: ")),
+        "",
+    )
+    version_text = version_line.removeprefix("Version: ").strip()
+    try:
+        major, minor = (int(part) for part in version_text.split(".")[:2])
+    except ValueError:
+        major, minor = (0, 0)
+    if (major, minor) >= (0, 16):
         return []
 
     uninstall = subprocess.run(
@@ -379,23 +380,12 @@ def ensure_torchao_is_compatible() -> list[str]:
         raise RuntimeError("failed to remove incompatible torchao before Heretic merge")
 
     verify = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "from importlib.metadata import PackageNotFoundError, version; "
-                "import sys; "
-                "try: v = version('torchao'); "
-                "except PackageNotFoundError: sys.exit(0); "
-                "parts = [int(p) for p in v.split('.')[:2]]; "
-                "sys.exit(0 if parts >= [0, 16] else 1)"
-            ),
-        ],
+        [sys.executable, "-m", "pip", "show", "torchao"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
     )
-    if verify.returncode != 0:
+    if verify.returncode == 0:
         raise RuntimeError("torchao compatibility fix did not take effect")
     return ["removed incompatible Kaggle torchao before Heretic merge"]
 
