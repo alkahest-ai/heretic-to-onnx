@@ -238,6 +238,7 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
 
         self.assertIn("keep_io_types=False", runner)
         self.assertIn("disable_shape_infer=True", runner)
+        self.assertIn("check_fp16_ready=False", runner)
 
     def test_build_contract_derives_layer_types_from_full_attention_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

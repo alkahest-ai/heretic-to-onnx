@@ -177,6 +177,7 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
 
         self.assertIn("keep_io_types=False", runner)
         self.assertIn("disable_shape_infer=True", runner)
+        self.assertIn("check_fp16_ready=False", runner)
 
 
 if __name__ == "__main__":

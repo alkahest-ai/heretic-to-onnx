@@ -37,6 +37,7 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
         q4_model,
         keep_io_types=False,
         disable_shape_infer=True,
+        check_fp16_ready=False,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
