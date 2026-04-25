@@ -784,6 +784,15 @@ def render_qwen3_5_export_runner(
             return tensor + marker * 0
 
 
+        def _resolve_pad_token_id(config):
+            value = getattr(config, "pad_token_id", None)
+            if value is None:
+                value = getattr(config, "eos_token_id", 0)
+            if isinstance(value, (list, tuple)):
+                value = value[0] if value else 0
+            return int(value)
+
+
         class Qwen35VisionEncoderWrapper(torch.nn.Module):
             def __init__(self, model):
                 super().__init__()
@@ -820,7 +829,7 @@ def render_qwen3_5_export_runner(
 
             def forward(self, input_ids):
                 config = self.model.config
-                pad_token_id = config.pad_token_id
+                pad_token_id = _resolve_pad_token_id(config)
                 multimodal_mask = input_ids == config.image_token_id
                 if getattr(config, "video_token_id", None) is not None:
                     multimodal_mask = multimodal_mask | (input_ids == config.video_token_id)
@@ -1078,7 +1087,8 @@ def render_qwen3_5_export_runner(
                     raise ValueError(f"unsupported video_features rank: {{video_features.ndim}}")
 
             total_sequence = max(image_token_slots + video_token_slots + 8, 16)
-            input_ids = torch.full((1, total_sequence), config.pad_token_id, dtype=torch.long, device=device)
+            pad_token_id = _resolve_pad_token_id(config)
+            input_ids = torch.full((1, total_sequence), pad_token_id, dtype=torch.long, device=device)
             mm_token_type_ids = torch.zeros((1, total_sequence), dtype=torch.int32, device=device)
             if getattr(config, "image_token_id", None) is not None:
                 start = 1

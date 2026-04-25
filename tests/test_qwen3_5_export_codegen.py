@@ -324,6 +324,9 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('mm_token_type_ids == 2', runner)
         self.assertIn('pixel_values_videos', runner)
         self.assertIn('repeat_shape = [frames] + [1] * max(pixel_values.ndim - 1, 0)', runner)
+        self.assertIn("def _resolve_pad_token_id(config):", runner)
+        self.assertIn("pad_token_id = _resolve_pad_token_id(config)", runner)
+        self.assertIn("torch.full((1, total_sequence), pad_token_id", runner)
 
     def test_runner_uses_supported_export_kwargs_without_legacy_fallback_chain(self) -> None:
         runner = render_qwen3_5_export_runner(
