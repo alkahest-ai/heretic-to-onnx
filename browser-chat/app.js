@@ -3,9 +3,9 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs?v=5";
+} from "../examples/browser-loader.mjs?v=6";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=6";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=7";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
@@ -216,8 +216,8 @@ function buildRuntimeDetail(info, message) {
   if (info?.status === "done") {
     return {
       percent: 100,
-      detail: message || "Download complete.",
-      logText: message || "Download complete.",
+      detail: message || "Download complete. Initializing WebGPU sessions...",
+      logText: message || "Download complete. Initializing WebGPU sessions...",
       logKey: "done",
     };
   }

@@ -1,7 +1,7 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=5";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=6";
 
 const DOWNLOAD_STALL_MS = 90_000;
-const PHASE_STALL_MS = 240_000;
+const PHASE_STALL_MS = 120_000;
 
 function errorFromPayload(error) {
   const normalized = new Error(error?.message || "Unknown browser runtime error");
@@ -68,7 +68,12 @@ function makeStallError(entry) {
       } for ${Math.round(elapsed / 1000)}s. The runtime worker was reset; clear cache and retry if this repeats.`,
     );
   }
-  const status = info?.status ? String(info.status).replaceAll("_", " ") : entry.type;
+  const status =
+    info?.status === "done"
+      ? "WebGPU session initialization"
+      : info?.status
+        ? String(info.status).replaceAll("_", " ")
+        : entry.type;
   return new Error(
     `Runtime stalled during ${status} for ${Math.round(elapsed / 1000)}s. The runtime worker was reset; retry the load.`,
   );
@@ -175,7 +180,7 @@ function createWorkerRuntime({
     if (worker) {
       return worker;
     }
-    worker = new Worker(new URL("./runtime-worker.js?v=7", import.meta.url), { type: "module" });
+    worker = new Worker(new URL("./runtime-worker.js?v=8", import.meta.url), { type: "module" });
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
     worker.addEventListener("messageerror", handleMessageError);

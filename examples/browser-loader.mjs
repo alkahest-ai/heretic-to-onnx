@@ -198,7 +198,7 @@ function makeProgressMessage(info) {
     return info.file ? `Loading ${info.file} (${percent}%)` : `Loading model (${percent}%)`;
   }
   if (info.status === "done") {
-    return "Download complete.";
+    return "Download complete. Initializing WebGPU sessions...";
   }
   if (typeof info.status === "string") {
     return info.file ? `${info.status}: ${info.file}` : info.status;
