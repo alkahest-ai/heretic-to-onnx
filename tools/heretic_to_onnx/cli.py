@@ -102,6 +102,17 @@ def _base_parser() -> argparse.ArgumentParser:
         help="Python executable to use for execute modes",
     )
     convert_parser.add_argument(
+        "--export-device",
+        default="cpu",
+        help="Device string passed to generated export runners in execute/script modes",
+    )
+    convert_parser.add_argument(
+        "--export-torch-dtype",
+        default="auto",
+        choices=["auto", "float32", "float16", "bfloat16"],
+        help="torch dtype passed to generated export runners in execute/script modes",
+    )
+    convert_parser.add_argument(
         "--opset-version",
         default=17,
         type=int,
@@ -127,6 +138,17 @@ def _base_parser() -> argparse.ArgumentParser:
         "--python-exec",
         default="python3",
         help="Python executable to use for execute mode",
+    )
+    export_parser.add_argument(
+        "--device",
+        default="cpu",
+        help="Device string passed to the generated export runner",
+    )
+    export_parser.add_argument(
+        "--torch-dtype",
+        default="auto",
+        choices=["auto", "float32", "float16", "bfloat16"],
+        help="torch dtype passed to the generated export runner",
     )
     export_parser.add_argument(
         "--opset-version",
@@ -180,6 +202,17 @@ def _base_parser() -> argparse.ArgumentParser:
         "--python-exec",
         default="python3",
         help="Python executable to use for execute mode",
+    )
+    qwen_export_parser.add_argument(
+        "--device",
+        default="cpu",
+        help="Device string passed to the generated export runner",
+    )
+    qwen_export_parser.add_argument(
+        "--torch-dtype",
+        default="auto",
+        choices=["auto", "float32", "float16", "bfloat16"],
+        help="torch dtype passed to the generated export runner",
     )
     qwen_export_parser.add_argument(
         "--opset-version",
@@ -322,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
             export_mode=args.export_mode,
             quantize_mode=args.quantize_mode,
             python_exec=args.python_exec,
+            export_device=args.export_device,
+            export_torch_dtype=args.export_torch_dtype,
             opset_version=args.opset_version,
             block_size=args.block_size,
         )
@@ -334,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
             getattr(args, "work_dir", None),
             mode=args.mode,
             python_exec=args.python_exec,
+            device=args.device,
+            torch_dtype=args.torch_dtype,
             opset_version=args.opset_version,
         )
         _dump_json(report.to_dict())
@@ -358,6 +395,8 @@ def main(argv: list[str] | None = None) -> int:
             getattr(args, "work_dir", None),
             mode=args.mode,
             python_exec=args.python_exec,
+            device=args.device,
+            torch_dtype=args.torch_dtype,
             opset_version=args.opset_version,
         )
         _dump_json(report.to_dict())

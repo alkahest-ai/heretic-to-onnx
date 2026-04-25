@@ -45,6 +45,8 @@ def _run_export(
     *,
     mode: str,
     python_exec: str,
+    device: str,
+    torch_dtype: str,
     opset_version: int,
 ):
     if manifest.architecture == "gemma4_conditional_generation":
@@ -53,6 +55,8 @@ def _run_export(
             layout.root,
             mode=mode,
             python_exec=python_exec,
+            device=device,
+            torch_dtype=torch_dtype,
             opset_version=opset_version,
         )
     if manifest.architecture == "qwen3_5_conditional_generation":
@@ -61,6 +65,8 @@ def _run_export(
             layout.root,
             mode=mode,
             python_exec=python_exec,
+            device=device,
+            torch_dtype=torch_dtype,
             opset_version=opset_version,
         )
     raise ValueError(f"unsupported architecture family: {manifest.architecture}")
@@ -111,6 +117,8 @@ def run_convert(
     export_mode: str = "plan",
     quantize_mode: str = "plan",
     python_exec: str = "python3",
+    export_device: str = "cpu",
+    export_torch_dtype: str = "auto",
     opset_version: int = 17,
     block_size: int = 32,
 ) -> ConvertReport:
@@ -144,6 +152,8 @@ def run_convert(
         layout,
         mode=export_mode,
         python_exec=python_exec,
+        device=export_device,
+        torch_dtype=export_torch_dtype,
         opset_version=opset_version,
     )
     quantize_report = _run_quantize(

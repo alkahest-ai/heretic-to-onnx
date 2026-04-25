@@ -37,6 +37,8 @@ def export_gemma4(
     *,
     mode: str = "plan",
     python_exec: str = "python3",
+    device: str = "cpu",
+    torch_dtype: str = "auto",
     opset_version: int = 17,
 ) -> ExportReport:
     layout = resolve_work_dir(manifest, work_dir).ensure()
@@ -95,6 +97,10 @@ def export_gemma4(
                 str(output_dir),
                 "--report-path",
                 str(runner_report_path),
+                "--device",
+                device,
+                "--torch-dtype",
+                torch_dtype,
                 "--opset-version",
                 str(opset_version),
             ]
