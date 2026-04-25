@@ -33,12 +33,18 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
     quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
     quantizer.process()
     q4_model = quantizer.model.model
-    q4f16_model = onnx_float16.convert_float_to_float16(
-        q4_model,
-        keep_io_types=False,
-        disable_shape_infer=True,
-        check_fp16_ready=False,
-    )
+    conversion_mode = "converted_to_fp16"
+    try:
+        q4f16_model = onnx_float16.convert_float_to_float16(
+            q4_model,
+            keep_io_types=False,
+            disable_shape_infer=True,
+        )
+    except ValueError as exc:
+        if "already converted to float16" not in str(exc):
+            raise
+        q4f16_model = q4_model
+        conversion_mode = "already_fp16_ready"
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     external_data_path = output_path.with_name(f"{{output_path.name}}_data")
@@ -56,6 +62,7 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
     )
 
     return {{
+        "conversion_mode": conversion_mode,
         "output_path": str(output_path),
         "external_data_path": str(external_data_path),
     }}

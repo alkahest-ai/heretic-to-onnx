@@ -238,7 +238,9 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
 
         self.assertIn("keep_io_types=False", runner)
         self.assertIn("disable_shape_infer=True", runner)
-        self.assertIn("check_fp16_ready=False", runner)
+        self.assertIn('conversion_mode = "converted_to_fp16"', runner)
+        self.assertIn('if "already converted to float16" not in str(exc):', runner)
+        self.assertIn('"conversion_mode": conversion_mode', runner)
 
     def test_build_contract_derives_layer_types_from_full_attention_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
