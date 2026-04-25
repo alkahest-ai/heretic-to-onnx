@@ -21,7 +21,7 @@ export const DEFAULT_MODEL_PRESETS = [
     modelId: ownedModel("alkahest-0.8b"),
     family: "qwen3_5",
     modalities: "text + image",
-    approxDownload: "~1.9 GB",
+    approxDownload: "~1.2 GB",
     dtype: "q4f16",
     note: "Direct Alkahest browser package.",
   },
