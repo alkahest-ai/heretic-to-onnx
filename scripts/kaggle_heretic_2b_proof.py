@@ -19,7 +19,7 @@ from tools.heretic_to_onnx.kaggle_heretic import (
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run a constrained non-interactive Heretic 2B proof for Kaggle notebooks."
+        description="Run a constrained non-interactive Heretic proof for Kaggle notebooks."
     )
     parser.add_argument("--label", choices=sorted(PRESETS), required=True)
     parser.add_argument("--base-model-id", help="Override the preset base model ID")

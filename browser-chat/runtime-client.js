@@ -1,4 +1,4 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=3";
 
 function errorFromPayload(error) {
   const normalized = new Error(error?.message || "Unknown browser runtime error");

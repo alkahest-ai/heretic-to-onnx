@@ -3,7 +3,7 @@ import * as Transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transfo
 const { AutoConfig, AutoModelForVision2Seq, AutoProcessor, TextStreamer, env, load_image, read_audio } =
   Transformers;
 
-env.allowLocalModels = false;
+env.allowLocalModels = true;
 env.allowRemoteModels = true;
 env.useBrowserCache = true;
 
@@ -334,6 +334,17 @@ export function findModelPreset(modelId) {
   return DEFAULT_MODEL_PRESETS.find((preset) => preset.modelId === modelId) ?? null;
 }
 
+export function inferModelFamily(modelId) {
+  const value = String(modelId || "").toLowerCase();
+  if (value.includes("alkahest")) {
+    return "qwen3_5";
+  }
+  if (value.includes("rally")) {
+    return "gemma4";
+  }
+  return null;
+}
+
 export function formatPresetSummary(preset) {
   if (!preset) {
     return "Custom model ID. Use a public Alkahest or Rally ONNX repo with a Transformers.js-compatible package layout.";
@@ -405,7 +416,7 @@ export function createBrowserChatRuntime({
     }
 
     const preset = findModelPreset(modelId);
-    const family = modelFamily ?? preset?.family ?? "gemma4";
+    const family = modelFamily ?? preset?.family ?? inferModelFamily(modelId) ?? "gemma4";
     const resolvedDtype = dtype ?? preset?.dtype ?? defaultDtype;
     const ProcessorClass = resolveProcessorClass(family);
     const ModelClass = resolveModelClass(family, { textOnly });

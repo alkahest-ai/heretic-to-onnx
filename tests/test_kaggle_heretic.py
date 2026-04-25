@@ -47,6 +47,13 @@ class KaggleHereticTests(unittest.TestCase):
         self.assertEqual(config.merged_output_dir.name, "rally-2b-heretic-merged")
         self.assertEqual(config.max_memory, {})
 
+    def test_alkahest_0_8b_preset_uses_official_base_model(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = build_run_config(label="alkahest-0.8b", work_root=tmpdir)
+
+        self.assertEqual(config.base_model_id, "Qwen/Qwen3.5-0.8B")
+        self.assertEqual(config.merged_output_dir.name, "alkahest-0.8b-heretic-merged")
+
     def test_stdin_answers_select_first_trial_save_and_merge(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = build_run_config(label="rally-2b", work_root=tmpdir)

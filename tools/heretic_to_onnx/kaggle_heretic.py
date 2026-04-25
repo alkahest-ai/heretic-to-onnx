@@ -27,6 +27,11 @@ PRESETS: dict[str, KaggleHereticPreset] = {
         base_model_id="google/gemma-4-E2B-it",
         merged_dir_name="rally-2b-heretic-merged",
     ),
+    "alkahest-0.8b": KaggleHereticPreset(
+        label="alkahest-0.8b",
+        base_model_id="Qwen/Qwen3.5-0.8B",
+        merged_dir_name="alkahest-0.8b-heretic-merged",
+    ),
     "alkahest-2b": KaggleHereticPreset(
         label="alkahest-2b",
         base_model_id="Qwen/Qwen3.5-2B",

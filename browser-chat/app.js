@@ -3,9 +3,9 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs";
+} from "../examples/browser-loader.mjs?v=3";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=4";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
@@ -265,6 +265,9 @@ function handleRuntimeProgress(info, message) {
   runtimeState.lastUpdateAt = Date.now();
   pushRuntimeLog(next.logText, next.logKey);
   setStatus(nextStatus);
+  if (state.loading && info?.status === "done") {
+    setBusy({ loading: false, generating: state.generating });
+  }
   renderRuntimePanel();
 }
 
