@@ -198,7 +198,7 @@ function makeProgressMessage(info) {
     return info.file ? `Loading ${info.file} (${percent}%)` : `Loading model (${percent}%)`;
   }
   if (info.status === "done") {
-    return "Model ready.";
+    return "Download complete.";
   }
   if (typeof info.status === "string") {
     return info.file ? `${info.status}: ${info.file}` : info.status;
@@ -423,17 +423,39 @@ export function createBrowserChatRuntime({
     const readyMessage = textOnly
       ? "Text chat ready. Multimodal sessions will load on first media prompt."
       : "Multimodal sessions ready.";
+    const sessionsWarm =
+      modelId === activeModelId &&
+      family === activeFamily &&
+      JSON.stringify(resolvedDtype) === JSON.stringify(activeDtype) &&
+      textOnly === activeTextOnly &&
+      processorPromise &&
+      modelPromise;
 
     reset(modelId, family, resolvedDtype, textOnly);
-    onProgress?.(
-      { status: textOnly ? "loading_text" : "loading_multimodal" },
-      textOnly ? "Loading text sessions..." : "Loading multimodal sessions...",
-    );
+    if (sessionsWarm) {
+      onProgress?.({ status: "sessions_warm", textOnly }, "Runtime sessions already warm.");
+    } else {
+      onProgress?.(
+        { status: textOnly ? "loading_text" : "loading_multimodal" },
+        textOnly ? "Loading text sessions..." : "Loading multimodal sessions...",
+      );
+    }
 
-    processorPromise ||= ProcessorClass.from_pretrained(modelId);
-    configPromise ||= AutoConfig.from_pretrained(modelId).then((config) => sanitizeBrowserConfig(config, resolvedDtype));
+    processorPromise ||= (async () => {
+      onProgress?.({ status: "loading_processor" }, "Loading processor...");
+      const processor = await ProcessorClass.from_pretrained(modelId);
+      onProgress?.({ status: "processor_ready" }, "Processor ready.");
+      return processor;
+    })();
+    configPromise ||= (async () => {
+      onProgress?.({ status: "loading_config" }, "Loading config...");
+      const config = await AutoConfig.from_pretrained(modelId);
+      onProgress?.({ status: "config_ready" }, "Config ready.");
+      return sanitizeBrowserConfig(config, resolvedDtype);
+    })();
     modelPromise ||= (async () => {
       const config = await configPromise;
+      onProgress?.({ status: "loading_model_sessions" }, "Loading ONNX sessions...");
       return ModelClass.from_pretrained(modelId, {
         config,
         device,
@@ -491,8 +513,10 @@ export function createBrowserChatRuntime({
     if (family === "gemma4") {
       promptOptions.enable_thinking = false;
     }
+    onProgress?.({ status: "formatting_prompt" }, "Formatting prompt...");
     const prompt = processor.apply_chat_template(promptMessages, promptOptions);
 
+    onProgress?.({ status: "loading_media" }, "Preparing inputs...");
     const images =
       imageSources.length > 0 ? await Promise.all(imageSources.map((source) => load_image(source))) : [];
     const audios =
@@ -515,6 +539,7 @@ export function createBrowserChatRuntime({
       },
     });
 
+    onProgress?.({ status: "generating" }, "Generating...");
     const outputs = await model.generate({
       ...inputs,
       max_new_tokens: maxNewTokens,

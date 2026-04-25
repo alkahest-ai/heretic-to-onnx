@@ -3,9 +3,9 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs?v=3";
+} from "../examples/browser-loader.mjs?v=5";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=4";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=5";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
@@ -216,8 +216,8 @@ function buildRuntimeDetail(info, message) {
   if (info?.status === "done") {
     return {
       percent: 100,
-      detail: message || "Model ready.",
-      logText: message || "Model ready.",
+      detail: message || "Download complete.",
+      logText: message || "Download complete.",
       logKey: "done",
     };
   }
@@ -265,9 +265,6 @@ function handleRuntimeProgress(info, message) {
   runtimeState.lastUpdateAt = Date.now();
   pushRuntimeLog(next.logText, next.logKey);
   setStatus(nextStatus);
-  if (state.loading && info?.status === "done") {
-    setBusy({ loading: false, generating: state.generating });
-  }
   renderRuntimePanel();
 }
 

@@ -1,4 +1,4 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=3";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=5";
 
 function errorFromPayload(error) {
   const normalized = new Error(error?.message || "Unknown browser runtime error");
@@ -23,7 +23,7 @@ function createWorkerRuntime({
   defaultDevice,
   defaultDtype,
 } = {}) {
-  const worker = new Worker(new URL("./runtime-worker.js", import.meta.url), { type: "module" });
+  const worker = new Worker(new URL("./runtime-worker.js?v=6", import.meta.url), { type: "module" });
   const pending = new Map();
   let nextRequestId = 1;
   let activeModelId = null;
