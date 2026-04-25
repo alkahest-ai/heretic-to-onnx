@@ -13,9 +13,33 @@ function ownedModel(modelName) {
   return `${PUBLIC_MODEL_OWNER}/${modelName}`;
 }
 
+const QWEN35_WEBGPU_DTYPE = Object.freeze({
+  embed_tokens: "q4",
+  decoder_model_merged: "q4",
+  vision_encoder: "fp16",
+});
+
 export const DEFAULT_MODEL_ID = ownedModel("rally-2b-rp");
 
 export const DEFAULT_MODEL_PRESETS = [
+  {
+    label: "Qwen3.5 0.8B Baseline",
+    modelId: "onnx-community/Qwen3.5-0.8B-ONNX",
+    family: "qwen3_5",
+    modalities: "text + image",
+    approxDownload: "~650-800 MB",
+    dtype: QWEN35_WEBGPU_DTYPE,
+    note: "Known-good upstream WebGPU package for loader/runtime verification.",
+  },
+  {
+    label: "Alkahest 0.8B Q4 WebGPU",
+    modelId: ownedModel("alkahest-0.8b-q4-webgpu"),
+    family: "qwen3_5",
+    modalities: "text + image",
+    approxDownload: "~650-800 MB",
+    dtype: QWEN35_WEBGPU_DTYPE,
+    note: "Heretic 0.8B test package using the official Qwen3.5 WebGPU q4/fp16 contract.",
+  },
   {
     label: "Alkahest 0.8B",
     modelId: ownedModel("alkahest-0.8b"),
@@ -23,7 +47,7 @@ export const DEFAULT_MODEL_PRESETS = [
     modalities: "text + image",
     approxDownload: "~1.2 GB",
     dtype: "q4f16",
-    note: "Direct Alkahest browser package.",
+    note: "Legacy q4f16 package; use the Q4 WebGPU package for browser smoke.",
   },
   {
     label: "Alkahest 0.8B V2",
@@ -206,11 +230,21 @@ function makeProgressMessage(info) {
   return "Loading model...";
 }
 
+function dtypeUsesBrowserFloat16Metadata(dtype) {
+  if (typeof dtype === "string") {
+    return ["q4f16", "fp16", "q4"].includes(dtype);
+  }
+  if (dtype && typeof dtype === "object") {
+    return Object.values(dtype).some((value) => ["q4f16", "fp16", "q4"].includes(value));
+  }
+  return false;
+}
+
 function sanitizeBrowserConfig(config, dtype) {
   if (!config || typeof config !== "object") {
     return config;
   }
-  if (!["q4f16", "fp16"].includes(dtype)) {
+  if (!dtypeUsesBrowserFloat16Metadata(dtype)) {
     return config;
   }
 
@@ -349,7 +383,8 @@ export function formatPresetSummary(preset) {
   if (!preset) {
     return "Custom model ID. Use a public Alkahest or Rally ONNX repo with a Transformers.js-compatible package layout.";
   }
-  return `${preset.label} | ${preset.modalities} | ${preset.approxDownload} first load | ${preset.note}`;
+  const dtypeLabel = typeof preset.dtype === "string" ? preset.dtype : JSON.stringify(preset.dtype);
+  return `${preset.label} | ${preset.modalities} | ${preset.approxDownload} first load | ${dtypeLabel} | ${preset.note}`;
 }
 
 export async function clearBrowserModelCache() {

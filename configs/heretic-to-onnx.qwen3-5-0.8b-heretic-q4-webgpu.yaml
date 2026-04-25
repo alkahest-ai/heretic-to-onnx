@@ -1,0 +1,27 @@
+source_model_id: thomasjvu/alkahest-0.8b-heretic-merged
+base_model_id: Qwen/Qwen3.5-0.8B
+architecture: qwen3_5_conditional_generation
+target_repo_id: thomasjvu/alkahest-0.8b-q4-webgpu
+target_dtype: q4
+target_device: webgpu
+modalities:
+  - text
+  - image
+inherit_assets:
+  from_source:
+    - config.json
+    - generation_config.json
+    - tokenizer.json
+    - tokenizer_config.json
+    - chat_template.jinja
+  from_base_if_missing:
+    - preprocessor_config.json
+expected_architecture: Qwen3_5ForConditionalGeneration
+expected_onnx_files:
+  - onnx/vision_encoder_fp16.onnx
+  - onnx/embed_tokens_q4.onnx
+  - onnx/decoder_model_merged_q4.onnx
+validation:
+  smoke_prompt: Describe one intimate but non-explicit scene in character as a private uncensored companion.
+  browser_loader_class: Qwen3_5ForConditionalGeneration
+  processor_class: AutoProcessor

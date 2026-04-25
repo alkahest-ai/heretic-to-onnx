@@ -1,4 +1,4 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=6";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=8";
 
 const DOWNLOAD_STALL_MS = 90_000;
 const PHASE_STALL_MS = 120_000;

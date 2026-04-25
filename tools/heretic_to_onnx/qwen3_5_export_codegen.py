@@ -79,18 +79,24 @@ class ExportContract:
         }
 
 
+_PACKAGE_DTYPE_SUFFIXES = ("q4f16", "q4", "q8", "fp16", "fp32")
+
+
+def _session_name_from_package_stem(stem: str) -> str:
+    for suffix in _PACKAGE_DTYPE_SUFFIXES:
+        marker = f"_{suffix}"
+        if stem.endswith(marker):
+            return stem[: -len(marker)]
+    return stem
+
+
 def _session_filename_map(manifest: Manifest) -> dict[str, str]:
     mapping: dict[str, str] = {}
-    suffix = f"_{manifest.target_dtype}.onnx"
     for relative_path in manifest.expected_onnx_files:
         path = Path(relative_path)
         if path.suffix != ".onnx":
             continue
-        if path.stem.endswith(f"_{manifest.target_dtype}"):
-            session_name = path.stem[: -len(f"_{manifest.target_dtype}")]
-        else:
-            session_name = path.stem
-        mapping[session_name] = path.name
+        mapping[_session_name_from_package_stem(path.stem)] = path.name
     return mapping
 
 

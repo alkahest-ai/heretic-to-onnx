@@ -12,7 +12,7 @@ Current status:
 - `prepare`, `inspect`, `package`, and `validate` are implemented
 - `convert` orchestrates inspect -> prepare -> export -> quantize -> package -> validate
 - Gemma 4 export and q4f16 quantization support `plan`, `script`, and `execute`
-- Qwen3.5 export and q4f16 quantization support `plan`, `script`, and `execute`
+- Qwen3.5 export supports both legacy q4f16 packaging and the browser WebGPU q4/fp16 package contract used by the known-working Qwen3.5 ONNX repos.
 - Gemma 4 is the more proven lane today
 
 ## Browser Release Gate

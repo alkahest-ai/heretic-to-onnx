@@ -7,6 +7,9 @@ from typing import Any
 
 from .config import Manifest
 
+_BROWSER_FLOAT16_METADATA_TARGETS = {"q4f16", "fp16", "q4"}
+_QWEN_Q4_08B_EMBED_EXTERNAL_DATA_MAX_BYTES = 350 * 1024 * 1024
+
 
 @dataclass(slots=True)
 class RuntimeSmokeSessionReport:
@@ -86,6 +89,44 @@ def _runtime_smoke_onnx_sessions(
         report.runtime_smoke.append(session_report)
 
 
+def _validate_qwen_webgpu_contract(manifest: Manifest, package_path: Path, report: ValidationReport) -> None:
+    if manifest.architecture != "qwen3_5_conditional_generation" or manifest.target_dtype != "q4":
+        return
+
+    expected = set(manifest.expected_onnx_files)
+    forbidden = sorted(path for path in expected if "_q4f16" in Path(path).name)
+    if forbidden:
+        report.ok = False
+        report.errors.append(
+            "Qwen WebGPU q4 packages must not use q4f16 session artifacts: " + ", ".join(forbidden)
+        )
+
+    required_text_sessions = {
+        "onnx/embed_tokens_q4.onnx",
+        "onnx/decoder_model_merged_q4.onnx",
+    }
+    missing_required = sorted(required_text_sessions - expected)
+    if missing_required:
+        report.ok = False
+        report.errors.append(
+            "Qwen WebGPU q4 packages must declare official-style text sessions: "
+            + ", ".join(missing_required)
+        )
+
+    if "image" in manifest.modalities and "onnx/vision_encoder_fp16.onnx" not in expected:
+        report.ok = False
+        report.errors.append("Qwen WebGPU q4 image packages must declare onnx/vision_encoder_fp16.onnx")
+
+    if "0.8b" in manifest.target_repo_id.lower():
+        embed_data = package_path / "onnx" / "embed_tokens_q4.onnx_data"
+        if embed_data.exists() and embed_data.stat().st_size > _QWEN_Q4_08B_EMBED_EXTERNAL_DATA_MAX_BYTES:
+            report.ok = False
+            report.errors.append(
+                "embed_tokens_q4.onnx_data is too large for the 0.8B q4 WebGPU contract; "
+                f"got {embed_data.stat().st_size} bytes"
+            )
+
+
 def validate_package(
     manifest: Manifest,
     package_dir: str | Path,
@@ -127,7 +168,7 @@ def validate_package(
             if "use_external_data_format" not in transformers_js_config:
                 report.ok = False
                 report.errors.append("config.json is missing transformers.js_config.use_external_data_format")
-            if manifest.target_dtype in {"q4f16", "fp16"}:
+            if manifest.target_dtype in _BROWSER_FLOAT16_METADATA_TARGETS:
                 kv_cache_dtype = transformers_js_config.get("kv_cache_dtype", {})
                 if kv_cache_dtype.get(manifest.target_dtype) != "float16":
                     report.ok = False
@@ -142,6 +183,8 @@ def validate_package(
                         "config.json still contains bfloat16 fields for a browser float16 target: "
                         + ", ".join(bfloat16_paths)
                     )
+
+    _validate_qwen_webgpu_contract(manifest, package_path, report)
 
     missing_onnx = [
         relative_path for relative_path in manifest.expected_onnx_files if not (package_path / relative_path).exists()

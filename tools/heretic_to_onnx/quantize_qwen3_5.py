@@ -119,8 +119,8 @@ def quantize_qwen3_5(
         report.notes.extend(
             [
                 "Plan mode validates the Qwen3.5 quantization contract and expected session file mapping only.",
-                "Use `--mode script` to generate a q4f16 quantization runner.",
-                "Use `--mode execute` to run q4f16 quantization in a Python environment with onnx, onnxruntime, and onnxconverter_common installed.",
+                "Use `--mode script` to generate a Qwen3.5 quantization runner.",
+                "Use `--mode execute` to run Qwen3.5 q4/fp16 or q4f16 quantization in a Python environment with onnx, onnxruntime, and onnxconverter_common installed.",
             ]
         )
     elif mode == "script":

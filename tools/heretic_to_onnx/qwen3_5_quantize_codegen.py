@@ -28,31 +28,14 @@ from pathlib import Path
 CONTRACT = {contract_literal}
 
 
-def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
-    model = onnx.load(str(input_path))
-    quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
-    quantizer.process()
-    q4_model = quantizer.model.model
-    conversion_mode = "converted_to_fp16"
-    try:
-        q4f16_model = onnx_float16.convert_float_to_float16(
-            q4_model,
-            keep_io_types=False,
-            disable_shape_infer=True,
-        )
-    except ValueError as exc:
-        if "already converted to float16" not in str(exc):
-            raise
-        q4f16_model = q4_model
-        conversion_mode = "already_fp16_ready"
-
+def _save_external_data_model(model, output_path: Path) -> str:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     external_data_path = output_path.with_name(f"{{output_path.name}}_data")
     if external_data_path.exists():
         external_data_path.unlink()
 
     onnx.save_model(
-        q4f16_model,
+        model,
         str(output_path),
         save_as_external_data=True,
         all_tensors_to_one_file=True,
@@ -60,12 +43,81 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
         size_threshold=0,
         convert_attribute=False,
     )
+    return str(external_data_path)
+
+
+def _convert_to_fp16(model):
+    conversion_mode = "converted_to_fp16"
+    try:
+        converted_model = onnx_float16.convert_float_to_float16(
+            model,
+            keep_io_types=False,
+            disable_shape_infer=True,
+        )
+    except ValueError as exc:
+        if "already converted to float16" not in str(exc):
+            raise
+        converted_model = model
+        conversion_mode = "already_fp16_ready"
+    return converted_model, conversion_mode
+
+
+def _quantize_q4(input_path: Path, output_path: Path, block_size: int) -> dict:
+    model = onnx.load(str(input_path))
+    quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
+    quantizer.process()
+    external_data_path = _save_external_data_model(quantizer.model.model, output_path)
+
+    return {{
+        "conversion_mode": "matmul_nbits_q4",
+        "output_path": str(output_path),
+        "external_data_path": external_data_path,
+    }}
+
+
+def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
+    model = onnx.load(str(input_path))
+    quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
+    quantizer.process()
+    q4f16_model, conversion_mode = _convert_to_fp16(quantizer.model.model)
+    external_data_path = _save_external_data_model(q4f16_model, output_path)
 
     return {{
         "conversion_mode": conversion_mode,
         "output_path": str(output_path),
-        "external_data_path": str(external_data_path),
+        "external_data_path": external_data_path,
     }}
+
+
+def _quantize_fp16(input_path: Path, output_path: Path) -> dict:
+    model = onnx.load(str(input_path))
+    fp16_model, conversion_mode = _convert_to_fp16(model)
+    external_data_path = _save_external_data_model(fp16_model, output_path)
+
+    return {{
+        "conversion_mode": conversion_mode,
+        "output_path": str(output_path),
+        "external_data_path": external_data_path,
+    }}
+
+
+def _package_dtype(package_filename: str) -> str:
+    stem = Path(package_filename).stem
+    for suffix in ("q4f16", "q4", "fp16"):
+        if stem.endswith(f"_{{suffix}}"):
+            return suffix
+    raise ValueError(f"unsupported Qwen3.5 package dtype in filename: {{package_filename}}")
+
+
+def _quantize_session(input_path: Path, output_path: Path, block_size: int, package_filename: str) -> dict:
+    package_dtype = _package_dtype(package_filename)
+    if package_dtype == "q4":
+        return _quantize_q4(input_path, output_path, block_size)
+    if package_dtype == "fp16":
+        return _quantize_fp16(input_path, output_path)
+    if package_dtype == "q4f16":
+        return _quantize_q4f16(input_path, output_path, block_size)
+    raise ValueError(f"unsupported Qwen3.5 package dtype: {{package_dtype}}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -91,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             missing_inputs.append(str(raw_path))
             continue
         quantized_path = output_dir / session["package_filename"]
-        result = _quantize_q4f16(raw_path, quantized_path, args.block_size)
+        result = _quantize_session(raw_path, quantized_path, args.block_size, session["package_filename"])
         results[session["name"]] = {{
             "input_path": str(raw_path),
             **result,

@@ -9,6 +9,9 @@ from typing import Any
 from .config import Manifest
 from .repo import RepoHandle
 
+_PACKAGE_DTYPE_SUFFIXES = ("q4f16", "q4", "q8", "fp16", "fp32")
+_BROWSER_FLOAT16_METADATA_TARGETS = {"q4f16", "fp16", "q4"}
+
 
 @dataclass(slots=True)
 class PackageReport:
@@ -33,9 +36,11 @@ def _expected_session_names(manifest: Manifest) -> list[str]:
         if path.suffix != ".onnx":
             continue
         name = path.stem
-        suffix = f"_{manifest.target_dtype}"
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
+        for dtype_suffix in _PACKAGE_DTYPE_SUFFIXES:
+            suffix = f"_{dtype_suffix}"
+            if name.endswith(suffix):
+                name = name[: -len(suffix)]
+                break
         if name not in session_names:
             session_names.append(name)
     return session_names
@@ -46,7 +51,7 @@ def _external_data_mapping(manifest: Manifest) -> dict[str, int]:
 
 
 def _normalize_browser_config_dtypes(value: Any, manifest: Manifest) -> Any:
-    target_dtype = "float16" if manifest.target_dtype in {"q4f16", "fp16"} else None
+    target_dtype = "float16" if manifest.target_dtype in _BROWSER_FLOAT16_METADATA_TARGETS else None
     if target_dtype is None:
         return value
 
@@ -73,7 +78,7 @@ def _patch_config(config_path: Path, manifest: Manifest) -> None:
     transformers_js_config = config.setdefault("transformers.js_config", {})
     transformers_js_config["use_external_data_format"] = _external_data_mapping(manifest)
     kv_cache_dtype = transformers_js_config.setdefault("kv_cache_dtype", {})
-    if manifest.target_dtype in {"q4f16", "fp16"}:
+    if manifest.target_dtype in _BROWSER_FLOAT16_METADATA_TARGETS:
         kv_cache_dtype[manifest.target_dtype] = "float16"
     config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

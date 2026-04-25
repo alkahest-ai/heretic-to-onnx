@@ -37,6 +37,27 @@ def _sample_manifest(*, include_video: bool = False) -> Manifest:
     )
 
 
+def _sample_q4_webgpu_manifest() -> Manifest:
+    return Manifest(
+        source_model_id="Qwen/Qwen3.5-0.8B",
+        base_model_id="Qwen/Qwen3.5-0.8B",
+        architecture="qwen3_5_conditional_generation",
+        target_repo_id="thomasjvu/alkahest-0.8b-q4-webgpu",
+        target_dtype="q4",
+        target_device="webgpu",
+        modalities=["text", "image"],
+        inherit_assets=InheritAssets(),
+        expected_architecture="Qwen3_5ForConditionalGeneration",
+        expected_onnx_files=[
+            "onnx/vision_encoder_fp16.onnx",
+            "onnx/embed_tokens_q4.onnx",
+            "onnx/decoder_model_merged_q4.onnx",
+        ],
+        validation=ValidationConfig(),
+        manifest_path=Path("/tmp/heretic-qwen3_5-q4-test.yaml"),
+    )
+
+
 def _write_source_config(
     root: Path,
     *,
@@ -241,6 +262,45 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('conversion_mode = "converted_to_fp16"', runner)
         self.assertIn('if "already converted to float16" not in str(exc):', runner)
         self.assertIn('"conversion_mode": conversion_mode', runner)
+
+    def test_build_contract_maps_official_qwen_webgpu_mixed_dtype_filenames(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir)
+            _write_source_config(
+                source_path,
+                layer_types=["linear_attention", "full_attention"],
+            )
+
+            contract = build_qwen3_5_export_contract(_sample_q4_webgpu_manifest(), source_path)
+
+        self.assertTrue(contract.ok)
+        self.assertEqual(contract.sessions[0].package_filename, "vision_encoder_fp16.onnx")
+        self.assertEqual(contract.sessions[1].package_filename, "embed_tokens_q4.onnx")
+        self.assertEqual(contract.sessions[2].package_filename, "decoder_model_merged_q4.onnx")
+
+    def test_quantize_runner_routes_official_qwen_webgpu_dtypes_per_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir)
+            _write_source_config(
+                source_path,
+                layer_types=["linear_attention", "full_attention"],
+            )
+            contract = build_qwen3_5_export_contract(_sample_q4_webgpu_manifest(), source_path)
+
+        runner = render_qwen3_5_quantize_runner(
+            contract,
+            input_dir="/tmp/input",
+            output_dir="/tmp/output",
+            report_path="/tmp/report.json",
+            block_size=32,
+        )
+
+        self.assertIn('if package_dtype == "q4":', runner)
+        self.assertIn('return _quantize_q4(input_path, output_path, block_size)', runner)
+        self.assertIn('if package_dtype == "fp16":', runner)
+        self.assertIn('return _quantize_fp16(input_path, output_path)', runner)
+        self.assertIn('_quantize_session(raw_path, quantized_path, args.block_size, session["package_filename"])', runner)
+        compile(runner, "<qwen3_5_quantize_runner>", "exec")
 
     def test_build_contract_derives_layer_types_from_full_attention_interval(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

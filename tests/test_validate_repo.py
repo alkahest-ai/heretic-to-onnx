@@ -33,6 +33,91 @@ def _manifest(root: Path, *, expected_onnx_files: list[str]) -> Manifest:
     )
 
 
+def _qwen_q4_manifest(root: Path, *, expected_onnx_files: list[str]) -> Manifest:
+    return Manifest(
+        source_model_id="example/source",
+        base_model_id="example/base",
+        architecture="qwen3_5_conditional_generation",
+        target_repo_id="thomasjvu/alkahest-0.8b-q4-webgpu",
+        target_dtype="q4",
+        target_device="webgpu",
+        modalities=["text", "image"],
+        inherit_assets=InheritAssets(),
+        expected_architecture="Qwen3_5ForConditionalGeneration",
+        expected_onnx_files=expected_onnx_files,
+        validation=ValidationConfig(),
+        manifest_path=root / "manifest.yaml",
+    )
+
+
+class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):
+    def _write_qwen_package_config(self, package_dir: Path) -> None:
+        _write_json(
+            package_dir / "config.json",
+            {
+                "architectures": ["Qwen3_5ForConditionalGeneration"],
+                "dtype": "float16",
+                "transformers.js_config": {
+                    "use_external_data_format": {
+                        "vision_encoder": 1,
+                        "embed_tokens": 1,
+                        "decoder_model_merged": 1,
+                    },
+                    "kv_cache_dtype": {"q4": "float16"},
+                },
+            },
+        )
+
+    def test_qwen_q4_webgpu_contract_rejects_q4f16_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_qwen_package_config(package_dir)
+
+            report = validate_package(
+                _qwen_q4_manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/vision_encoder_q4f16.onnx",
+                        "onnx/embed_tokens_q4f16.onnx",
+                        "onnx/decoder_model_merged_q4f16.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("must not use q4f16" in error for error in report.errors))
+        self.assertTrue(any("must declare official-style text sessions" in error for error in report.errors))
+
+    def test_qwen_q4_webgpu_contract_rejects_inflated_08b_embed_external_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_qwen_package_config(package_dir)
+            data_path = package_dir / "onnx" / "embed_tokens_q4.onnx_data"
+            data_path.parent.mkdir(parents=True, exist_ok=True)
+            with data_path.open("wb") as file:
+                file.truncate(351 * 1024 * 1024)
+
+            report = validate_package(
+                _qwen_q4_manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/vision_encoder_fp16.onnx",
+                        "onnx/embed_tokens_q4.onnx",
+                        "onnx/decoder_model_merged_q4.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("too large for the 0.8B q4 WebGPU contract" in error for error in report.errors))
+
+
 @unittest.skipUnless(
     importlib.util.find_spec("onnx") is not None and importlib.util.find_spec("onnxruntime") is not None,
     "onnx + onnxruntime are required for packaged runtime smoke tests",
