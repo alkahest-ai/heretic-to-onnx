@@ -327,6 +327,10 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn("def _resolve_pad_token_id(config):", runner)
         self.assertIn("pad_token_id = _resolve_pad_token_id(config)", runner)
         self.assertIn("torch.full((1, total_sequence), pad_token_id", runner)
+        self.assertIn("repeat_shape = [1] * key.dim()", runner)
+        self.assertIn("key = key.repeat(*repeat_shape)", runner)
+        self.assertIn("value = value.repeat(*repeat_shape)", runner)
+        self.assertNotIn("repeat_interleave(", runner)
 
     def test_runner_uses_supported_export_kwargs_without_legacy_fallback_chain(self) -> None:
         runner = render_qwen3_5_export_runner(

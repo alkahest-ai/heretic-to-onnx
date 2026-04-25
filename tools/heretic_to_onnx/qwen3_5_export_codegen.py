@@ -574,9 +574,11 @@ def render_qwen3_5_export_runner(
             if enable_gqa and query.shape[-3] != key.shape[-3]:
                 if query.shape[-3] % key.shape[-3] != 0:
                     raise ValueError("query heads must be divisible by key heads when enable_gqa=True")
-                repeat_factor = query.shape[-3] // key.shape[-3]
-                key = key.repeat_interleave(repeat_factor, dim=-3)
-                value = value.repeat_interleave(repeat_factor, dim=-3)
+                repeat_factor = int(query.shape[-3] // key.shape[-3])
+                repeat_shape = [1] * key.dim()
+                repeat_shape[-3] = repeat_factor
+                key = key.repeat(*repeat_shape)
+                value = value.repeat(*repeat_shape)
 
             attn_scores = torch.matmul(query, key.transpose(-2, -1)) * scale
 
