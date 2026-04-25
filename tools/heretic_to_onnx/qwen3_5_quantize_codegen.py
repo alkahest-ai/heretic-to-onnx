@@ -75,6 +75,87 @@ def _quantize_q4(input_path: Path, output_path: Path, block_size: int) -> dict:
     }}
 
 
+def _pack_int4(values):
+    if values.shape[-1] % 2:
+        values = np.pad(values, [(0, 0)] * (values.ndim - 1) + [(0, 1)])
+    low = values[..., 0::2]
+    high = values[..., 1::2]
+    return (low | (high << 4)).astype(np.uint8)
+
+
+def _quantize_gather_block_q4(input_path: Path, output_path: Path, block_size: int) -> dict:
+    model = onnx.load(str(input_path))
+    gather_nodes = [node for node in model.graph.node if node.op_type == "Gather"]
+    if len(gather_nodes) != 1:
+        raise ValueError(f"expected exactly one Gather node in embed_tokens session, got {{len(gather_nodes)}}")
+
+    gather_node = gather_nodes[0]
+    weight_name, input_ids_name = gather_node.input[:2]
+    output_name = gather_node.output[0]
+    initializers = {{initializer.name: initializer for initializer in model.graph.initializer}}
+    if weight_name not in initializers:
+        raise ValueError(f"Gather weight initializer was not found: {{weight_name}}")
+
+    weight = numpy_helper.to_array(initializers[weight_name]).astype(np.float32)
+    if weight.ndim != 2:
+        raise ValueError(f"expected 2D embedding weight, got shape {{weight.shape}}")
+    vocab_size, hidden_size = weight.shape
+    if hidden_size % block_size:
+        raise ValueError(f"embedding hidden size {{hidden_size}} is not divisible by block size {{block_size}}")
+
+    num_blocks = hidden_size // block_size
+    blocks = weight.reshape(vocab_size, num_blocks, block_size)
+    mins = blocks.min(axis=-1)
+    maxs = blocks.max(axis=-1)
+    scales = (maxs - mins) / 15.0
+    scales = np.where(scales == 0, 1.0, scales).astype(np.float32)
+    zero_points = np.rint(-mins / scales).clip(0, 15).astype(np.uint8)
+    quantized = np.rint(blocks / scales[..., None] + zero_points[..., None]).clip(0, 15).astype(np.uint8)
+
+    quant_name = weight_name.replace(".", "_") + "_quant"
+    scales_name = weight_name.replace(".", "_") + "_scales"
+    zero_points_name = weight_name.replace(".", "_") + "_zp"
+    quant_tensor = numpy_helper.from_array(_pack_int4(quantized.reshape(vocab_size, hidden_size)), quant_name)
+    scales_tensor = numpy_helper.from_array(scales, scales_name)
+    zero_points_tensor = numpy_helper.from_array(_pack_int4(zero_points), zero_points_name)
+
+    inputs = list(model.graph.input)
+    outputs = list(model.graph.output)
+    for output in outputs:
+        if output.name == output_name:
+            output.type.tensor_type.elem_type = TensorProto.FLOAT
+
+    graph = helper.make_graph(
+        [
+            helper.make_node(
+                "GatherBlockQuantized",
+                [quant_name, input_ids_name, scales_name, zero_points_name],
+                [output_name],
+                domain="com.microsoft",
+            )
+        ],
+        model.graph.name or "embed_tokens_q4",
+        inputs,
+        outputs,
+        [quant_tensor, scales_tensor, zero_points_tensor],
+    )
+    quantized_model = helper.make_model(
+        graph,
+        opset_imports=[helper.make_opsetid("", 21), helper.make_opsetid("com.microsoft", 1)],
+    )
+    quantized_model.ir_version = min(model.ir_version, 10) if model.ir_version else 10
+    external_data_path = _save_external_data_model(quantized_model, output_path)
+
+    return {{
+        "conversion_mode": "gather_block_quantized_q4",
+        "output_path": str(output_path),
+        "external_data_path": external_data_path,
+        "block_size": block_size,
+        "vocab_size": int(vocab_size),
+        "hidden_size": int(hidden_size),
+    }}
+
+
 def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
     model = onnx.load(str(input_path))
     quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
@@ -91,7 +172,18 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
 
 def _quantize_fp16(input_path: Path, output_path: Path) -> dict:
     model = onnx.load(str(input_path))
-    fp16_model, conversion_mode = _convert_to_fp16(model)
+    conversion_mode = "converted_to_fp16_keep_io"
+    try:
+        fp16_model = onnx_float16.convert_float_to_float16(
+            model,
+            keep_io_types=True,
+            disable_shape_infer=True,
+        )
+    except ValueError as exc:
+        if "already converted to float16" not in str(exc):
+            raise
+        fp16_model = model
+        conversion_mode = "already_fp16_ready"
     external_data_path = _save_external_data_model(fp16_model, output_path)
 
     return {{
@@ -112,6 +204,8 @@ def _package_dtype(package_filename: str) -> str:
 def _quantize_session(input_path: Path, output_path: Path, block_size: int, package_filename: str) -> dict:
     package_dtype = _package_dtype(package_filename)
     if package_dtype == "q4":
+        if Path(package_filename).stem.startswith("embed_tokens_"):
+            return _quantize_gather_block_q4(input_path, output_path, block_size)
         return _quantize_q4(input_path, output_path, block_size)
     if package_dtype == "fp16":
         return _quantize_fp16(input_path, output_path)
@@ -165,7 +259,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    import numpy as np
     import onnx
+    from onnx import TensorProto, helper, numpy_helper
     from onnxconverter_common import float16 as onnx_float16
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 

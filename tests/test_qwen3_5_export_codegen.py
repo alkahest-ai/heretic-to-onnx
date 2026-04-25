@@ -296,9 +296,12 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         )
 
         self.assertIn('if package_dtype == "q4":', runner)
+        self.assertIn('GatherBlockQuantized', runner)
+        self.assertIn('return _quantize_gather_block_q4(input_path, output_path, block_size)', runner)
         self.assertIn('return _quantize_q4(input_path, output_path, block_size)', runner)
         self.assertIn('if package_dtype == "fp16":', runner)
         self.assertIn('return _quantize_fp16(input_path, output_path)', runner)
+        self.assertIn('keep_io_types=True', runner)
         self.assertIn('_quantize_session(raw_path, quantized_path, args.block_size, session["package_filename"])', runner)
         compile(runner, "<qwen3_5_quantize_runner>", "exec")
 
