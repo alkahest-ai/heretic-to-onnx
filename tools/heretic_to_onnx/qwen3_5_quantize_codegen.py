@@ -96,6 +96,25 @@ def _replace_node_outputs_and_consumers(model, old_name: str, new_name: str) -> 
                 node.input[index] = new_name
 
 
+def _float_tensor_to_fp16(tensor):
+    if tensor.data_type != TensorProto.FLOAT:
+        return tensor
+    return numpy_helper.from_array(numpy_helper.to_array(tensor).astype(np.float16), tensor.name)
+
+
+def _normalize_float_constants_to_fp16(model) -> None:
+    for index, initializer in enumerate(model.graph.initializer):
+        if initializer.data_type == TensorProto.FLOAT:
+            model.graph.initializer[index].CopyFrom(_float_tensor_to_fp16(initializer))
+
+    for node in model.graph.node:
+        if node.op_type != "Constant":
+            continue
+        for attr in node.attribute:
+            if attr.type == onnx.AttributeProto.TENSOR and attr.t.data_type == TensorProto.FLOAT:
+                attr.t.CopyFrom(_float_tensor_to_fp16(attr.t))
+
+
 def _wrap_fp16_model_with_float32_io(model, original_model) -> None:
     original_inputs = {{value.name: _copy_value_info(value) for value in original_model.graph.input}}
     original_outputs = {{value.name: _copy_value_info(value) for value in original_model.graph.output}}
@@ -237,6 +256,10 @@ def _quantize_gather_block_q4(input_path: Path, output_path: Path, block_size: i
                 [quant_name, input_ids_name, scales_name, zero_points_name],
                 [output_name],
                 domain="com.microsoft",
+                bits=4,
+                block_size=block_size,
+                gather_axis=0,
+                quantize_axis=1,
             )
         ],
         model.graph.name or "embed_tokens_q4",
@@ -285,6 +308,7 @@ def _quantize_fp16(input_path: Path, output_path: Path) -> dict:
             keep_io_types=False,
             disable_shape_infer=True,
         )
+        _normalize_float_constants_to_fp16(fp16_model)
         _wrap_fp16_model_with_float32_io(fp16_model, original_model)
     except ValueError as exc:
         if "already converted to float16" not in str(exc):
