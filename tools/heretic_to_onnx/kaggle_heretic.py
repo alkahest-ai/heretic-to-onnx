@@ -479,6 +479,25 @@ def ensure_generation_config(path: str | Path, *, base_model_id: str) -> bool:
         return False
 
 
+def ensure_tokenizer_assets(path: str | Path, *, base_model_id: str) -> bool:
+    root = Path(path)
+    existing = [
+        name
+        for name in ("tokenizer.json", "tokenizer.model", "vocab.json", "tokenizer_config.json")
+        if (root / name).is_file()
+    ]
+    if existing:
+        return False
+    try:
+        from transformers import AutoTokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+        tokenizer.save_pretrained(root)
+        return True
+    except Exception:
+        return False
+
+
 def run_kaggle_heretic(
     config: KaggleHereticRunConfig,
     *,
@@ -547,6 +566,13 @@ def run_kaggle_heretic(
     )
     if generated_generation_config:
         warnings.append("generation_config.json was copied from the base model after merge")
+
+    generated_tokenizer_assets = ensure_tokenizer_assets(
+        config.merged_output_dir,
+        base_model_id=config.base_model_id,
+    )
+    if generated_tokenizer_assets:
+        warnings.append("tokenizer assets were copied from the base model after merge")
 
     merged = validate_merged_checkpoint(config.merged_output_dir)
     if returncode != 0 and merged.ok:

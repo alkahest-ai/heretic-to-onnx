@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import yaml
@@ -12,6 +14,7 @@ from tools.heretic_to_onnx.kaggle_heretic import (
     build_run_config,
     build_stdin_answers,
     ensure_torchao_is_compatible,
+    ensure_tokenizer_assets,
     render_config_toml,
     run_kaggle_heretic,
     validate_merged_checkpoint,
@@ -91,6 +94,28 @@ class KaggleHereticTests(unittest.TestCase):
         self.assertTrue(report.ok, report.missing)
         self.assertEqual(report.weight_files, ["model.safetensors"])
         self.assertEqual(report.tokenizer_files, ["tokenizer.json"])
+
+    def test_tokenizer_assets_are_copied_from_base_model_when_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+
+            def save_pretrained(dst: Path) -> None:
+                (Path(dst) / "tokenizer.json").write_text("{}\n", encoding="utf-8")
+                (Path(dst) / "tokenizer_config.json").write_text("{}\n", encoding="utf-8")
+
+            tokenizer = mock.Mock()
+            tokenizer.save_pretrained.side_effect = save_pretrained
+            transformers = mock.Mock()
+            transformers.AutoTokenizer.from_pretrained.return_value = tokenizer
+
+            with mock.patch.dict(sys.modules, {"transformers": transformers}):
+                changed = ensure_tokenizer_assets(root, base_model_id="Qwen/Qwen3.5-2B")
+                self.assertTrue(changed)
+                transformers.AutoTokenizer.from_pretrained.assert_called_once_with(
+                    "Qwen/Qwen3.5-2B"
+                )
+                self.assertTrue((root / "tokenizer.json").is_file())
+                self.assertTrue((root / "tokenizer_config.json").is_file())
 
     def test_dry_run_writes_config_and_report_without_launching_heretic(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
