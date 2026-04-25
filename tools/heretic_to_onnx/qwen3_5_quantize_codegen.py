@@ -62,6 +62,97 @@ def _convert_to_fp16(model):
     return converted_model, conversion_mode
 
 
+def _tensor_elem_type(value_info) -> int | None:
+    tensor_type = value_info.type.tensor_type
+    return tensor_type.elem_type if tensor_type.HasField("elem_type") else None
+
+
+def _copy_value_info(value_info):
+    copied = onnx.ValueInfoProto()
+    copied.CopyFrom(value_info)
+    return copied
+
+
+def _copy_model(model):
+    copied = onnx.ModelProto()
+    copied.CopyFrom(model)
+    return copied
+
+
+def _replace_node_inputs(model, old_name: str, new_name: str) -> None:
+    for node in model.graph.node:
+        for index, input_name in enumerate(node.input):
+            if input_name == old_name:
+                node.input[index] = new_name
+
+
+def _replace_node_outputs_and_consumers(model, old_name: str, new_name: str) -> None:
+    for node in model.graph.node:
+        for index, output_name in enumerate(node.output):
+            if output_name == old_name:
+                node.output[index] = new_name
+        for index, input_name in enumerate(node.input):
+            if input_name == old_name:
+                node.input[index] = new_name
+
+
+def _wrap_fp16_model_with_float32_io(model, original_model) -> None:
+    original_inputs = {{value.name: _copy_value_info(value) for value in original_model.graph.input}}
+    original_outputs = {{value.name: _copy_value_info(value) for value in original_model.graph.output}}
+    prefix_nodes = []
+    suffix_nodes = []
+
+    for value in model.graph.input:
+        original = original_inputs.get(value.name)
+        if original is None or _tensor_elem_type(original) != TensorProto.FLOAT:
+            continue
+        if _tensor_elem_type(value) != TensorProto.FLOAT16:
+            continue
+
+        external_name = value.name
+        internal_name = f"{{external_name}}_fp16"
+        _replace_node_inputs(model, external_name, internal_name)
+        value.CopyFrom(original)
+        prefix_nodes.append(
+            helper.make_node(
+                "Cast",
+                [external_name],
+                [internal_name],
+                name=f"{{external_name}}_to_fp16",
+                to=TensorProto.FLOAT16,
+            )
+        )
+
+    for value in model.graph.output:
+        original = original_outputs.get(value.name)
+        if original is None or _tensor_elem_type(original) != TensorProto.FLOAT:
+            continue
+        if _tensor_elem_type(value) != TensorProto.FLOAT16:
+            continue
+
+        external_name = value.name
+        internal_name = f"{{external_name}}_fp16"
+        _replace_node_outputs_and_consumers(model, external_name, internal_name)
+        value.CopyFrom(original)
+        suffix_nodes.append(
+            helper.make_node(
+                "Cast",
+                [internal_name],
+                [external_name],
+                name=f"{{external_name}}_to_fp32",
+                to=TensorProto.FLOAT,
+            )
+        )
+
+    if prefix_nodes:
+        existing_nodes = list(model.graph.node)
+        del model.graph.node[:]
+        model.graph.node.extend(prefix_nodes)
+        model.graph.node.extend(existing_nodes)
+    if suffix_nodes:
+        model.graph.node.extend(suffix_nodes)
+
+
 def _quantize_q4(input_path: Path, output_path: Path, block_size: int) -> dict:
     model = onnx.load(str(input_path))
     quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
@@ -89,10 +180,24 @@ def _quantize_gather_block_q4(input_path: Path, output_path: Path, block_size: i
     if len(gather_nodes) != 1:
         raise ValueError(f"expected exactly one Gather node in embed_tokens session, got {{len(gather_nodes)}}")
 
-    gather_node = gather_nodes[0]
-    weight_name, input_ids_name = gather_node.input[:2]
-    output_name = gather_node.output[0]
     initializers = {{initializer.name: initializer for initializer in model.graph.initializer}}
+    gather_node = gather_nodes[0]
+    weight_inputs = [input_name for input_name in gather_node.input if input_name in initializers]
+    if len(weight_inputs) != 1:
+        raise ValueError(
+            "expected exactly one Gather initializer input in embed_tokens session, "
+            f"got {{weight_inputs}} from inputs {{list(gather_node.input)}}"
+        )
+    weight_name = weight_inputs[0]
+    integer_inputs = [
+        value.name
+        for value in model.graph.input
+        if _tensor_elem_type(value) in (TensorProto.INT32, TensorProto.INT64)
+    ]
+    if not integer_inputs:
+        raise ValueError("embed_tokens session is missing an integer graph input for token ids")
+    input_ids_name = integer_inputs[0]
+    output_name = model.graph.output[0].name if len(model.graph.output) == 1 else gather_node.output[0]
     if weight_name not in initializers:
         raise ValueError(f"Gather weight initializer was not found: {{weight_name}}")
 
@@ -172,13 +277,15 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
 
 def _quantize_fp16(input_path: Path, output_path: Path) -> dict:
     model = onnx.load(str(input_path))
-    conversion_mode = "converted_to_fp16_keep_io"
+    original_model = _copy_model(model)
+    conversion_mode = "converted_to_fp16_wrapped_float32_io"
     try:
         fp16_model = onnx_float16.convert_float_to_float16(
             model,
-            keep_io_types=True,
+            keep_io_types=False,
             disable_shape_infer=True,
         )
+        _wrap_fp16_model_with_float32_io(fp16_model, original_model)
     except ValueError as exc:
         if "already converted to float16" not in str(exc):
             raise

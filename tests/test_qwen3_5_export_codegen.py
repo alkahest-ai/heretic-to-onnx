@@ -301,7 +301,11 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('return _quantize_q4(input_path, output_path, block_size)', runner)
         self.assertIn('if package_dtype == "fp16":', runner)
         self.assertIn('return _quantize_fp16(input_path, output_path)', runner)
-        self.assertIn('keep_io_types=True', runner)
+        self.assertIn('conversion_mode = "converted_to_fp16_wrapped_float32_io"', runner)
+        self.assertIn('keep_io_types=False', runner)
+        self.assertIn("_wrap_fp16_model_with_float32_io(fp16_model, original_model)", runner)
+        self.assertIn('input_ids_name = integer_inputs[0]', runner)
+        self.assertIn("weight_inputs = [input_name for input_name in gather_node.input if input_name in initializers]", runner)
         self.assertIn('_quantize_session(raw_path, quantized_path, args.block_size, session["package_filename"])', runner)
         compile(runner, "<qwen3_5_quantize_runner>", "exec")
 
