@@ -5,7 +5,7 @@ import {
   formatPresetSummary,
 } from "../examples/browser-loader.mjs?v=5";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=5";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=6";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),

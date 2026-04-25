@@ -10,5 +10,8 @@ export function formatRuntimeError(error) {
   ) {
     return `${message} This published q4f16 ONNX package was quantized with the older mixed-type conversion path and needs to be regenerated and republished.`;
   }
+  if (message.includes("Download stalled while fetching")) {
+    return `${message} Use Clear cache, then retry on a stable connection. If it stalls at the same byte offset again, the browser cache likely has a bad partial entry.`;
+  }
   return message;
 }
