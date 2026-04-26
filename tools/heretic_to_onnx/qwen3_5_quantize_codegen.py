@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from pathlib import Path
 
 CONTRACT = {contract_literal}
@@ -324,6 +325,28 @@ def _quantize_fp16(input_path: Path, output_path: Path) -> dict:
     }}
 
 
+def _copy_official_onnx_session(output_path: Path, package_filename: str, official_onnx_repo: str) -> dict:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    session_path = hf_hub_download(
+        official_onnx_repo,
+        f"onnx/{{package_filename}}",
+    )
+    external_path = hf_hub_download(
+        official_onnx_repo,
+        f"onnx/{{package_filename}}_data",
+    )
+    shutil.copy2(session_path, output_path)
+    external_output_path = output_path.with_name(f"{{output_path.name}}_data")
+    shutil.copy2(external_path, external_output_path)
+
+    return {{
+        "conversion_mode": "copied_official_qwen35_webgpu_session",
+        "official_onnx_repo": official_onnx_repo,
+        "output_path": str(output_path),
+        "external_data_path": str(external_output_path),
+    }}
+
+
 def _package_dtype(package_filename: str) -> str:
     stem = Path(package_filename).stem
     for suffix in ("q4f16", "q4", "fp16"):
@@ -332,13 +355,21 @@ def _package_dtype(package_filename: str) -> str:
     raise ValueError(f"unsupported Qwen3.5 package dtype in filename: {{package_filename}}")
 
 
-def _quantize_session(input_path: Path, output_path: Path, block_size: int, package_filename: str) -> dict:
+def _quantize_session(
+    input_path: Path,
+    output_path: Path,
+    block_size: int,
+    package_filename: str,
+    official_onnx_repo: str,
+) -> dict:
     package_dtype = _package_dtype(package_filename)
     if package_dtype == "q4":
         if Path(package_filename).stem.startswith("embed_tokens_"):
             return _quantize_gather_block_q4(input_path, output_path, block_size)
         return _quantize_q4(input_path, output_path, block_size)
     if package_dtype == "fp16":
+        if Path(package_filename).stem.startswith("vision_encoder_"):
+            return _copy_official_onnx_session(output_path, package_filename, official_onnx_repo)
         return _quantize_fp16(input_path, output_path)
     if package_dtype == "q4f16":
         return _quantize_q4f16(input_path, output_path, block_size)
@@ -351,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", default={default_output_dir})
     parser.add_argument("--report-path", default={default_report_path})
     parser.add_argument("--block-size", default={block_size}, type=int)
+    parser.add_argument("--official-onnx-repo", default="onnx-community/Qwen3.5-0.8B-ONNX")
     args = parser.parse_args(argv)
 
     input_dir = Path(args.input_dir).expanduser().resolve()
@@ -368,7 +400,13 @@ def main(argv: list[str] | None = None) -> int:
             missing_inputs.append(str(raw_path))
             continue
         quantized_path = output_dir / session["package_filename"]
-        result = _quantize_session(raw_path, quantized_path, args.block_size, session["package_filename"])
+        result = _quantize_session(
+            raw_path,
+            quantized_path,
+            args.block_size,
+            session["package_filename"],
+            args.official_onnx_repo,
+        )
         results[session["name"]] = {{
             "input_path": str(raw_path),
             **result,
@@ -379,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
         "block_size": args.block_size,
         "contract": CONTRACT,
         "input_dir": str(input_dir),
+        "official_onnx_repo": args.official_onnx_repo,
         "output_dir": str(output_dir),
         "results": results,
         "missing_inputs": missing_inputs,
@@ -392,6 +431,7 @@ def main(argv: list[str] | None = None) -> int:
 if __name__ == "__main__":
     import numpy as np
     import onnx
+    from huggingface_hub import hf_hub_download
     from onnx import TensorProto, helper, numpy_helper
     from onnxconverter_common import float16 as onnx_float16
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer

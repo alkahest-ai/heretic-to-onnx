@@ -304,6 +304,9 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('return _quantize_gather_block_q4(input_path, output_path, block_size)', runner)
         self.assertIn('return _quantize_q4(input_path, output_path, block_size)', runner)
         self.assertIn('if package_dtype == "fp16":', runner)
+        self.assertIn('return _copy_official_onnx_session(output_path, package_filename, official_onnx_repo)', runner)
+        self.assertIn('parser.add_argument("--official-onnx-repo", default="onnx-community/Qwen3.5-0.8B-ONNX")', runner)
+        self.assertIn('from huggingface_hub import hf_hub_download', runner)
         self.assertIn('return _quantize_fp16(input_path, output_path)', runner)
         self.assertIn('conversion_mode = "converted_to_fp16_wrapped_float32_io"', runner)
         self.assertIn("_normalize_float_constants_to_fp16(fp16_model)", runner)
@@ -311,7 +314,8 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn("_wrap_fp16_model_with_float32_io(fp16_model, original_model)", runner)
         self.assertIn('input_ids_name = integer_inputs[0]', runner)
         self.assertIn("weight_inputs = [input_name for input_name in gather_node.input if input_name in initializers]", runner)
-        self.assertIn('_quantize_session(raw_path, quantized_path, args.block_size, session["package_filename"])', runner)
+        self.assertIn("args.official_onnx_repo", runner)
+        self.assertIn('session["package_filename"],', runner)
         compile(runner, "<qwen3_5_quantize_runner>", "exec")
 
     def test_build_contract_derives_layer_types_from_full_attention_interval(self) -> None:
