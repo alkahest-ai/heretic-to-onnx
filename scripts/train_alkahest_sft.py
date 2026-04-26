@@ -167,7 +167,6 @@ def main() -> int:
     def tokenize(row: dict[str, Any]) -> dict[str, Any]:
         text = _messages_to_text(row, tokenizer)
         encoded = tokenizer(text, truncation=True, max_length=args.max_seq_length)
-        encoded["labels"] = list(encoded["input_ids"])
         return encoded
 
     train_dataset = Dataset.from_list(train_rows).map(tokenize, remove_columns=list(train_rows[0].keys()))
