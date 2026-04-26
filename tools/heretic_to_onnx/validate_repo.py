@@ -9,6 +9,12 @@ from .config import Manifest
 
 _BROWSER_FLOAT16_METADATA_TARGETS = {"q4f16", "fp16", "q4"}
 _QWEN_Q4_08B_EMBED_EXTERNAL_DATA_MAX_BYTES = 350 * 1024 * 1024
+_QWEN_WEBGPU_DECODER_MAX_NODES = 10_000
+_QWEN_WEBGPU_REQUIRED_DECODER_OPS = {
+    "CausalConvWithState",
+    "LinearAttention",
+    "SkipSimplifiedLayerNormalization",
+}
 
 
 @dataclass(slots=True)
@@ -125,6 +131,40 @@ def _validate_qwen_webgpu_contract(manifest: Manifest, package_path: Path, repor
                 "embed_tokens_q4.onnx_data is too large for the 0.8B q4 WebGPU contract; "
                 f"got {embed_data.stat().st_size} bytes"
             )
+
+    decoder_path = package_path / "onnx" / "decoder_model_merged_q4.onnx"
+    if not decoder_path.exists():
+        return
+
+    try:
+        import onnx
+    except Exception as exc:
+        report.ok = False
+        report.errors.append(f"Qwen WebGPU decoder contract requires onnx graph inspection: {exc}")
+        return
+
+    try:
+        decoder = onnx.load(str(decoder_path), load_external_data=False)
+    except Exception as exc:
+        report.ok = False
+        report.errors.append(f"Qwen WebGPU decoder graph could not be inspected: {exc}")
+        return
+
+    node_count = len(decoder.graph.node)
+    if node_count > _QWEN_WEBGPU_DECODER_MAX_NODES:
+        report.ok = False
+        report.errors.append(
+            "Qwen WebGPU decoder graph is not browser-optimized; "
+            f"got {node_count} nodes, expected <= {_QWEN_WEBGPU_DECODER_MAX_NODES}"
+        )
+
+    custom_ops = {node.op_type for node in decoder.graph.node if node.domain == "com.microsoft"}
+    missing_ops = sorted(_QWEN_WEBGPU_REQUIRED_DECODER_OPS - custom_ops)
+    if missing_ops:
+        report.ok = False
+        report.errors.append(
+            "Qwen WebGPU decoder graph is missing required optimized custom ops: " + ", ".join(missing_ops)
+        )
 
 
 def validate_package(

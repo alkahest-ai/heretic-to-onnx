@@ -1,4 +1,4 @@
-import * as Transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.1";
+import * as Transformers from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
 
 const { AutoConfig, AutoModelForVision2Seq, AutoProcessor, TextStreamer, env, load_image, read_audio } =
   Transformers;
@@ -24,7 +24,7 @@ export const DEFAULT_MODEL_ID = ownedModel("rally-2b-rp");
 export const DEFAULT_MODEL_PRESETS = [
   {
     label: "Qwen3.5 0.8B Baseline",
-    modelId: "onnx-community/Qwen3.5-0.8B-ONNX",
+    modelId: "onnx-community/Qwen3.5-0.8B-ONNX-OPT",
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~650-800 MB",
@@ -275,13 +275,11 @@ function resolveModelClass(family, { textOnly = false } = {}) {
       ? textOnly
         ? [Transformers.Gemma4ForCausalLM, Transformers.Gemma4ForConditionalGeneration]
         : [Transformers.Gemma4ForConditionalGeneration]
-      : textOnly
-        ? [Transformers.Qwen3_5ForCausalLM, Transformers.Qwen3ForCausalLM]
-        : [
-            Transformers.Qwen3_5ForConditionalGeneration,
-            Transformers.Qwen3VLForConditionalGeneration,
-            Transformers.Qwen2_5_VLForConditionalGeneration,
-          ];
+      : [
+          Transformers.Qwen3_5ForConditionalGeneration,
+          Transformers.Qwen3VLForConditionalGeneration,
+          Transformers.Qwen2_5_VLForConditionalGeneration,
+        ];
 
   for (const candidate of candidates) {
     if (typeof candidate?.from_pretrained === "function") {
@@ -311,6 +309,10 @@ function resolveProcessorClass(family) {
 
 async function buildProcessorInputs(processor, family, prompt, imageArg, audioArg, videoArg) {
   const options = { add_special_tokens: false };
+  if (!imageArg && !audioArg && !videoArg) {
+    return family === "qwen3_5" ? processor(prompt) : processor(prompt, options);
+  }
+
   const attempt = async (factory) => {
     try {
       return await factory();
@@ -348,10 +350,6 @@ async function buildProcessorInputs(processor, family, prompt, imageArg, audioAr
     attempts.push(() => processor(prompt, imageArg, options));
   }
 
-  if (!imageArg && !audioArg && !videoArg) {
-    attempts.push(() => processor(prompt, options));
-  }
-
   let lastError = null;
   for (const factory of attempts) {
     const result = await attempt(factory);
@@ -362,6 +360,45 @@ async function buildProcessorInputs(processor, family, prompt, imageArg, audioAr
   }
 
   throw lastError ?? new Error("unable to build multimodal processor inputs");
+}
+
+function firstDecodedText(processor, outputs) {
+  const decoded = processor.batch_decode(outputs, {
+    skip_special_tokens: true,
+  });
+  return typeof decoded?.[0] === "string" ? decoded[0] : "";
+}
+
+function decodeGeneratedText(processor, outputs, inputs, streamedText) {
+  const streamed = streamedText.trim();
+  if (streamed) {
+    return streamed;
+  }
+
+  const promptTokens = Number(inputs?.input_ids?.dims?.at?.(-1));
+  if (Number.isFinite(promptTokens) && promptTokens > 0 && typeof outputs?.slice === "function") {
+    try {
+      const generatedOnly = outputs.slice(null, [promptTokens, null]);
+      const decoded = firstDecodedText(processor, generatedOnly).trim();
+      if (decoded) {
+        return decoded;
+      }
+    } catch {
+      // Tensor slicing differs across Transformers.js releases; full decode is safer than failing a completed generation.
+    }
+  }
+
+  const decoded = firstDecodedText(processor, outputs).trim();
+  if (!decoded || !inputs?.input_ids) {
+    return decoded;
+  }
+
+  try {
+    const prompt = firstDecodedText(processor, inputs.input_ids).trim();
+    return prompt && decoded.startsWith(prompt) ? decoded.slice(prompt.length).trim() : decoded;
+  } catch {
+    return decoded;
+  }
 }
 
 export function findModelPreset(modelId) {
@@ -547,6 +584,8 @@ export function createBrowserChatRuntime({
     };
     if (family === "gemma4") {
       promptOptions.enable_thinking = false;
+    } else if (family === "qwen3_5") {
+      promptOptions.tokenizer_kwargs = { enable_thinking: false };
     }
     onProgress?.({ status: "formatting_prompt" }, "Formatting prompt...");
     const prompt = processor.apply_chat_template(promptMessages, promptOptions);
@@ -584,14 +623,10 @@ export function createBrowserChatRuntime({
       top_k: topK,
       repetition_penalty: repetitionPenalty,
       streamer,
+      ...(family === "qwen3_5" ? { return_dict_in_generate: true } : {}),
     });
 
-    const promptTokens = inputs.input_ids.dims.at(-1);
-    const decoded = processor.batch_decode(outputs.slice(null, [promptTokens, null]), {
-      skip_special_tokens: true,
-    })[0];
-
-    return (decoded ?? streamedText).trim();
+    return decodeGeneratedText(processor, outputs?.sequences ?? outputs, inputs, streamedText);
   }
 
   async function dispose() {

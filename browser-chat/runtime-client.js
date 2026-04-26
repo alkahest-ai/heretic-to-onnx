@@ -1,4 +1,4 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=8";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=11";
 
 const DOWNLOAD_STALL_MS = 90_000;
 const PHASE_STALL_MS = 120_000;
@@ -180,7 +180,7 @@ function createWorkerRuntime({
     if (worker) {
       return worker;
     }
-    worker = new Worker(new URL("./runtime-worker.js?v=8", import.meta.url), { type: "module" });
+    worker = new Worker(new URL("./runtime-worker.js?v=11", import.meta.url), { type: "module" });
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
     worker.addEventListener("messageerror", handleMessageError);
@@ -265,6 +265,18 @@ export function createBrowserChatRuntimeClient({
   let activeRuntime = null;
   let workerProbe = null;
 
+  function forceMainThreadRuntime() {
+    if (runtimeMode === "main" && activeRuntime) {
+      return activeRuntime;
+    }
+    if (activeRuntime?.terminate) {
+      activeRuntime.terminate();
+    }
+    activeRuntime = null;
+    workerProbe = null;
+    return ensureMainThreadRuntime();
+  }
+
   function ensureMainThreadRuntime() {
     runtimeMode = "main";
     activeRuntime = createBrowserChatRuntime({
@@ -321,10 +333,16 @@ export function createBrowserChatRuntimeClient({
 
   return {
     async load(options = {}) {
+      if (options.modelFamily === "qwen3_5") {
+        return forceMainThreadRuntime().load(options);
+      }
       const runtime = await resolveRuntime();
       return runtime.load(options);
     },
     async generate(options = {}) {
+      if (options.modelFamily === "qwen3_5") {
+        return forceMainThreadRuntime().generate(options);
+      }
       const runtime = await resolveRuntime();
       return runtime.generate(options);
     },

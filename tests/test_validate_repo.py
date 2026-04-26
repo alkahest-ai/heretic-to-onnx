@@ -117,6 +117,47 @@ class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):
         self.assertFalse(report.ok)
         self.assertTrue(any("too large for the 0.8B q4 WebGPU contract" in error for error in report.errors))
 
+    @unittest.skipUnless(
+        importlib.util.find_spec("onnx") is not None,
+        "onnx is required for Qwen WebGPU graph contract tests",
+    )
+    def test_qwen_q4_webgpu_contract_rejects_unoptimized_decoder_graph(self) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_qwen_package_config(package_dir)
+            decoder_path = package_dir / "onnx" / "decoder_model_merged_q4.onnx"
+            decoder_path.parent.mkdir(parents=True, exist_ok=True)
+            input_info = helper.make_tensor_value_info("input", TensorProto.FLOAT, [1])
+            output_info = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1])
+            graph = helper.make_graph(
+                [helper.make_node("Identity", ["input"], ["output"])],
+                "unoptimized_qwen_decoder",
+                [input_info],
+                [output_info],
+            )
+            model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+            onnx.save_model(model, decoder_path)
+
+            report = validate_package(
+                _qwen_q4_manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/vision_encoder_fp16.onnx",
+                        "onnx/embed_tokens_q4.onnx",
+                        "onnx/decoder_model_merged_q4.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("missing required optimized custom ops" in error for error in report.errors))
+
 
 @unittest.skipUnless(
     importlib.util.find_spec("onnx") is not None and importlib.util.find_spec("onnxruntime") is not None,
