@@ -1,0 +1,13 @@
+{
+  "id": "thomasjvu/alkahest-0-8b-heretic-rp-sft",
+  "title": "Alkahest 0.8B Heretic RP SFT",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}
