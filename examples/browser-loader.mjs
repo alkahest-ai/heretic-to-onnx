@@ -7,6 +7,37 @@ env.allowLocalModels = true;
 env.allowRemoteModels = true;
 env.useBrowserCache = true;
 
+const defaultFetch = globalThis.fetch?.bind(globalThis);
+
+function configureHubAuth(authToken) {
+  if (!defaultFetch) {
+    return;
+  }
+
+  if (!authToken) {
+    env.fetch = defaultFetch;
+    if (env.HF_TOKEN) {
+      delete env.HF_TOKEN;
+    }
+    return;
+  }
+
+  env.HF_TOKEN = authToken;
+  env.fetch = async (input, init = {}) => {
+    const url = typeof input === "string" ? input : input?.url;
+    const nextInit = { ...init };
+    if (typeof url === "string") {
+      const parsed = new URL(url, globalThis.location?.href);
+      if (parsed.hostname === "huggingface.co") {
+        const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined));
+        headers.set("Authorization", `Bearer ${authToken}`);
+        nextInit.headers = headers;
+      }
+    }
+    return defaultFetch(input, nextInit);
+  };
+}
+
 export const PUBLIC_MODEL_OWNER = "thomasjvu";
 
 function ownedModel(modelName) {
@@ -17,6 +48,12 @@ const QWEN35_WEBGPU_DTYPE = Object.freeze({
   embed_tokens: "q4",
   decoder_model_merged: "q4",
   vision_encoder: "fp16",
+});
+
+const QWEN35_WEBGPU_Q8_DTYPE = Object.freeze({
+  embed_tokens: "q8",
+  decoder_model_merged: "q8",
+  vision_encoder: "q8",
 });
 
 export const DEFAULT_MODEL_ID = ownedModel("rally-2b-rp");
@@ -32,22 +69,22 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Known-good upstream WebGPU package for loader/runtime verification.",
   },
   {
-    label: "Alkahest 0.8B Q4 WebGPU",
-    modelId: ownedModel("alkahest-0.8b-q4-webgpu"),
+    label: "Alkahest 0.8B Heretic Q4",
+    modelId: ownedModel("alkahest-0.8b-heretic-q4-onnx"),
     family: "qwen3_5",
     modalities: "text + image",
-    approxDownload: "~650-800 MB",
+    approxDownload: "~850 MB",
     dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Heretic 0.8B test package using the official Qwen3.5 WebGPU q4/fp16 contract.",
+    note: "Heretic-only 0.8B q4 browser package with Qwen3.5 RMSNorm offset patching.",
   },
   {
-    label: "Alkahest 0.8B",
-    modelId: ownedModel("alkahest-0.8b"),
+    label: "Alkahest 0.8B Heretic Q8",
+    modelId: ownedModel("alkahest-0.8b-heretic-q8-onnx"),
     family: "qwen3_5",
     modalities: "text + image",
-    approxDownload: "~1.2 GB",
-    dtype: "q4f16",
-    note: "Legacy q4f16 package; use the Q4 WebGPU package for browser smoke.",
+    approxDownload: "~1.1 GB",
+    dtype: QWEN35_WEBGPU_Q8_DTYPE,
+    note: "Heretic-only 0.8B q8 browser package using the official raw Qwen3.5 ONNX graph contract.",
   },
   {
     label: "Alkahest 0.8B V2",
@@ -461,14 +498,22 @@ export function createBrowserChatRuntime({
   let activeFamily = null;
   let activeDtype = null;
   let activeTextOnly = null;
+  let activeAuthToken = null;
 
-  function reset(modelId, family, dtype, textOnly) {
+  function reset(modelId, family, dtype, textOnly, authToken) {
     const sameDtype = JSON.stringify(dtype) === JSON.stringify(activeDtype);
-    if (modelId !== activeModelId || family !== activeFamily || !sameDtype || textOnly !== activeTextOnly) {
+    if (
+      modelId !== activeModelId ||
+      family !== activeFamily ||
+      !sameDtype ||
+      textOnly !== activeTextOnly ||
+      authToken !== activeAuthToken
+    ) {
       activeModelId = modelId;
       activeFamily = family;
       activeDtype = dtype;
       activeTextOnly = textOnly;
+      activeAuthToken = authToken;
       configPromise = null;
       processorPromise = null;
       modelPromise = null;
@@ -481,6 +526,7 @@ export function createBrowserChatRuntime({
     dtype,
     device = defaultDevice,
     textOnly = true,
+    authToken = "",
     onProgress,
   } = {}) {
     if (!globalThis.navigator?.gpu && device === "webgpu") {
@@ -503,7 +549,10 @@ export function createBrowserChatRuntime({
       processorPromise &&
       modelPromise;
 
-    reset(modelId, family, resolvedDtype, textOnly);
+    const hubOptions = authToken ? { token: authToken } : {};
+    configureHubAuth(authToken);
+
+    reset(modelId, family, resolvedDtype, textOnly, authToken);
     if (sessionsWarm) {
       onProgress?.({ status: "sessions_warm", textOnly }, "Runtime sessions already warm.");
     } else {
@@ -515,13 +564,13 @@ export function createBrowserChatRuntime({
 
     processorPromise ||= (async () => {
       onProgress?.({ status: "loading_processor" }, "Loading processor...");
-      const processor = await ProcessorClass.from_pretrained(modelId);
+      const processor = await ProcessorClass.from_pretrained(modelId, hubOptions);
       onProgress?.({ status: "processor_ready" }, "Processor ready.");
       return processor;
     })();
     configPromise ||= (async () => {
       onProgress?.({ status: "loading_config" }, "Loading config...");
-      const config = await AutoConfig.from_pretrained(modelId);
+      const config = await AutoConfig.from_pretrained(modelId, hubOptions);
       onProgress?.({ status: "config_ready" }, "Config ready.");
       return sanitizeBrowserConfig(config, resolvedDtype);
     })();
@@ -529,6 +578,7 @@ export function createBrowserChatRuntime({
       const config = await configPromise;
       onProgress?.({ status: "loading_model_sessions" }, "Loading ONNX sessions...");
       return ModelClass.from_pretrained(modelId, {
+        ...hubOptions,
         config,
         device,
         dtype: resolvedDtype,
@@ -563,6 +613,7 @@ export function createBrowserChatRuntime({
     topP = 0.92,
     topK = 64,
     repetitionPenalty = 1.05,
+    authToken = "",
     onToken,
     onProgress,
   }) {
@@ -576,6 +627,7 @@ export function createBrowserChatRuntime({
       modelId,
       modelFamily,
       dtype,
+      authToken,
       textOnly,
       onProgress,
     });

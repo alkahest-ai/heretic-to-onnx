@@ -42,7 +42,7 @@ def _sample_q4_webgpu_manifest() -> Manifest:
         source_model_id="Qwen/Qwen3.5-0.8B",
         base_model_id="Qwen/Qwen3.5-0.8B",
         architecture="qwen3_5_conditional_generation",
-        target_repo_id="thomasjvu/alkahest-0.8b-q4-webgpu",
+        target_repo_id="thomasjvu/alkahest-0.8b-heretic-onnx-opt",
         target_dtype="q4",
         target_device="webgpu",
         modalities=["text", "image"],

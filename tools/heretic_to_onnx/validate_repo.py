@@ -21,6 +21,7 @@ _QWEN_WEBGPU_REQUIRED_DECODER_OPS = {
 class RuntimeSmokeSessionReport:
     onnx_path: str
     ok: bool
+    skipped: bool = False
     providers: list[str] = field(default_factory=list)
     error: str = ""
 
@@ -80,6 +81,26 @@ def _runtime_smoke_onnx_sessions(
         session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
 
     for relative_path, onnx_path in session_paths:
+        if (
+            manifest.architecture == "qwen3_5_conditional_generation"
+            and manifest.target_dtype == "q4"
+            and Path(relative_path).name in {"decoder_model_merged_q4.onnx", "decoder_model_merged_q4f16.onnx"}
+        ):
+            report.warnings.append(
+                "runtime smoke skipped for optimized Qwen decoder: stock CPU onnxruntime does not "
+                "register ORT-web custom ops; browser smoke is required"
+            )
+            report.runtime_smoke.append(
+                RuntimeSmokeSessionReport(
+                    onnx_path=relative_path,
+                    ok=True,
+                    skipped=True,
+                    providers=[],
+                    error="skipped: optimized Qwen decoder requires ORT-web custom ops",
+                )
+            )
+            continue
+
         session_report = RuntimeSmokeSessionReport(
             onnx_path=relative_path,
             ok=True,
@@ -100,11 +121,15 @@ def _validate_qwen_webgpu_contract(manifest: Manifest, package_path: Path, repor
         return
 
     expected = set(manifest.expected_onnx_files)
-    forbidden = sorted(path for path in expected if "_q4f16" in Path(path).name)
+    forbidden = sorted(
+        path
+        for path in expected
+        if "_q4f16" in Path(path).name
+    )
     if forbidden:
         report.ok = False
         report.errors.append(
-            "Qwen WebGPU q4 packages must not use q4f16 session artifacts: " + ", ".join(forbidden)
+            "Qwen WebGPU q4 packages must not use legacy q4f16 session artifacts: " + ", ".join(forbidden)
         )
 
     required_text_sessions = {

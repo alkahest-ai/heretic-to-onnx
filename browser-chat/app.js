@@ -3,14 +3,15 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs?v=11";
+} from "../examples/browser-loader.mjs?v=14";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=12";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=14";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
   modelId: document.querySelector("#model-id"),
   presetNote: document.querySelector("#preset-note"),
+  hfToken: document.querySelector("#hf-token"),
   imageInput: document.querySelector("#image-input"),
   imageStatus: document.querySelector("#image-status"),
   audioInput: document.querySelector("#audio-input"),
@@ -68,9 +69,22 @@ const pendingDotsState = {
   timer: null,
 };
 
+const HF_TOKEN_STORAGE_KEY = "heretic.browserChat.hfToken";
+
 function initialModelId() {
   const url = new URL(window.location.href);
   return url.searchParams.get("model") || DEFAULT_MODEL_ID;
+}
+
+function getAuthToken() {
+  return elements.hfToken.value.trim();
+}
+
+function initializeAuthToken() {
+  const stored = window.localStorage.getItem(HF_TOKEN_STORAGE_KEY);
+  if (stored) {
+    elements.hfToken.value = stored;
+  }
 }
 
 function clampPercent(value) {
@@ -305,6 +319,7 @@ function setBusy({ loading = state.loading, generating = state.generating } = {}
   elements.promptInput.disabled = disabled;
   elements.modelId.disabled = modelSelectionDisabled;
   elements.presetModel.disabled = modelSelectionDisabled;
+  elements.hfToken.disabled = disabled;
   elements.imageInput.disabled = disabled;
   elements.audioInput.disabled = disabled || !selectedPresetSupports("audio");
   elements.videoInput.disabled = disabled || !selectedPresetSupports("video");
@@ -593,6 +608,7 @@ async function loadModel() {
       modelId,
       modelFamily: preset?.family,
       dtype: preset?.dtype,
+      authToken: getAuthToken(),
       textOnly: true,
       onProgress: handleRuntimeProgress,
     });
@@ -661,6 +677,7 @@ async function sendMessage() {
       modelId,
       modelFamily: preset?.family,
       dtype: preset?.dtype,
+      authToken: getAuthToken(),
       systemPrompt: elements.systemPrompt.value,
       messages: buildConversationMessages(
         truncateContext(state.messages.filter((message) => !message.pending)),
@@ -766,6 +783,15 @@ function bindEvents() {
     syncPresetSelection();
   });
 
+  elements.hfToken.addEventListener("input", () => {
+    const token = getAuthToken();
+    if (token) {
+      window.localStorage.setItem(HF_TOKEN_STORAGE_KEY, token);
+    } else {
+      window.localStorage.removeItem(HF_TOKEN_STORAGE_KEY);
+    }
+  });
+
   elements.imageInput.addEventListener("change", () => {
     handleMediaSelection("image", elements.imageInput.files?.[0] ?? null);
   });
@@ -819,6 +845,7 @@ function initializeRuntimeStatus() {
   setStatus("WebGPU detected. Load a model to start.", { immediate: true });
 }
 
+initializeAuthToken();
 initializePresets();
 bindEvents();
 renderMessages();

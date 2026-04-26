@@ -20,7 +20,7 @@
         <div class="brand-panel">
           <p class="kicker">browser chat</p>
           <h1>Heretic ONNX</h1>
-          <p class="subhead">Local WebGPU chat for public ONNX repos. No server-side inference.</p>
+          <p class="subhead">Local WebGPU chat for ONNX repos. No server-side inference.</p>
         </div>
 
         <div class="status-grid">
@@ -66,6 +66,18 @@
                 spellcheck="false"
                 value="thomasjvu/rally-2b-rp"
               />
+            </label>
+
+            <label class="field">
+              <span>hf token</span>
+              <input
+                id="hf-token"
+                type="password"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="Optional for private repos"
+              />
+              <small class="field-hint">Stored only in this browser for private Hub model smoke tests.</small>
             </label>
 
             <label class="field">
@@ -130,11 +142,11 @@
           <section class="panel-section notes-panel">
             <p class="section-title">notes</p>
             <ul class="note-list">
-              <li>Use current public repos until ownership moves to the org namespace.</li>
+              <li>Private repos require an HF token with read access.</li>
               <li>Text-only warm loads stay lighter; image, audio, and video sessions load on first media prompt.</li>
               <li>Full multimodal loads are still large and may take several minutes on consumer hardware.</li>
               <li>Best results are desktop Safari or Chromium with WebGPU enabled.</li>
-              <li>This picker covers the published Alkahest and Rally browser repos only.</li>
+              <li>This picker covers known-good published Alkahest and Rally browser repos only.</li>
             </ul>
           </section>
         </aside>
@@ -158,6 +170,6 @@
       </main>
     </div>
 
-    <script type="module" src="./app.js?v=12"></script>
+    <script type="module" src="./app.js?v=14"></script>
   </body>
 </html>

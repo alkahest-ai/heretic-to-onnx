@@ -105,7 +105,7 @@ class PackageRepoTests(unittest.TestCase):
                 source_model_id=str(source_dir),
                 base_model_id=str(base_dir),
                 architecture="qwen3_5_conditional_generation",
-                target_repo_id="thomasjvu/alkahest-0.8b-q4-webgpu",
+                target_repo_id="thomasjvu/alkahest-0.8b-heretic-onnx-opt",
                 target_dtype="q4",
                 target_device="webgpu",
                 modalities=["text", "image"],
