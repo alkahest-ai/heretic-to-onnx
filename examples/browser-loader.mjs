@@ -96,6 +96,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Cleaned roleplay SFT package with assistant-only loss and q4 optimized Qwen3.5 WebGPU artifact names.",
   },
   {
+    label: "Alkahest 0.8B Heretic RP SFT Q4 v3",
+    modelId: ownedModel("alkahest-0.8b-heretic-rp-sft-v3-q4-onnx"),
+    family: "qwen3_5",
+    modalities: "text + image",
+    approxDownload: "~850 MB",
+    dtype: QWEN35_WEBGPU_DTYPE,
+    note: "Filtered external adult chat SFT package with assistant-only loss and q4 optimized Qwen3.5 WebGPU artifact names.",
+  },
+  {
     label: "Alkahest 0.8B Heretic Q8",
     modelId: ownedModel("alkahest-0.8b-heretic-q8-onnx"),
     family: "qwen3_5",
