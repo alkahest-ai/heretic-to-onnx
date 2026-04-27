@@ -150,6 +150,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Same v5 adapter merged at 25% strength to preserve base instruction-following while retaining roleplay style lift.",
   },
   {
+    label: "Alkahest 0.8B Heretic RP SFT Q4 v5 Safety",
+    modelId: ownedModel("alkahest-0.8b-heretic-rp-sft-v5-safety-q4-onnx"),
+    family: "qwen3_5",
+    modalities: "text + image",
+    approxDownload: "~850 MB",
+    dtype: QWEN35_WEBGPU_DTYPE,
+    note: "Safety-heavy v5 retry with explicit boundary rows plus instruction and roleplay anchors.",
+  },
+  {
     label: "Alkahest 0.8B Heretic Q8",
     modelId: ownedModel("alkahest-0.8b-heretic-q8-onnx"),
     family: "qwen3_5",
