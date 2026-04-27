@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from tools.heretic_to_onnx.text_sft_dataset import prepare_texting_sex_dataset
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
+
+from tools.heretic_to_onnx.text_sft_dataset import prepare_texting_sex_dataset  # noqa: E402
 
 
 def main() -> int:
