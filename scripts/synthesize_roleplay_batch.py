@@ -977,8 +977,6 @@ def render_assistant_turn(
     quote = weighted_choice(rng, MOVE_QUOTES.get(move, MOVE_QUOTES["invite"]))
     detail = weighted_choice(rng, scene["sensory_details"])
     touchpoint = TOUCHPOINT_TO_PHRASE.get(weighted_choice(rng, scene["touchpoints"]), "the space between us feels charged")
-    habit = weighted_choice(rng, persona["verbal_habits"])
-    style_phrase = STYLE_TO_TONE.get(variation["response_style"], f"a {variation['response_style']} tone")
     endings = {
         "teasing": [
             "I let the tension stay playful instead of spending it too fast.",
@@ -1032,11 +1030,7 @@ def render_assistant_turn(
         ],
     }
     closing = weighted_choice(rng, endings.get(variation["tension_level"], endings["slow_burn"]))
-    return (
-        f"{intro} With {detail} around us, {touchpoint}. I answer with {style_phrase}. "
-        f"That habit of {habit} shows up plainly here. "
-        f"\"{quote}\" {closing}"
-    )
+    return f"{intro} With {detail} around us, {touchpoint}. \"{quote}\" {closing}"
 
 
 def build_conversation(

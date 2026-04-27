@@ -60,6 +60,16 @@ BANNED_MARKERS = ["underage", "child", "young teen", "grade school", "middle sch
 SUPPORTED_ROLES = {"system", "user", "assistant"}
 SUPPORTED_TABLE_SUFFIXES = {".csv", ".tsv"}
 SUPPORTED_DATASET_SUFFIXES = {".jsonl", *SUPPORTED_TABLE_SUFFIXES}
+ASSISTANT_STYLE_MARKERS = [
+    "i answer with",
+    "i answer like",
+    "i answer in a way",
+    "that habit of",
+    "shows up plainly here",
+    "i can't tell user",
+    "without clarification",
+    "i should ask",
+]
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -89,6 +99,30 @@ def to_minimal_chat_rows(rows: list[dict]) -> list[dict]:
         validate_conversation(row, index)
         minimal_rows.append({"messages": row["messages"]})
     return minimal_rows
+
+
+def clean_assistant_roleplay_text(text: str) -> str:
+    """Remove generator scaffolding that teaches meta-commentary instead of roleplay."""
+
+    cleaned = re.sub(r"\s*I answer (?:with|like) [^.?!]+[.?!]", " ", text)
+    cleaned = re.sub(r"\s*I answer in a way [^.?!]+[.?!]", " ", cleaned)
+    cleaned = re.sub(r"\s*That habit of [^.?!]+ shows up plainly here[.?!]", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.?!])", r"\1", cleaned)
+    return cleaned.strip()
+
+
+def assistant_style_markers(text: str) -> list[str]:
+    normalized = text.lower()
+    return [marker for marker in ASSISTANT_STYLE_MARKERS if marker in normalized]
+
+
+def clean_conversation_for_sft(conversation: dict) -> dict:
+    cleaned = copy.deepcopy(conversation)
+    for message in cleaned.get("messages", []):
+        if message.get("role") == "assistant" and isinstance(message.get("content"), str):
+            message["content"] = clean_assistant_roleplay_text(message["content"])
+    return cleaned
 
 
 def _delimiter_for_path(path: Path) -> str:
@@ -171,7 +205,7 @@ def detect_review_table_mode(fieldnames: list[str]) -> str:
     missing_full = [field for field in REQUIRED_REVIEW_FIELDS if field not in fieldnames]
     missing_slim = [field for field in SLIM_REVIEW_FIELDS if field not in fieldnames]
     raise ValueError(
-        "review table columns do not match a supported format; "
+        "review table columns do not match a supported format; missing required columns; "
         f"missing full columns: {', '.join(missing_full) or 'none'}; "
         f"missing slim columns: {', '.join(missing_slim) or 'none'}"
     )
@@ -340,6 +374,15 @@ def review_rows_to_conversations(
             continue
 
         first = ordered[0]
+        variation = {
+            "tension_level": first.get("tension_level", ""),
+            "pacing": first.get("pacing", ""),
+            "response_style": first.get("response_style", ""),
+            "assistant_move_plan": _parse_pipe_list(first.get("assistant_move_plan", "")),
+        }
+        if first.get("dialogue_turns", ""):
+            variation["dialogue_turns"] = int(first.get("dialogue_turns", "0") or "0")
+
         conversation = {
             "id": conversation_id,
             "persona_id": first.get("persona_id", ""),
@@ -350,13 +393,7 @@ def review_rows_to_conversations(
             "batch_id": first.get("batch_id", ""),
             "source_stage": first.get("source_stage", "approved_jsonl"),
             "source_version": first.get("source_version", "roleplay_v2"),
-            "variation": {
-                "dialogue_turns": int(first.get("dialogue_turns", "0") or "0"),
-                "tension_level": first.get("tension_level", ""),
-                "pacing": first.get("pacing", ""),
-                "response_style": first.get("response_style", ""),
-                "assistant_move_plan": _parse_pipe_list(first.get("assistant_move_plan", "")),
-            },
+            "variation": variation,
             "messages": [
                 {
                     "role": row["role"],
@@ -455,6 +492,8 @@ def lint_conversations(
     conversation_shape_examples: dict[str, list[str]] = defaultdict(list)
     conversation_signature_counts: Counter[str] = Counter()
     conversation_signature_examples: dict[str, list[str]] = defaultdict(list)
+    style_marker_counts: Counter[str] = Counter()
+    style_marker_examples: dict[str, list[str]] = defaultdict(list)
 
     for index, conversation in enumerate(conversations, start=1):
         validate_conversation(conversation, index)
@@ -482,6 +521,9 @@ def lint_conversations(
             signature_parts.append(f"{message['role']}::{_normalize_text(message['content'])}")
             if message["role"] != "assistant":
                 continue
+            for marker in assistant_style_markers(message["content"]):
+                style_marker_counts[marker] += 1
+                style_marker_examples[marker].append(conversation["id"])
             normalized = _normalize_text(message["content"])
             assistant_line_counts[normalized] += 1
             assistant_line_examples[normalized].append(conversation["id"])
@@ -519,11 +561,16 @@ def lint_conversations(
                 f"conversation shape reused {count} times (threshold {conversation_shape_threshold}): {examples}"
             )
 
+    for marker, count in style_marker_counts.items():
+        examples = ", ".join(sorted(set(style_marker_examples[marker]))[:4])
+        warnings.append(f"assistant style marker {marker!r} appears {count} times: {examples}")
+
     stats = {
         "conversations": len(conversations),
         "assistant_lines_unique": len(assistant_line_counts),
         "assistant_skeletons_unique": len(assistant_skeleton_counts),
         "conversation_shapes_unique": len(conversation_shape_counts),
+        "assistant_style_markers": dict(sorted(style_marker_counts.items())),
         "errors": len(errors),
         "warnings": len(warnings),
     }

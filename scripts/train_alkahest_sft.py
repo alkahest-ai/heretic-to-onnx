@@ -32,6 +32,66 @@ def _messages_to_text(row: dict[str, Any], tokenizer: Any) -> str:
     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
 
 
+def _messages_to_features(
+    row: dict[str, Any],
+    tokenizer: Any,
+    *,
+    max_length: int,
+    assistant_only_loss: bool,
+) -> dict[str, Any]:
+    text = _messages_to_text(row, tokenizer)
+    encoded = tokenizer(
+        text,
+        truncation=True,
+        max_length=max_length,
+        return_offsets_mapping=assistant_only_loss,
+    )
+    if not assistant_only_loss:
+        return encoded
+
+    offsets = encoded.pop("offset_mapping")
+    labels = [-100] * len(encoded["input_ids"])
+    cursor = 0
+    assistant_spans: list[tuple[int, int]] = []
+    for message in row["messages"]:
+        content = message.get("content", "")
+        if message.get("role") != "assistant" or not isinstance(content, str) or not content:
+            continue
+        start = text.find(content, cursor)
+        if start < 0:
+            start = text.find(content)
+        if start < 0:
+            raise ValueError("assistant content could not be located in rendered chat template")
+        end = start + len(content)
+        assistant_spans.append((start, end))
+        cursor = end
+
+    for index, (token_start, token_end) in enumerate(offsets):
+        if token_end <= token_start:
+            continue
+        if any(token_start < span_end and token_end > span_start for span_start, span_end in assistant_spans):
+            labels[index] = encoded["input_ids"][index]
+    if all(label == -100 for label in labels):
+        raise ValueError("assistant-only loss mask is empty for SFT row")
+    encoded["labels"] = labels
+    return encoded
+
+
+def _collate_features(features: list[dict[str, Any]], tokenizer: Any, torch: Any) -> dict[str, Any]:
+    labels = [feature["labels"] for feature in features] if "labels" in features[0] else None
+    model_features = [{key: value for key, value in feature.items() if key != "labels"} for feature in features]
+    batch = tokenizer.pad(model_features, padding=True, return_tensors="pt")
+    if labels is None:
+        batch["labels"] = batch["input_ids"].clone()
+        batch["labels"][batch["attention_mask"] == 0] = -100
+        return batch
+
+    max_len = batch["input_ids"].shape[1]
+    padded_labels = [label + [-100] * (max_len - len(label)) for label in labels]
+    batch["labels"] = torch.tensor(padded_labels, dtype=torch.long)
+    return batch
+
+
 def _load_multimodal_text_model(model_id: str, **kwargs: Any) -> Any:
     from transformers import AutoModelForCausalLM
 
@@ -121,6 +181,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--lora-rank", type=int, default=16)
     parser.add_argument("--lora-alpha", type=int, default=32)
     parser.add_argument("--seed", type=int, default=3407)
+    parser.add_argument("--assistant-only-loss", action="store_true", default=True)
+    parser.add_argument("--full-chat-loss", dest="assistant_only_loss", action="store_false")
     parser.add_argument("--load-in-4bit", action="store_true", default=True)
     parser.add_argument("--no-load-in-4bit", dest="load_in_4bit", action="store_false")
     parser.add_argument("--merge", action="store_true", default=True)
@@ -141,7 +203,6 @@ def main() -> int:
     from transformers import (
         AutoTokenizer,
         BitsAndBytesConfig,
-        DataCollatorForLanguageModeling,
         Trainer,
         TrainingArguments,
     )
@@ -165,9 +226,12 @@ def main() -> int:
         raise ValueError("validation split is empty")
 
     def tokenize(row: dict[str, Any]) -> dict[str, Any]:
-        text = _messages_to_text(row, tokenizer)
-        encoded = tokenizer(text, truncation=True, max_length=args.max_seq_length)
-        return encoded
+        return _messages_to_features(
+            row,
+            tokenizer,
+            max_length=args.max_seq_length,
+            assistant_only_loss=args.assistant_only_loss,
+        )
 
     train_dataset = Dataset.from_list(train_rows).map(tokenize, remove_columns=list(train_rows[0].keys()))
     eval_dataset = Dataset.from_list(val_rows).map(tokenize, remove_columns=list(val_rows[0].keys()))
@@ -234,7 +298,7 @@ def main() -> int:
         ),
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        data_collator=lambda features: _collate_features(features, tokenizer, torch),
     )
     trainer.train()
     trainer.model.save_pretrained(str(output_dir))
@@ -252,6 +316,7 @@ def main() -> int:
         "max_seq_length": args.max_seq_length,
         "train_rows": len(train_rows),
         "val_rows": len(val_rows),
+        "assistant_only_loss": args.assistant_only_loss,
         "merged": False,
         "uploaded_merged_to": "",
         "uploaded_adapter_to": "",

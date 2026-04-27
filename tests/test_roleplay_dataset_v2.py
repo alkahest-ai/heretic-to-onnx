@@ -9,6 +9,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "scripts"))
 
 from roleplay_dataset_v2 import (  # noqa: E402
+    assistant_style_markers,
+    clean_assistant_roleplay_text,
+    clean_conversation_for_sft,
     conversation_to_review_rows,
     lint_conversations,
     load_conversations,
@@ -92,6 +95,35 @@ class RoleplayDatasetV2Tests(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertFalse(report["errors"])
         self.assertTrue(any("assistant line reused" in warning for warning in report["warnings"]))
+
+    def test_clean_assistant_roleplay_text_removes_generator_scaffolding(self) -> None:
+        dirty = (
+            "I let the challenge stay playful. With velvet around us, the room feels close. "
+            "I answer with a direct tone. I answer like care is part of the seduction. "
+            "That habit of naming boundaries shows up plainly here. "
+            '"Then be specific." The answer refuses to hurry.'
+        )
+
+        cleaned = clean_assistant_roleplay_text(dirty)
+
+        self.assertEqual(
+            cleaned,
+            'I let the challenge stay playful. With velvet around us, the room feels close. "Then be specific." The answer refuses to hurry.',
+        )
+        self.assertEqual(assistant_style_markers(cleaned), [])
+
+    def test_clean_conversation_for_sft_allows_style_marker_gate(self) -> None:
+        conversation = _sample_conversation(
+            "conv-style",
+            assistant_tail='I answer with a warm tone. That habit of praising clearly shows up plainly here.',
+        )
+
+        dirty_report = lint_conversations([conversation])
+        cleaned = clean_conversation_for_sft(conversation)
+        clean_report = lint_conversations([cleaned])
+
+        self.assertIn("i answer with", dirty_report["stats"]["assistant_style_markers"])
+        self.assertEqual(clean_report["stats"]["assistant_style_markers"], {})
 
     def test_load_conversations_from_review_directory(self) -> None:
         first = _sample_conversation("conv-dir-1", user_tail="first", assistant_tail="first.")

@@ -5,7 +5,15 @@ import json
 import random
 from pathlib import Path
 
-from roleplay_dataset_v2 import ROLEPLAY_V2_DIR, lint_conversations, load_conversations, to_minimal_chat_rows, write_jsonl
+from roleplay_dataset_v2 import (
+    ROLEPLAY_V2_DIR,
+    clean_conversation_for_sft,
+    lint_conversations,
+    load_conversations,
+    to_minimal_chat_rows,
+    validate_conversation,
+    write_jsonl,
+)
 
 
 def main() -> int:
@@ -35,6 +43,26 @@ def main() -> int:
         default=4,
         help="Warning threshold for repeated conversation shapes",
     )
+    parser.add_argument(
+        "--clean-assistant-style",
+        action="store_true",
+        help="Remove generator scaffold phrases from assistant turns before splitting.",
+    )
+    parser.add_argument(
+        "--fail-on-style-markers",
+        action="store_true",
+        help="Fail if assistant meta-style markers remain after optional cleaning.",
+    )
+    parser.add_argument(
+        "--drop-invalid-after-cleaning",
+        action="store_true",
+        help="Drop conversations that become invalid after assistant-style cleaning.",
+    )
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Print a compact manifest summary instead of the full lint warning list.",
+    )
     parser.add_argument("--fail-on-warnings", action="store_true", help="Treat lint warnings as fatal")
     args = parser.parse_args()
 
@@ -45,6 +73,22 @@ def main() -> int:
     rows = load_conversations(input_path)
     if not rows:
         raise ValueError("dataset is empty")
+    dropped_after_cleaning = 0
+    if args.clean_assistant_style:
+        cleaned_rows = [clean_conversation_for_sft(row) for row in rows]
+        if args.drop_invalid_after_cleaning:
+            rows = []
+            for index, row in enumerate(cleaned_rows, start=1):
+                try:
+                    validate_conversation(row, index)
+                except ValueError:
+                    dropped_after_cleaning += 1
+                    continue
+                rows.append(row)
+        else:
+            rows = cleaned_rows
+        if not rows:
+            raise ValueError("all rows were dropped after assistant-style cleaning")
 
     lint_report = lint_conversations(
         rows,
@@ -54,6 +98,12 @@ def main() -> int:
     )
     if lint_report["errors"]:
         raise ValueError("dataset lint failed:\n- " + "\n- ".join(lint_report["errors"]))
+    remaining_style_markers = lint_report["stats"].get("assistant_style_markers", {})
+    if args.fail_on_style_markers and remaining_style_markers:
+        raise ValueError(
+            "assistant style markers remain after preparation: "
+            + json.dumps(remaining_style_markers, sort_keys=True)
+        )
     if args.fail_on_warnings and lint_report["warnings"]:
         raise ValueError("dataset lint warnings treated as fatal:\n- " + "\n- ".join(lint_report["warnings"]))
 
@@ -83,10 +133,28 @@ def main() -> int:
         "source_version": (corpus_manifest or {}).get("source_version", "roleplay_v2"),
         "corpus_manifest_path": str(corpus_manifest_path),
         "corpus_manifest": corpus_manifest,
+        "clean_assistant_style": args.clean_assistant_style,
+        "dropped_after_cleaning": dropped_after_cleaning,
         "lint": lint_report,
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(manifest, indent=2))
+    if args.summary_only:
+        summary = {
+            "input_path": manifest["input_path"],
+            "output_dir": manifest["output_dir"],
+            "rows_total": manifest["rows_total"],
+            "rows_train": manifest["rows_train"],
+            "rows_val": manifest["rows_val"],
+            "clean_assistant_style": manifest["clean_assistant_style"],
+            "dropped_after_cleaning": manifest["dropped_after_cleaning"],
+            "lint_ok": lint_report["ok"],
+            "lint_error_count": len(lint_report["errors"]),
+            "lint_warning_count": len(lint_report["warnings"]),
+            "assistant_style_markers": lint_report["stats"].get("assistant_style_markers", {}),
+        }
+        print(json.dumps(summary, indent=2))
+    else:
+        print(json.dumps(manifest, indent=2))
     return 0
 
 
