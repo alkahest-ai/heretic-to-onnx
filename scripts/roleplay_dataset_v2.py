@@ -101,12 +101,28 @@ def to_minimal_chat_rows(rows: list[dict]) -> list[dict]:
     return minimal_rows
 
 
-def clean_assistant_roleplay_text(text: str) -> str:
+def extract_quoted_dialogue(text: str) -> str:
+    quotes = []
+    for match in re.findall(r'"([^"]+)"', text):
+        quote = re.sub(r"\s+", " ", match).strip()
+        if not quote:
+            continue
+        if quote[-1] not in ".?!":
+            quote = f"{quote}."
+        quotes.append(quote)
+    return " ".join(quotes)
+
+
+def clean_assistant_roleplay_text(text: str, *, direct_dialogue: bool = False) -> str:
     """Remove generator scaffolding that teaches meta-commentary instead of roleplay."""
 
     cleaned = re.sub(r"\s*I answer (?:with|like) [^.?!]+[.?!]", " ", text)
     cleaned = re.sub(r"\s*I answer in a way [^.?!]+[.?!]", " ", cleaned)
     cleaned = re.sub(r"\s*That habit of [^.?!]+ shows up plainly here[.?!]", " ", cleaned)
+    if direct_dialogue:
+        dialogue = extract_quoted_dialogue(cleaned)
+        if dialogue:
+            cleaned = dialogue
     cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = re.sub(r"\s+([,.?!])", r"\1", cleaned)
     return cleaned.strip()
@@ -117,11 +133,14 @@ def assistant_style_markers(text: str) -> list[str]:
     return [marker for marker in ASSISTANT_STYLE_MARKERS if marker in normalized]
 
 
-def clean_conversation_for_sft(conversation: dict) -> dict:
+def clean_conversation_for_sft(conversation: dict, *, direct_dialogue: bool = False) -> dict:
     cleaned = copy.deepcopy(conversation)
     for message in cleaned.get("messages", []):
         if message.get("role") == "assistant" and isinstance(message.get("content"), str):
-            message["content"] = clean_assistant_roleplay_text(message["content"])
+            message["content"] = clean_assistant_roleplay_text(
+                message["content"],
+                direct_dialogue=direct_dialogue,
+            )
     return cleaned
 
 

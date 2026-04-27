@@ -49,6 +49,11 @@ def main() -> int:
         help="Remove generator scaffold phrases from assistant turns before splitting.",
     )
     parser.add_argument(
+        "--assistant-direct-dialogue",
+        action="store_true",
+        help="When cleaning assistant style, train only on quoted assistant dialogue if available.",
+    )
+    parser.add_argument(
         "--fail-on-style-markers",
         action="store_true",
         help="Fail if assistant meta-style markers remain after optional cleaning.",
@@ -75,7 +80,10 @@ def main() -> int:
         raise ValueError("dataset is empty")
     dropped_after_cleaning = 0
     if args.clean_assistant_style:
-        cleaned_rows = [clean_conversation_for_sft(row) for row in rows]
+        cleaned_rows = [
+            clean_conversation_for_sft(row, direct_dialogue=args.assistant_direct_dialogue)
+            for row in rows
+        ]
         if args.drop_invalid_after_cleaning:
             rows = []
             for index, row in enumerate(cleaned_rows, start=1):
@@ -134,6 +142,7 @@ def main() -> int:
         "corpus_manifest_path": str(corpus_manifest_path),
         "corpus_manifest": corpus_manifest,
         "clean_assistant_style": args.clean_assistant_style,
+        "assistant_direct_dialogue": args.assistant_direct_dialogue,
         "dropped_after_cleaning": dropped_after_cleaning,
         "lint": lint_report,
     }
@@ -146,6 +155,7 @@ def main() -> int:
             "rows_train": manifest["rows_train"],
             "rows_val": manifest["rows_val"],
             "clean_assistant_style": manifest["clean_assistant_style"],
+            "assistant_direct_dialogue": manifest["assistant_direct_dialogue"],
             "dropped_after_cleaning": manifest["dropped_after_cleaning"],
             "lint_ok": lint_report["ok"],
             "lint_error_count": len(lint_report["errors"]),

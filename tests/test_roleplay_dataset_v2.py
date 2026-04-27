@@ -13,6 +13,7 @@ from roleplay_dataset_v2 import (  # noqa: E402
     clean_assistant_roleplay_text,
     clean_conversation_for_sft,
     conversation_to_review_rows,
+    extract_quoted_dialogue,
     lint_conversations,
     load_conversations,
     read_review_table,
@@ -112,6 +113,18 @@ class RoleplayDatasetV2Tests(unittest.TestCase):
         )
         self.assertEqual(assistant_style_markers(cleaned), [])
 
+    def test_clean_assistant_roleplay_text_can_keep_direct_dialogue_only(self) -> None:
+        dirty = (
+            "I let the challenge stay playful. With velvet around us, the room feels close. "
+            '"Then be specific." The answer refuses to hurry. "I can do that."'
+        )
+
+        self.assertEqual(extract_quoted_dialogue(dirty), "Then be specific. I can do that.")
+        self.assertEqual(
+            clean_assistant_roleplay_text(dirty, direct_dialogue=True),
+            "Then be specific. I can do that.",
+        )
+
     def test_clean_conversation_for_sft_allows_style_marker_gate(self) -> None:
         conversation = _sample_conversation(
             "conv-style",
@@ -124,6 +137,16 @@ class RoleplayDatasetV2Tests(unittest.TestCase):
 
         self.assertIn("i answer with", dirty_report["stats"]["assistant_style_markers"])
         self.assertEqual(clean_report["stats"]["assistant_style_markers"], {})
+
+    def test_clean_conversation_for_sft_can_keep_direct_dialogue_only(self) -> None:
+        conversation = _sample_conversation(
+            "conv-direct",
+            assistant_tail='With candlelight around us, the room feels close. "Welcome in." The answer stays warm.',
+        )
+
+        cleaned = clean_conversation_for_sft(conversation, direct_dialogue=True)
+
+        self.assertEqual(cleaned["messages"][-1]["content"], "Stay with me; you look incredible tonight. Welcome in.")
 
     def test_load_conversations_from_review_directory(self) -> None:
         first = _sample_conversation("conv-dir-1", user_tail="first", assistant_tail="first.")
