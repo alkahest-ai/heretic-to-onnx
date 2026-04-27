@@ -3,9 +3,9 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs?v=14";
+} from "../examples/browser-loader.mjs?v=16";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=14";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=16";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
@@ -56,6 +56,8 @@ const statusState = {
   lastRendered: "",
 };
 
+let localAuthTokenPromise = null;
+
 const runtimeState = {
   percent: null,
   detail: "Waiting for model activity.",
@@ -85,6 +87,37 @@ function initializeAuthToken() {
   if (stored) {
     elements.hfToken.value = stored;
   }
+}
+
+async function discoverLocalAuthToken() {
+  if (getAuthToken()) {
+    return;
+  }
+  if (!["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/__hf_token", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    const token = typeof payload?.token === "string" ? payload.token.trim() : "";
+    if (!token) {
+      return;
+    }
+    elements.hfToken.value = token;
+    window.localStorage.setItem(HF_TOKEN_STORAGE_KEY, token);
+    pushRuntimeLog("Loaded local HF token for private repo access.", "local-hf-token");
+  } catch {
+    // Local token discovery is best-effort; manual paste still works.
+  }
+}
+
+function initializeLocalAuthToken() {
+  localAuthTokenPromise ||= discoverLocalAuthToken();
+  return localAuthTokenPromise;
 }
 
 function clampPercent(value) {
@@ -604,6 +637,7 @@ async function loadModel() {
       detail: "Preparing text-only session warm load.",
       resetProgress: true,
     });
+    await initializeLocalAuthToken();
     const result = await state.runtime.load({
       modelId,
       modelFamily: preset?.family,
@@ -673,6 +707,7 @@ async function sendMessage() {
         !state.loadedModelId || state.loadedModelId !== modelId || (state.loadedTextOnly && needsMultimodal),
     });
 
+    await initializeLocalAuthToken();
     const result = await state.runtime.generate({
       modelId,
       modelFamily: preset?.family,
@@ -853,6 +888,7 @@ initializeRuntimeStatus();
 syncComposerMediaState();
 renderRuntimeLog();
 renderRuntimePanel();
+initializeLocalAuthToken();
 setInterval(() => {
   if (runtimeState.lastUpdateAt) {
     renderRuntimeAge();

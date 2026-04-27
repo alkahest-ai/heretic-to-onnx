@@ -78,6 +78,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Heretic-only 0.8B q4 browser package with Qwen3.5 RMSNorm offset patching.",
   },
   {
+    label: "Alkahest 0.8B Heretic RP SFT Q4",
+    modelId: ownedModel("alkahest-0.8b-heretic-rp-sft-q4-onnx"),
+    family: "qwen3_5",
+    modalities: "text + image",
+    approxDownload: "~850 MB",
+    dtype: QWEN35_WEBGPU_DTYPE,
+    note: "Heretic 0.8B q4 browser package after generated roleplay SFT proof tuning.",
+  },
+  {
     label: "Alkahest 0.8B Heretic Q8",
     modelId: ownedModel("alkahest-0.8b-heretic-q8-onnx"),
     family: "qwen3_5",

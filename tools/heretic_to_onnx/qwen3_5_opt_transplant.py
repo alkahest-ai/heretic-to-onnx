@@ -129,8 +129,9 @@ def _replace_initializer(model, tensor) -> None:
 def _tensor_to_numpy(tensor, *, dtype):
     import numpy as np
 
-    # bfloat16 tensors cannot be converted directly to numpy on every torch build.
-    return tensor.detach().cpu().to(dtype).numpy()
+    if hasattr(tensor, "detach"):
+        return tensor.detach().cpu().to(dtype).numpy()
+    return np.asarray(tensor, dtype=dtype)
 
 
 def _make_tensor_like(name: str, tensor, template_initializer):
@@ -138,9 +139,9 @@ def _make_tensor_like(name: str, tensor, template_initializer):
     from onnx import TensorProto, numpy_helper
 
     if template_initializer.data_type == TensorProto.FLOAT16:
-        array = _tensor_to_numpy(tensor, dtype=__import__("torch").float16)
+        array = _tensor_to_numpy(tensor, dtype=np.float16)
     else:
-        array = _tensor_to_numpy(tensor, dtype=__import__("torch").float32)
+        array = _tensor_to_numpy(tensor, dtype=np.float32)
     if template_initializer.data_type == TensorProto.FLOAT16:
         array = array.astype(np.float16, copy=False)
     else:
@@ -180,7 +181,7 @@ def _quantize_matmul_weight(
     from onnx import TensorProto, helper, numpy_helper
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 
-    weight_np = _tensor_to_numpy(weight, dtype=__import__("torch").float32).T.astype(np.float32, copy=False)
+    weight_np = _tensor_to_numpy(weight, dtype=np.float32).T.astype(np.float32, copy=False)
     k_dim, n_dim = weight_np.shape
     graph = helper.make_graph(
         [
@@ -296,6 +297,8 @@ def _state_key_for_raw_matmul_initializer(name: str) -> str | None:
 
 
 def _tensor_for_initializer(name: str, safe_file, initializer):
+    import numpy as np
+
     state_key = _state_key_for_raw_matmul_initializer(name)
     if state_key is not None:
         return _make_tensor_like(name, safe_file.get_tensor(state_key).T, initializer)
@@ -308,12 +311,12 @@ def _tensor_for_initializer(name: str, safe_file, initializer):
     if name.endswith(".gdn.conv1d.weight"):
         tensor = tensor.squeeze(1)
     if _needs_qwen35_rmsnorm_offset(name):
-        tensor = tensor.detach().float() + 1.0
+        tensor = _tensor_to_numpy(tensor, dtype=np.float32) + 1.0
     return _make_tensor_like(name, tensor, initializer)
 
 
 def _replace_a_neg_exp(model, safe_file, replaced: list[str]) -> None:
-    import torch
+    import numpy as np
     from onnx import numpy_helper
 
     for initializer in list(model.graph.initializer):
@@ -321,7 +324,7 @@ def _replace_a_neg_exp(model, safe_file, replaced: list[str]) -> None:
         if not match:
             continue
         state_key = f"model.language_model.layers.{match.group(1)}.linear_attn.A_log"
-        value = -torch.exp(safe_file.get_tensor(state_key).detach().cpu().float()).numpy()
+        value = -np.exp(_tensor_to_numpy(safe_file.get_tensor(state_key), dtype=np.float32))
         _replace_initializer(model, numpy_helper.from_array(value, initializer.name))
         replaced.append(initializer.name)
 
@@ -332,6 +335,7 @@ def _replace_raw_decoder_initializers(
     source_safetensors: Path,
     output_decoder: Path,
 ) -> tuple[int, int]:
+    import numpy as np
     import onnx
     from safetensors import safe_open
 
@@ -340,7 +344,7 @@ def _replace_raw_decoder_initializers(
     plain_replaced: list[str] = []
     missing_external: list[str] = []
 
-    with safe_open(source_safetensors, framework="pt", device="cpu") as safe_file:
+    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
         for initializer in list(model.graph.initializer):
             tensor = _tensor_for_initializer(initializer.name, safe_file, initializer)
             if tensor is None:
@@ -390,7 +394,7 @@ def _write_raw_embed_tokens(
     from safetensors import safe_open
 
     model = onnx.load(str(template_embed), load_external_data=False)
-    with safe_open(source_safetensors, framework="pt", device="cpu") as safe_file:
+    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
         tensor = _make_tensor_like(
             "model.embed_tokens.weight",
             safe_file.get_tensor("model.language_model.embed_tokens.weight"),
@@ -459,6 +463,7 @@ def _replace_decoder_initializers(
     block_size: int,
     decoder_dtype: str = "q4",
 ) -> tuple[int, int]:
+    import numpy as np
     import onnx
     from safetensors import safe_open
 
@@ -467,7 +472,7 @@ def _replace_decoder_initializers(
     quantized_count = 0
     plain_replaced: list[str] = []
 
-    with safe_open(source_safetensors, framework="pt", device="cpu") as safe_file:
+    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
         if decoder_dtype == "q4":
             for node in model.graph.node:
                 if node.domain != "com.microsoft" or node.op_type != "MatMulNBits":
@@ -551,7 +556,7 @@ def _replace_decoder_initializers(
                 continue
             tensor = safe_file.get_tensor(state_key)
             if _needs_qwen35_rmsnorm_offset(name):
-                tensor = tensor.detach().float() + 1.0
+                tensor = _tensor_to_numpy(tensor, dtype=np.float32) + 1.0
             _replace_initializer(model, _make_tensor_like(name, tensor, initializer))
             plain_replaced.append(name)
 
@@ -588,8 +593,8 @@ def _write_embed_tokens(
     from safetensors import safe_open
 
     model = onnx.load(str(template_embed), load_external_data=True)
-    with safe_open(source_safetensors, framework="pt", device="cpu") as safe_file:
-        weight = safe_file.get_tensor("model.language_model.embed_tokens.weight").detach().cpu().float().numpy()
+    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
+        weight = _tensor_to_numpy(safe_file.get_tensor("model.language_model.embed_tokens.weight"), dtype=np.float32)
 
     vocab_size, hidden_size = weight.shape
     if hidden_size % block_size:

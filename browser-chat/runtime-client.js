@@ -180,7 +180,7 @@ function createWorkerRuntime({
     if (worker) {
       return worker;
     }
-    worker = new Worker(new URL("./runtime-worker.js?v=14", import.meta.url), { type: "module" });
+    worker = new Worker(new URL("./runtime-worker.js?v=16", import.meta.url), { type: "module" });
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
     worker.addEventListener("messageerror", handleMessageError);
