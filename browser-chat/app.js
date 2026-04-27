@@ -3,9 +3,9 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs?v=18";
+} from "../examples/browser-loader.mjs?v=21";
 import { formatRuntimeError } from "./runtime-errors.mjs";
-import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=18";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=21";
 
 const elements = {
   presetModel: document.querySelector("#preset-model"),
