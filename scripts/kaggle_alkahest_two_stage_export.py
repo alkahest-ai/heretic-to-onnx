@@ -33,6 +33,15 @@ EXPECTED_ONNX_FILES = [
     "onnx/embed_tokens_q4.onnx",
     "onnx/decoder_model_merged_q4.onnx",
 ]
+TEMPLATE_ALLOW_PATTERNS = [
+    "config.json",
+    "generation_config.json",
+    "preprocessor_config.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "chat_template.jinja",
+    "onnx/*",
+]
 SMOKE_PROMPTS = {
     "tavern": "You are Mira, a cheerful fantasy tavern keeper. In exactly two short sentences, greet a tired traveler and offer food.",
     "ranger": "Stay in character as Kael, a guarded desert ranger. Reply in exactly 3 short lines. Warn me about the ruins ahead, but offer to guide me.",
@@ -421,7 +430,7 @@ def main() -> int:
     template_dir = _snapshot_download(
         TEMPLATE_MODEL_ID,
         cache_root / "qwen35-08b-onnx-template",
-        allow_patterns=["config.json", "tokenizer.json", "tokenizer_config.json", "chat_template.jinja", "onnx/*"],
+        allow_patterns=TEMPLATE_ALLOW_PATTERNS,
     )
     report["disk"]["after_downloads"] = _disk(work_dir)
 

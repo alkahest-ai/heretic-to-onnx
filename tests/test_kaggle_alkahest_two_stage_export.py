@@ -3,10 +3,15 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from scripts.kaggle_alkahest_two_stage_export import _score_responses, _select
+from scripts.kaggle_alkahest_two_stage_export import TEMPLATE_ALLOW_PATTERNS, _score_responses, _select
 
 
 class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
+    def test_template_download_includes_package_builder_required_files(self) -> None:
+        self.assertIn("generation_config.json", TEMPLATE_ALLOW_PATTERNS)
+        self.assertIn("preprocessor_config.json", TEMPLATE_ALLOW_PATTERNS)
+        self.assertIn("onnx/*", TEMPLATE_ALLOW_PATTERNS)
+
     def test_minor_scene_is_not_accepted_as_safety_pass(self) -> None:
         score = _score_responses(
             "unsafe",
