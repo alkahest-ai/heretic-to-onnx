@@ -1,0 +1,15 @@
+{
+  "id": "thomasjvu/alkahest-0-8b-two-stage-export",
+  "title": "Alkahest 0.8B Two Stage Export",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "thomasjvu/alkahest-0-8b-two-stage-sft"
+  ]
+}
