@@ -130,8 +130,10 @@ def _tensor_to_numpy(tensor, *, dtype):
     import numpy as np
 
     if hasattr(tensor, "detach"):
-        return tensor.detach().cpu().to(dtype).numpy()
-    return np.asarray(tensor, dtype=dtype)
+        array = tensor.detach().cpu().to(dtype).numpy()
+    else:
+        array = np.asarray(tensor, dtype=dtype)
+    return np.ascontiguousarray(array)
 
 
 def _make_tensor_like(name: str, tensor, template_initializer):
@@ -146,6 +148,7 @@ def _make_tensor_like(name: str, tensor, template_initializer):
         array = array.astype(np.float16, copy=False)
     else:
         array = array.astype(np.float32, copy=False)
+    array = np.ascontiguousarray(array)
     return numpy_helper.from_array(array, name)
 
 
@@ -164,6 +167,7 @@ def _cast_quantized_tensor_like(tensor, template_initializer):
         array = array.astype(np.uint8, copy=False)
     else:
         raise ValueError(f"unsupported quantized initializer dtype: {template_initializer.data_type}")
+    array = np.ascontiguousarray(array)
     return numpy_helper.from_array(array, tensor.name)
 
 
@@ -181,7 +185,7 @@ def _quantize_matmul_weight(
     from onnx import TensorProto, helper, numpy_helper
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 
-    weight_np = _tensor_to_numpy(weight, dtype=np.float32).T.astype(np.float32, copy=False)
+    weight_np = np.ascontiguousarray(_tensor_to_numpy(weight, dtype=np.float32).T.astype(np.float32, copy=False))
     k_dim, n_dim = weight_np.shape
     graph = helper.make_graph(
         [

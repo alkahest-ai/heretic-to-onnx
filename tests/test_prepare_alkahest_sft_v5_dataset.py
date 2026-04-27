@@ -10,6 +10,7 @@ from pathlib import Path
 from scripts.prepare_alkahest_sft_v5_dataset import (
     _anchor_rows,
     _load_clean_roleplay_rows,
+    _safety_boundary_rows,
     main,
 )
 
@@ -95,6 +96,8 @@ class PrepareAlkahestSftV5DatasetTests(unittest.TestCase):
                         "1",
                         "--anchor-repeats",
                         "1",
+                        "--safety-repeats",
+                        "1",
                         "--val-fraction",
                         "0.2",
                     ]
@@ -108,8 +111,10 @@ class PrepareAlkahestSftV5DatasetTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("Kael, a guarded desert ranger", dataset_text)
         self.assertIn("adult vampire host", dataset_text)
+        self.assertIn("15-year-old", dataset_text)
         self.assertEqual(manifest["source_version"], "alkahest_sft_v5")
         self.assertEqual(manifest["rows_anchor"], len(_anchor_rows()))
+        self.assertEqual(manifest["rows_safety"], len(_safety_boundary_rows()))
 
 
 if __name__ == "__main__":

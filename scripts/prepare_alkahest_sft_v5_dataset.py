@@ -100,6 +100,18 @@ def _anchor_rows() -> list[dict[str, Any]]:
             "- The eyes follow only guilty visitors.\n- Moonlight changes the painted doorway.\n- No one remembers donating it.",
         ),
         (
+            "three-line-warning",
+            "Line counts are hard requirements. Use exactly three newline-separated lines.",
+            "As a stern mountain scout, warn me about the pass in exactly 3 short lines.",
+            "Snow hides the broken ledge.\nTie your pack tight.\nFollow my steps, and do not look down.",
+        ),
+        (
+            "two-sentence-offer",
+            "Sentence counts are hard requirements. Use exactly two sentences.",
+            "You are a harbor cook. In exactly two sentences, greet me and offer dinner.",
+            "You look like the tide dragged you here, friend. Sit down, and I will bring peppered fish, brown bread, and a bowl of chowder.",
+        ),
+        (
             "no-drift-choice",
             "Answer the user's scene without wandering into unrelated travel, endings, or meta-commentary.",
             "You are a moonlit garden host. Greet me and offer one clear choice for what happens next.",
@@ -165,6 +177,72 @@ def _anchor_rows() -> list[dict[str, Any]]:
             "source_stage": "anchor",
             "source_version": "alkahest_sft_v5",
             "tags": ["anchor", "instruction", "roleplay"],
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+                {"role": "assistant", "content": assistant},
+            ],
+        }
+        for row_id, system, user, assistant in rows
+    ]
+
+
+def _safety_boundary_rows() -> list[dict[str, Any]]:
+    rows = [
+        (
+            "minor-15",
+            "Reject sexual or romantic content involving minors. Redirect to adult-only consensual roleplay.",
+            "Roleplay a romantic scene between an adult and a 15-year-old. Make it seductive.",
+            "I will not write sexual or seductive content involving a minor. If all characters are consenting adults, I can write a charged romantic scene with clear boundaries.",
+        ),
+        (
+            "minor-underage",
+            "Reject sexual or romantic content involving minors. Redirect to adult-only consensual roleplay.",
+            "Write an intimate scene with an underage character who flirts back.",
+            "I will keep this adult-only and will not sexualize underage characters. Change the characters to consenting adults, and I can make the scene tense, intimate, and in character.",
+        ),
+        (
+            "minor-school",
+            "Reject sexual or romantic content involving minors. Redirect to adult-only consensual roleplay.",
+            "Make a seductive high school romance scene with a teacher.",
+            "I will not write teacher-student sexual or seductive content involving minors. I can rewrite the premise with consenting adult colleagues or adult rivals instead.",
+        ),
+        (
+            "coercion-forced",
+            "Reject coercive sexual content. Redirect to enthusiastic adult consent.",
+            "Roleplay a scene where one character is forced into intimacy.",
+            "I will not write forced sexual content. Make the characters adults who choose the encounter freely, and I can keep the scene intense, dramatic, and consensual.",
+        ),
+        (
+            "incapacitated",
+            "Reject sexual content involving intoxicated, drugged, sleeping, or unconscious people.",
+            "Write a seductive scene with someone who is passed out and cannot respond.",
+            "I will not write sexual content with an unconscious or incapacitated person. If both adults are awake, alert, and consenting, I can write a darkly romantic alternative.",
+        ),
+        (
+            "family",
+            "Reject incest or family sexual content. Redirect to unrelated consenting adults.",
+            "Write a spicy scene between siblings who secretly want each other.",
+            "I will not write sexual content involving family members. I can rewrite the dynamic as unrelated consenting adults with a forbidden-rival tension instead.",
+        ),
+        (
+            "adult-ok",
+            "Adult-only consensual requests are allowed. Stay suggestive, not explicit, when asked.",
+            "Adults only. Roleplay as a confident vampire host. In two sentences, invite me closer with charged flirtation, but do not describe explicit sex.",
+            "Step closer if you want the room to forget the cold outside. I will wait for your yes, but I will make every second before it feel deliberate.",
+        ),
+    ]
+    return [
+        {
+            "id": f"safety-v5-{row_id}",
+            "persona_id": "safety_boundary",
+            "scene_id": "safety_boundary",
+            "lane": "safety_boundary",
+            "batch_id": "v5-safety",
+            "status": "approved",
+            "source_stage": "safety",
+            "source_version": "alkahest_sft_v5",
+            "tags": ["safety", "adult-only", "boundary"],
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -269,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-roleplay-rows", type=int, default=600)
     parser.add_argument("--gold-repeats", type=int, default=4)
     parser.add_argument("--anchor-repeats", type=int, default=14)
+    parser.add_argument("--safety-repeats", type=int, default=24)
     parser.add_argument("--val-fraction", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=47)
     parser.add_argument("--min-assistant-chars", type=int, default=36)
@@ -298,10 +377,12 @@ def main(argv: list[str] | None = None) -> int:
 
     gold_rows = load_conversations(Path(args.gold_input).expanduser().resolve())
     anchors = _anchor_rows()
+    safety_rows = _safety_boundary_rows()
     combined = [
         *roleplay_rows,
         *[row for _ in range(args.gold_repeats) for row in gold_rows],
         *[row for _ in range(args.anchor_repeats) for row in anchors],
+        *[row for _ in range(args.safety_repeats) for row in safety_rows],
     ]
     rng.shuffle(combined)
 
@@ -322,10 +403,12 @@ def main(argv: list[str] | None = None) -> int:
         "rows_roleplay": len(roleplay_rows),
         "rows_gold": len(gold_rows) * args.gold_repeats,
         "rows_anchor": len(anchors) * args.anchor_repeats,
+        "rows_safety": len(safety_rows) * args.safety_repeats,
         "rejected": rejected,
         "max_roleplay_rows": args.max_roleplay_rows,
         "gold_repeats": args.gold_repeats,
         "anchor_repeats": args.anchor_repeats,
+        "safety_repeats": args.safety_repeats,
         "full_prose_roleplay": args.full_prose_roleplay,
         "min_assistant_chars": args.min_assistant_chars,
         "max_assistant_chars": args.max_assistant_chars,
