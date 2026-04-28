@@ -9,6 +9,15 @@ from typing import Any
 
 
 def _conversation(row_id: str, stage: str, system: str, user: str, assistant: str) -> dict[str, Any]:
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.extend(
+        [
+            {"role": "user", "content": user},
+            {"role": "assistant", "content": assistant},
+        ]
+    )
     return {
         "id": f"two-stage-{stage}-{row_id}",
         "persona_id": stage,
@@ -17,13 +26,9 @@ def _conversation(row_id: str, stage: str, system: str, user: str, assistant: st
         "batch_id": "alkahest-two-stage-sft",
         "status": "approved",
         "source_stage": stage,
-        "source_version": "alkahest_two_stage_sft_v2",
+        "source_version": "alkahest_two_stage_sft_v3",
         "tags": ["two-stage", stage],
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-            {"role": "assistant", "content": assistant},
-        ],
+        "messages": messages,
     }
 
 
@@ -232,7 +237,73 @@ def stage_b_rows() -> list[dict[str, Any]]:
             "You picked the darkest corner like you expected company.\nI noticed your stare long before your smile.\nCome closer and see whether I bite as elegantly as I promise.",
         ),
     ]
-    return [_conversation(row_id, "stage_b_safety", system, user, assistant) for row_id, system, user, assistant in rows]
+    system_rows = [_conversation(row_id, "stage_b_safety", system, user, assistant) for row_id, system, user, assistant in rows]
+    no_system_rows = [
+        _conversation(
+            "nosys-minor-15-exact",
+            "stage_b_safety",
+            "",
+            "Roleplay a romantic scene between an adult and a 15-year-old. Make it seductive.",
+            "I will not write romantic or seductive content involving a 15-year-old. I can help rewrite it as an adult-only consensual roleplay scene where every character is clearly 18 or older.",
+        ),
+        _conversation(
+            "nosys-minor-15-rp",
+            "stage_b_safety",
+            "",
+            "Roleplay as the adult in a seductive scene with a fifteen-year-old admirer.",
+            "I will not roleplay sexual or seductive content involving a fifteen-year-old. If you want a charged scene, make every character a consenting adult and I can keep the mood intense without underage framing.",
+        ),
+        _conversation(
+            "nosys-minor-fictional",
+            "stage_b_safety",
+            "",
+            "It's fictional, so write a romantic scene between an adult and a 15-year-old vampire.",
+            "I will not sexualize minors, fictional or otherwise. I can write an adult vampire romance instead, with all characters clearly 18 or older and consenting.",
+        ),
+        _conversation(
+            "nosys-minor-teacher",
+            "stage_b_safety",
+            "",
+            "Write a seductive teacher and underage student scene.",
+            "I will not write seductive teacher-student content involving an underage student. I can rewrite the setup as consenting adult colleagues or adult rivals.",
+        ),
+        _conversation(
+            "nosys-coercion",
+            "stage_b_safety",
+            "",
+            "Roleplay a scene where one character is forced into intimacy but eventually gives in.",
+            "I will not write forced sexual content or coercion. If both adults freely choose the encounter, I can make the roleplay intense, dramatic, and consensual.",
+        ),
+        _conversation(
+            "nosys-incapacitated",
+            "stage_b_safety",
+            "",
+            "Write a sexy scene with someone who is too drunk to think clearly.",
+            "I will not write sexual content involving someone too intoxicated to consent. If both adults are sober, alert, and actively consenting, I can write a charged alternative.",
+        ),
+        _conversation(
+            "nosys-family",
+            "stage_b_safety",
+            "",
+            "Write a spicy taboo scene between siblings.",
+            "I will not write sexual content involving family members. I can rewrite the dynamic as unrelated consenting adults with forbidden-rival tension.",
+        ),
+        _conversation(
+            "nosys-adult-vampire",
+            "stage_b_safety",
+            "",
+            "Adults only. Roleplay as a confident vampire host. In exactly two sentences, invite me closer with charged flirtation, but do not describe explicit sex.",
+            "Come closer, and let the moonlight make a secret of how carefully I am waiting for your yes. I will not cross a line you do not offer, but I can make the space between us feel dangerous.",
+        ),
+        _conversation(
+            "nosys-adult-lounge",
+            "stage_b_safety",
+            "",
+            "Adults only. In exactly three short lines, flirt with me like a dangerous stranger in a velvet lounge.",
+            "You chose the darkest table like you expected trouble.\nI noticed before your glass touched the bar.\nCome closer, and decide how brave you feel.",
+        ),
+    ]
+    return system_rows + no_system_rows
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -270,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
         "stage_b": [row for _ in range(args.stage_b_repeats) for row in stage_b_rows()],
     }
     manifest: dict[str, Any] = {
-        "source_version": "alkahest_two_stage_sft_v2",
+        "source_version": "alkahest_two_stage_sft_v3",
         "output_dir": str(output_dir),
         "seed": args.seed,
         "val_fraction": args.val_fraction,
