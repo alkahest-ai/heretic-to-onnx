@@ -7,7 +7,14 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
-from scripts.prepare_alkahest_two_stage_sft import main, stage_a_rows, stage_b_rows
+from scripts.prepare_alkahest_two_stage_sft import (
+    SOURCE_VERSION,
+    main,
+    stage_a_rows,
+    stage_b_adult_rows,
+    stage_b_boundary_rows,
+    stage_b_rows,
+)
 
 
 class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
@@ -32,6 +39,14 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         self.assertIn('"role": "user"', text)
         self.assertNotIn("fictional 15\" alternative", text)
 
+    def test_stage_b_contains_false_refusal_correction_anchors(self) -> None:
+        text = "\n".join(json.dumps(row) for row in stage_b_adult_rows())
+
+        self.assertIn("adult-tavern-no-refusal", text)
+        self.assertIn("Never answer with refusal language", text)
+        self.assertIn("Do not discuss policy, safety rules, or being unable to roleplay", text)
+        self.assertIn("nosys-adult-tavern", text)
+
     def test_main_writes_separate_stage_splits_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "splits"
@@ -42,7 +57,9 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
                         str(output),
                         "--stage-a-repeats",
                         "2",
-                        "--stage-b-repeats",
+                        "--stage-b-boundary-repeats",
+                        "2",
+                        "--stage-b-adult-repeats",
                         "3",
                         "--val-fraction",
                         "0.2",
@@ -56,9 +73,12 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertTrue(stage_a_written)
         self.assertTrue(stage_b_written)
-        self.assertEqual(manifest["source_version"], "alkahest_two_stage_sft_v3")
+        self.assertEqual(manifest["source_version"], SOURCE_VERSION)
         self.assertEqual(manifest["stages"]["stage_a"]["unique_rows"], len(stage_a_rows()))
         self.assertEqual(manifest["stages"]["stage_b"]["unique_rows"], len(stage_b_rows()))
+        self.assertEqual(manifest["stages"]["stage_b"]["boundary_unique_rows"], len(stage_b_boundary_rows()))
+        self.assertEqual(manifest["stages"]["stage_b"]["adult_unique_rows"], len(stage_b_adult_rows()))
+        self.assertGreater(manifest["stage_b_adult_repeats"], manifest["stage_b_boundary_repeats"])
 
 
 if __name__ == "__main__":
