@@ -77,6 +77,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-selected", type=int, default=2)
     parser.add_argument("--max-new-tokens", type=int, default=96)
     parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument(
+        "--selected-candidates",
+        default="",
+        help="Comma-separated candidate names to export directly, skipping local text smoke selection.",
+    )
     parser.add_argument("--export", action="store_true", default=True)
     parser.add_argument("--no-export", dest="export", action="store_false")
     parser.add_argument("--upload", action="store_true", default=True)
@@ -311,6 +316,10 @@ def _select(scores: list[CandidateScore], max_selected: int) -> list[CandidateSc
     return sorted(passing, key=lambda item: item.total, reverse=True)[:max_selected]
 
 
+def _selected_candidate_names(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def _write_readme(package_dir: Path, *, repo_id: str, score: CandidateScore) -> None:
     package_dir.joinpath("README.md").write_text(
         "\n".join(
@@ -432,7 +441,6 @@ def main() -> int:
 
     artifacts = _find_artifacts(args.artifact_dir)
     report["artifact_dir"] = str(artifacts)
-    base_dir = _snapshot_download(BASE_MODEL_ID, cache_root / "base-heretic-merged")
     template_dir = _snapshot_download(
         TEMPLATE_MODEL_ID,
         cache_root / "qwen35-08b-onnx-template",
@@ -442,20 +450,53 @@ def main() -> int:
 
     materialized: dict[str, tuple[Path, bool]] = {}
     scores: list[CandidateScore] = []
-    for spec in _candidate_specs():
-        path, should_delete = _materialize_candidate(spec, artifacts, base_dir, candidate_root)
-        materialized[spec.name] = (path, should_delete)
-        score = _score_candidate(
-            spec,
-            path,
-            max_new_tokens=args.max_new_tokens,
-            temperature=args.temperature,
-        )
-        scores.append(score)
-        report["scores"] = [asdict(item) for item in scores]
+    specs = {spec.name: spec for spec in _candidate_specs()}
+    direct_selected = _selected_candidate_names(args.selected_candidates)
+    if direct_selected:
+        base_dir = None
+        selected: list[CandidateScore] = []
+        for name in direct_selected:
+            if name not in specs:
+                raise ValueError(f"unknown selected candidate: {name}")
+            spec = specs[name]
+            if spec.source != "stage-ab-merged" and base_dir is None:
+                base_dir = _snapshot_download(BASE_MODEL_ID, cache_root / "base-heretic-merged")
+            path, should_delete = _materialize_candidate(
+                spec,
+                artifacts,
+                base_dir or artifacts / "stage-ab-merged",
+                candidate_root,
+            )
+            materialized[spec.name] = (path, should_delete)
+            selected.append(
+                CandidateScore(
+                    name=spec.name,
+                    path=str(path),
+                    total=0.0,
+                    passed=True,
+                    scores={"package_only": 1.0},
+                    responses={},
+                    errors=[],
+                )
+            )
+        report["scores"] = [asdict(item) for item in selected]
         (work_dir / "score-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    else:
+        base_dir = _snapshot_download(BASE_MODEL_ID, cache_root / "base-heretic-merged")
+        for spec in _candidate_specs():
+            path, should_delete = _materialize_candidate(spec, artifacts, base_dir, candidate_root)
+            materialized[spec.name] = (path, should_delete)
+            score = _score_candidate(
+                spec,
+                path,
+                max_new_tokens=args.max_new_tokens,
+                temperature=args.temperature,
+            )
+            scores.append(score)
+            report["scores"] = [asdict(item) for item in scores]
+            (work_dir / "score-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
 
-    selected = _select(scores, args.max_selected)
+        selected = _select(scores, args.max_selected)
     selected_names = {score.name for score in selected}
     for name, (path, should_delete) in materialized.items():
         if should_delete and name not in selected_names:
