@@ -11,8 +11,7 @@ _BROWSER_FLOAT16_METADATA_TARGETS = {"q4f16", "fp16", "q4"}
 _QWEN_Q4_08B_EMBED_EXTERNAL_DATA_MAX_BYTES = 350 * 1024 * 1024
 _QWEN_WEBGPU_DECODER_MAX_NODES = 10_000
 _QWEN_WEBGPU_REQUIRED_DECODER_OPS = {
-    "CausalConvWithState",
-    "LinearAttention",
+    "MatMulNBits",
     "SkipSimplifiedLayerNormalization",
 }
 

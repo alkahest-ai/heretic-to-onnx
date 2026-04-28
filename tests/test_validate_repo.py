@@ -175,8 +175,14 @@ class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):
             graph = helper.make_graph(
                 [
                     helper.make_node(
-                        "CausalConvWithState",
+                        "MatMulNBits",
                         ["x"],
+                        ["matmul_out"],
+                        domain="com.microsoft",
+                    ),
+                    helper.make_node(
+                        "SkipSimplifiedLayerNormalization",
+                        ["matmul_out"],
                         ["y"],
                         domain="com.microsoft",
                     )
@@ -207,7 +213,7 @@ class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):
                 runtime_smoke=True,
             )
 
-        self.assertFalse(report.ok)
+        self.assertTrue(report.ok)
         self.assertEqual(len(report.runtime_smoke), 1)
         self.assertTrue(report.runtime_smoke[0].ok)
         self.assertTrue(report.runtime_smoke[0].skipped)
