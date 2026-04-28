@@ -305,7 +305,7 @@ class Qwen35ExportCodegenTests(unittest.TestCase):
         self.assertIn('return _quantize_q4(input_path, output_path, block_size)', runner)
         self.assertIn('if package_dtype == "fp16":', runner)
         self.assertIn('return _copy_official_onnx_session(output_path, package_filename, official_onnx_repo)', runner)
-        self.assertIn('parser.add_argument("--official-onnx-repo", default="onnx-community/Qwen3.5-0.8B-ONNX")', runner)
+        self.assertIn('parser.add_argument("--official-onnx-repo", default="onnx-community/Qwen3.5-0.8B-ONNX-OPT")', runner)
         self.assertIn('from huggingface_hub import hf_hub_download', runner)
         self.assertIn('return _quantize_fp16(input_path, output_path)', runner)
         self.assertIn('conversion_mode = "converted_to_fp16_wrapped_float32_io"', runner)

@@ -26,7 +26,7 @@ from tools.heretic_to_onnx.validate_repo import validate_package
 
 
 BASE_MODEL_ID = "thomasjvu/alkahest-0.8b-heretic-merged"
-TEMPLATE_MODEL_ID = "onnx-community/Qwen3.5-0.8B-ONNX"
+TEMPLATE_MODEL_ID = "onnx-community/Qwen3.5-0.8B-ONNX-OPT"
 QWEN_BASE_MODEL_ID = "Qwen/Qwen3.5-0.8B"
 EXPECTED_ONNX_FILES = [
     "onnx/vision_encoder_fp16.onnx",

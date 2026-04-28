@@ -552,6 +552,19 @@ export function inferModelFamily(modelId) {
   return null;
 }
 
+export function inferCustomModelDtype(modelId, family) {
+  const value = String(modelId || "").toLowerCase();
+  if (family === "qwen3_5") {
+    if (value.includes("q8-onnx")) {
+      return QWEN35_WEBGPU_Q8_DTYPE;
+    }
+    if (value.includes("q4-onnx")) {
+      return QWEN35_WEBGPU_DTYPE;
+    }
+  }
+  return null;
+}
+
 export function formatPresetSummary(preset) {
   if (!preset) {
     return "Custom model ID. Use a public Alkahest or Rally ONNX repo with a Transformers.js-compatible package layout.";
@@ -634,7 +647,7 @@ export function createBrowserChatRuntime({
 
     const preset = findModelPreset(modelId);
     const family = modelFamily ?? preset?.family ?? inferModelFamily(modelId) ?? "gemma4";
-    const resolvedDtype = dtype ?? preset?.dtype ?? defaultDtype;
+    const resolvedDtype = dtype ?? preset?.dtype ?? inferCustomModelDtype(modelId, family) ?? defaultDtype;
     const ProcessorClass = resolveProcessorClass(family);
     const ModelClass = resolveModelClass(family, { textOnly });
     const readyMessage = textOnly

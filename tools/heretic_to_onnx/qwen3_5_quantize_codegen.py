@@ -382,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", default={default_output_dir})
     parser.add_argument("--report-path", default={default_report_path})
     parser.add_argument("--block-size", default={block_size}, type=int)
-    parser.add_argument("--official-onnx-repo", default="onnx-community/Qwen3.5-0.8B-ONNX")
+    parser.add_argument("--official-onnx-repo", default="onnx-community/Qwen3.5-0.8B-ONNX-OPT")
     args = parser.parse_args(argv)
 
     input_dir = Path(args.input_dir).expanduser().resolve()
