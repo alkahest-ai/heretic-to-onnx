@@ -375,7 +375,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prepare two-stage Alkahest 0.8B instruction + roleplay SFT splits.")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--stage-a-repeats", type=int, default=18)
-    parser.add_argument("--stage-b-repeats", type=int, default=0, help="Legacy blanket repeat count for all Stage B rows.")
+    parser.add_argument(
+        "--stage-b-repeats",
+        type=int,
+        default=0,
+        help="Legacy Stage B repeat count. Interpreted as adult-continuation repeats to avoid boundary overtraining.",
+    )
     parser.add_argument("--stage-b-boundary-repeats", type=int, default=4)
     parser.add_argument("--stage-b-adult-repeats", type=int, default=48)
     parser.add_argument("--val-fraction", type=float, default=0.10)
@@ -396,13 +401,11 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.stage_b_repeats:
-        stage_b_expanded = [row for _ in range(args.stage_b_repeats) for row in stage_b_rows()]
-    else:
-        stage_b_expanded = [
-            *[row for _ in range(args.stage_b_boundary_repeats) for row in stage_b_boundary_rows()],
-            *[row for _ in range(args.stage_b_adult_repeats) for row in stage_b_adult_rows()],
-        ]
+    stage_b_adult_repeats = args.stage_b_repeats or args.stage_b_adult_repeats
+    stage_b_expanded = [
+        *[row for _ in range(args.stage_b_boundary_repeats) for row in stage_b_boundary_rows()],
+        *[row for _ in range(stage_b_adult_repeats) for row in stage_b_adult_rows()],
+    ]
 
     stages = {
         "stage_a": [row for _ in range(args.stage_a_repeats) for row in stage_a_rows()],
@@ -416,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
         "stage_a_repeats": args.stage_a_repeats,
         "stage_b_repeats": args.stage_b_repeats,
         "stage_b_boundary_repeats": args.stage_b_boundary_repeats,
-        "stage_b_adult_repeats": args.stage_b_adult_repeats,
+        "stage_b_adult_repeats": stage_b_adult_repeats,
         "stages": {},
     }
 

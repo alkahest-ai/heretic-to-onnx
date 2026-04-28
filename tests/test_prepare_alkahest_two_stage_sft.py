@@ -80,6 +80,26 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         self.assertEqual(manifest["stages"]["stage_b"]["adult_unique_rows"], len(stage_b_adult_rows()))
         self.assertGreater(manifest["stage_b_adult_repeats"], manifest["stage_b_boundary_repeats"])
 
+    def test_legacy_stage_b_repeats_do_not_overrepeat_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "splits"
+            with redirect_stdout(StringIO()):
+                main(
+                    [
+                        "--output-dir",
+                        str(output),
+                        "--stage-b-repeats",
+                        "5",
+                        "--stage-b-boundary-repeats",
+                        "2",
+                    ]
+                )
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+
+        expected_rows = 2 * len(stage_b_boundary_rows()) + 5 * len(stage_b_adult_rows())
+        self.assertEqual(manifest["stage_b_adult_repeats"], 5)
+        self.assertEqual(manifest["stages"]["stage_b"]["rows_total"], expected_rows)
+
 
 if __name__ == "__main__":
     unittest.main()
