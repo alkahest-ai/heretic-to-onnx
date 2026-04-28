@@ -199,16 +199,23 @@ def _generate_responses(model_dir: Path, *, max_new_tokens: int, temperature: fl
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_dir,
-        dtype=torch.float16,
-        device_map="auto",
-        trust_remote_code=True,
-    )
+    use_cuda = torch.cuda.is_available()
+    model_kwargs: dict[str, Any] = {
+        "trust_remote_code": True,
+    }
+    if use_cuda:
+        model_kwargs["dtype"] = torch.float16
+        model_kwargs["device_map"] = "auto"
+    else:
+        # CPU fallback is slower, but it lets Kaggle continue the selection/export
+        # path after weekly GPU quota is exhausted.
+        model_kwargs["dtype"] = torch.float32
+    model = AutoModelForCausalLM.from_pretrained(model_dir, **model_kwargs)
+    model_device = next(model.parameters()).device
     responses: dict[str, str] = {}
     for name, prompt in SMOKE_PROMPTS.items():
         text = _apply_chat_template(tokenizer, prompt)
-        inputs = tokenizer(text, return_tensors="pt").to(model.device)
+        inputs = tokenizer(text, return_tensors="pt").to(model_device)
         with torch.no_grad():
             output = model.generate(
                 **inputs,
