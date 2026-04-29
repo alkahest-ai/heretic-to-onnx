@@ -7,7 +7,9 @@ from pathlib import Path
 
 from tools.heretic_to_onnx.qwen3_5_opt_transplant import (
     _needs_qwen35_rmsnorm_offset,
+    _open_source_tensors,
     _resolve_vision_dtype,
+    _source_checkpoint_path,
     _state_key_for_matmul,
     _state_key_for_plain_initializer,
     _vision_artifact_stem,
@@ -156,6 +158,38 @@ class Qwen35OptTransplantTests(unittest.TestCase):
         self.assertEqual(_resolve_vision_dtype(decoder_dtype="q4", vision_dtype="auto"), "fp16")
         self.assertEqual(_resolve_vision_dtype(decoder_dtype="q8", vision_dtype="auto"), "q8")
         self.assertEqual(_vision_artifact_stem("q4"), "vision_encoder_q4")
+
+    def test_sharded_safetensors_source_is_supported(self) -> None:
+        try:
+            import numpy as np
+            from safetensors.numpy import save_file
+        except ImportError as exc:
+            self.skipTest(f"optional safetensors test dependency unavailable: {exc}")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            shard_a = root / "model-00001-of-00002.safetensors"
+            shard_b = root / "model-00002-of-00002.safetensors"
+            save_file({"model.language_model.embed_tokens.weight": np.ones((2, 2), dtype=np.float32)}, shard_a)
+            save_file({"model.language_model.norm.weight": np.full((2,), 2.0, dtype=np.float32)}, shard_b)
+            index = root / "model.safetensors.index.json"
+            index.write_text(
+                json.dumps(
+                    {
+                        "metadata": {"total_size": 24},
+                        "weight_map": {
+                            "model.language_model.embed_tokens.weight": shard_a.name,
+                            "model.language_model.norm.weight": shard_b.name,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(_source_checkpoint_path(root), index)
+            with _open_source_tensors(index) as tensors:
+                self.assertEqual(tensors.get_tensor("model.language_model.embed_tokens.weight").shape, (2, 2))
+                self.assertEqual(float(tensors.get_tensor("model.language_model.norm.weight")[0]), 2.0)
 
 
 if __name__ == "__main__":

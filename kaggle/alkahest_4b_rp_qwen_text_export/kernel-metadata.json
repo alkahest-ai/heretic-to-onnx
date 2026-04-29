@@ -9,5 +9,7 @@
   "enable_internet": true,
   "dataset_sources": [],
   "competition_sources": [],
-  "kernel_sources": []
+  "kernel_sources": [
+    "alkahestai/alkahest-4b-two-stage-sft-t4"
+  ]
 }

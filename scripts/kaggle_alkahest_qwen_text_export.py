@@ -215,18 +215,24 @@ def main() -> int:
     work_dir.mkdir(parents=True, exist_ok=True)
     _rm(package_dir)
 
-    source = _snapshot_download(
-        args.source_repo_id,
-        source_dir,
-        allow_patterns=[
-            "config.json",
-            "generation_config.json",
-            "tokenizer.json",
-            "tokenizer_config.json",
-            "chat_template.jinja",
-            "model.safetensors",
-        ],
-    )
+    source_repo_path = Path(args.source_repo_id).expanduser()
+    if source_repo_path.exists():
+        source = source_repo_path.resolve()
+    else:
+        source = _snapshot_download(
+            args.source_repo_id,
+            source_dir,
+            allow_patterns=[
+                "config.json",
+                "generation_config.json",
+                "tokenizer.json",
+                "tokenizer_config.json",
+                "chat_template.jinja",
+                "model.safetensors",
+                "model.safetensors.index.json",
+                "model-*.safetensors",
+            ],
+        )
     template = _snapshot_download(
         args.template_model_id,
         template_dir,

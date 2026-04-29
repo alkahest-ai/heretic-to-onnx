@@ -120,6 +120,65 @@ def _vision_artifact_stem(vision_dtype: str) -> str:
     raise ValueError(f"unsupported vision dtype: {vision_dtype}")
 
 
+class _SourceTensors:
+    """Read tensors from either single-file or sharded HF safetensors checkpoints."""
+
+    def __init__(self, checkpoint_path: Path):
+        self.checkpoint_path = checkpoint_path
+        self._single = checkpoint_path.suffix == ".safetensors"
+        self._weight_map: dict[str, str] = {}
+        self._contexts: list[Any] = []
+        self._handles: dict[str, Any] = {}
+
+    def __enter__(self) -> "_SourceTensors":
+        from safetensors import safe_open
+
+        if self._single:
+            context = safe_open(self.checkpoint_path, framework="np", device="cpu")
+            self._contexts.append(context)
+            self._handles[""] = context.__enter__()
+            return self
+
+        index = json.loads(self.checkpoint_path.read_text(encoding="utf-8"))
+        self._weight_map = dict(index.get("weight_map") or {})
+        for shard_name in sorted(set(self._weight_map.values())):
+            context = safe_open(self.checkpoint_path.parent / shard_name, framework="np", device="cpu")
+            self._contexts.append(context)
+            self._handles[shard_name] = context.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        for context in reversed(self._contexts):
+            context.__exit__(exc_type, exc, traceback)
+        self._contexts.clear()
+        self._handles.clear()
+
+    def get_tensor(self, key: str):
+        if self._single:
+            return self._handles[""].get_tensor(key)
+        shard_name = self._weight_map.get(key)
+        if shard_name is None:
+            raise KeyError(key)
+        return self._handles[shard_name].get_tensor(key)
+
+
+def _open_source_tensors(checkpoint_path: Path) -> _SourceTensors:
+    return _SourceTensors(checkpoint_path)
+
+
+def _source_checkpoint_path(source: Path) -> Path | None:
+    single = source / "model.safetensors"
+    if single.exists():
+        return single
+    index = source / "model.safetensors.index.json"
+    if index.exists():
+        return index
+    safetensors_files = sorted(source.glob("*.safetensors"))
+    if len(safetensors_files) == 1:
+        return safetensors_files[0]
+    return None
+
+
 def _write_tokenizer_config(
     *,
     template_tokenizer_config: Path,
@@ -365,14 +424,13 @@ def _replace_raw_decoder_initializers(
 ) -> tuple[int, int]:
     import numpy as np
     import onnx
-    from safetensors import safe_open
 
     model = onnx.load(str(template_decoder), load_external_data=False)
     matmul_replaced = 0
     plain_replaced: list[str] = []
     missing_external: list[str] = []
 
-    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
+    with _open_source_tensors(source_safetensors) as safe_file:
         for initializer in list(model.graph.initializer):
             tensor = _tensor_for_initializer(initializer.name, safe_file, initializer)
             if tensor is None:
@@ -419,10 +477,9 @@ def _write_raw_embed_tokens(
     output_embed: Path,
 ) -> None:
     import onnx
-    from safetensors import safe_open
 
     model = onnx.load(str(template_embed), load_external_data=False)
-    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
+    with _open_source_tensors(source_safetensors) as safe_file:
         tensor = _make_tensor_like(
             "model.embed_tokens.weight",
             safe_file.get_tensor("model.language_model.embed_tokens.weight"),
@@ -493,14 +550,13 @@ def _replace_decoder_initializers(
 ) -> tuple[int, int]:
     import numpy as np
     import onnx
-    from safetensors import safe_open
 
     model = onnx.load(str(template_decoder), load_external_data=True)
     initializers = {initializer.name: initializer for initializer in model.graph.initializer}
     quantized_count = 0
     plain_replaced: list[str] = []
 
-    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
+    with _open_source_tensors(source_safetensors) as safe_file:
         if decoder_dtype == "q4":
             for node in model.graph.node:
                 if node.domain != "com.microsoft" or node.op_type != "MatMulNBits":
@@ -618,10 +674,9 @@ def _write_embed_tokens(
     import numpy as np
     import onnx
     from onnx import numpy_helper
-    from safetensors import safe_open
 
     model = onnx.load(str(template_embed), load_external_data=True)
-    with safe_open(source_safetensors, framework="np", device="cpu") as safe_file:
+    with _open_source_tensors(source_safetensors) as safe_file:
         weight = _tensor_to_numpy(safe_file.get_tensor("model.language_model.embed_tokens.weight"), dtype=np.float32)
 
     vocab_size, hidden_size = weight.shape
@@ -720,9 +775,13 @@ def build_optimized_qwen35_package(
             errors,
         )
 
-    source_safetensors = source / "model.safetensors"
-    if not source_safetensors.exists():
-        errors.append(f"missing source safetensors: {source_safetensors}")
+    source_safetensors = _source_checkpoint_path(source)
+    if source_safetensors is None:
+        errors.append(
+            "missing source safetensors: expected model.safetensors, "
+            "model.safetensors.index.json, or a single *.safetensors file under "
+            f"{source}"
+        )
 
     decoder_count = 0
     plain_count = 0
