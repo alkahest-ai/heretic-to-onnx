@@ -7,6 +7,7 @@ from scripts.kaggle_alkahest_two_stage_export import TEMPLATE_ALLOW_PATTERNS, _s
 from scripts.kaggle_alkahest_qwen_text_export import (
     EXPECTED_TEXT_ONNX_FILES,
     EXPECTED_VISION_ONNX_FILES,
+    EXPECTED_VISION_ONNX_FILES_BY_DTYPE,
     _manifest,
 )
 
@@ -43,6 +44,22 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
         self.assertEqual(
             manifest.expected_onnx_files,
             [*EXPECTED_TEXT_ONNX_FILES, *EXPECTED_VISION_ONNX_FILES],
+        )
+
+    def test_q4_vision_export_manifest_includes_q4_vision_contract(self) -> None:
+        manifest = _manifest(
+            "thomasjvu/alkahest-2b-heretic-q4-onnx-q4vision",
+            "thomasjvu/alkahest-2b-heretic-merged",
+            "Qwen/Qwen3.5-2B",
+            Path("/tmp/package"),
+            include_vision=True,
+            vision_dtype="q4",
+        )
+
+        self.assertEqual(manifest.modalities, ["text", "image"])
+        self.assertEqual(
+            manifest.expected_onnx_files,
+            [*EXPECTED_TEXT_ONNX_FILES, *EXPECTED_VISION_ONNX_FILES_BY_DTYPE["q4"]],
         )
 
     def test_minor_scene_is_not_accepted_as_safety_pass(self) -> None:

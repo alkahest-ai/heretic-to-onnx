@@ -146,17 +146,21 @@ def _copy_missing_assets(source: str, output_dir: Path, tokenizer: Any) -> None:
         shutil.copy2(downloaded, dst)
 
 
-def _upload_folder(repo_id: str, folder: Path, *, private: bool, message: str) -> None:
+def _upload_folder(repo_id: str, folder: Path, *, private: bool, message: str) -> dict[str, Any]:
     from huggingface_hub import HfApi
 
     api = HfApi()
-    api.create_repo(repo_id=repo_id, repo_type="model", private=private, exist_ok=True)
-    api.upload_folder(
-        repo_id=repo_id,
-        repo_type="model",
-        folder_path=str(folder),
-        commit_message=message,
-    )
+    try:
+        api.create_repo(repo_id=repo_id, repo_type="model", private=private, exist_ok=True)
+        api.upload_folder(
+            repo_id=repo_id,
+            repo_type="model",
+            folder_path=str(folder),
+            commit_message=message,
+        )
+    except Exception as exc:
+        return {"ok": False, "repo_id": repo_id, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, "repo_id": repo_id, "private": private}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -324,16 +328,19 @@ def main() -> int:
         "merged": False,
         "uploaded_merged_to": "",
         "uploaded_adapter_to": "",
+        "upload_results": [],
     }
 
     if args.upload_adapter_to:
-        _upload_folder(
+        upload_result = _upload_folder(
             args.upload_adapter_to,
             output_dir,
             private=args.upload_private,
             message="Upload Alkahest 0.8B Heretic RP SFT adapter",
         )
-        run_report["uploaded_adapter_to"] = args.upload_adapter_to
+        run_report["upload_results"].append(upload_result)
+        if upload_result["ok"]:
+            run_report["uploaded_adapter_to"] = args.upload_adapter_to
 
     if args.merge:
         del trainer
@@ -375,13 +382,15 @@ def main() -> int:
                     ),
                     encoding="utf-8",
                 )
-            _upload_folder(
+            upload_result = _upload_folder(
                 args.upload_merged_to,
                 merged_output_dir,
                 private=args.upload_private,
                 message="Upload Alkahest 0.8B Heretic RP SFT merged checkpoint",
             )
-            run_report["uploaded_merged_to"] = args.upload_merged_to
+            run_report["upload_results"].append(upload_result)
+            if upload_result["ok"]:
+                run_report["uploaded_merged_to"] = args.upload_merged_to
 
     (output_dir / "training-run.json").write_text(json.dumps(run_report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(run_report, indent=2, sort_keys=True))

@@ -102,6 +102,24 @@ def _write_q8_browser_config(source_config: Path, output_config: Path, *, includ
     output_config.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _resolve_vision_dtype(*, decoder_dtype: str, vision_dtype: str) -> str:
+    if vision_dtype == "auto":
+        return "q8" if decoder_dtype == "q8" else "fp16"
+    if vision_dtype not in {"fp16", "q4", "q8"}:
+        raise ValueError(f"unsupported vision dtype: {vision_dtype}")
+    return vision_dtype
+
+
+def _vision_artifact_stem(vision_dtype: str) -> str:
+    if vision_dtype == "fp16":
+        return "vision_encoder_fp16"
+    if vision_dtype == "q4":
+        return "vision_encoder_q4"
+    if vision_dtype == "q8":
+        return "vision_encoder_quantized"
+    raise ValueError(f"unsupported vision dtype: {vision_dtype}")
+
+
 def _write_tokenizer_config(
     *,
     template_tokenizer_config: Path,
@@ -246,8 +264,7 @@ def _state_key_for_matmul(node_name: str) -> str:
 
 
 def _state_key_for_plain_initializer(name: str) -> str | None:
-    final_norm = "model.layers.24.final_norm_layernorm.weight"
-    if name == final_norm:
+    if re.match(r"^model\.layers\.\d+\.final_norm_layernorm\.weight$", name):
         return "model.language_model.norm.weight"
 
     layer_match = re.match(r"^model\.layers\.(\d+)\.(.+)$", name)
@@ -276,7 +293,7 @@ def _state_key_for_plain_initializer(name: str) -> str | None:
 def _needs_qwen35_rmsnorm_offset(name: str) -> bool:
     # Qwen3.5 RMSNorm stores a delta and applies (1 + weight) at runtime.
     # ORT's SimplifiedLayerNormalization initializer is the direct multiplier.
-    if name == "model.layers.24.final_norm_layernorm.weight":
+    if re.match(r"^model\.layers\.\d+\.final_norm_layernorm\.weight$", name):
         return True
     return (
         name.endswith(".input_layernorm.weight")
@@ -652,6 +669,7 @@ def build_optimized_qwen35_package(
     block_size: int = 32,
     decoder_dtype: str = "q4",
     include_vision: bool = True,
+    vision_dtype: str = "auto",
 ) -> TransplantReport:
     source = Path(source_dir).expanduser().resolve()
     template = Path(template_dir).expanduser().resolve()
@@ -661,6 +679,7 @@ def build_optimized_qwen35_package(
 
     output.mkdir(parents=True, exist_ok=True)
     (output / "onnx").mkdir(exist_ok=True)
+    resolved_vision_dtype = _resolve_vision_dtype(decoder_dtype=decoder_dtype, vision_dtype=vision_dtype)
 
     if (source / "config.json").exists():
         if decoder_dtype == "q8":
@@ -683,24 +702,17 @@ def build_optimized_qwen35_package(
     else:
         errors.append(f"missing required file: {template / 'tokenizer_config.json'}")
     _copy_required_file(template / "preprocessor_config.json", output / "preprocessor_config.json", copied, errors)
-    if include_vision and decoder_dtype == "q8":
-        _copy_required_file(template / "onnx" / "vision_encoder_quantized.onnx", output / "onnx" / "vision_encoder_quantized.onnx", copied, errors)
+    if include_vision:
+        vision_stem = _vision_artifact_stem(resolved_vision_dtype)
         _copy_required_file(
-            template / "onnx" / "vision_encoder_quantized.onnx_data",
-            output / "onnx" / "vision_encoder_quantized.onnx_data",
-            copied,
-            errors,
-        )
-    elif include_vision:
-        _copy_required_file(
-            template / "onnx" / "vision_encoder_fp16.onnx",
-            output / "onnx" / "vision_encoder_fp16.onnx",
+            template / "onnx" / f"{vision_stem}.onnx",
+            output / "onnx" / f"{vision_stem}.onnx",
             copied,
             errors,
         )
         _copy_required_file(
-            template / "onnx" / "vision_encoder_fp16.onnx_data",
-            output / "onnx" / "vision_encoder_fp16.onnx_data",
+            template / "onnx" / f"{vision_stem}.onnx_data",
+            output / "onnx" / f"{vision_stem}.onnx_data",
             copied,
             errors,
         )
@@ -770,6 +782,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--block-size", type=int, default=32)
     parser.add_argument("--decoder-dtype", choices=["q4", "fp16", "q8"], default="q4")
+    parser.add_argument("--vision-dtype", choices=["auto", "fp16", "q4", "q8"], default="auto")
     parser.add_argument("--text-only", action="store_true", help="Do not copy/package vision encoder ONNX files.")
     args = parser.parse_args(argv)
 
@@ -780,6 +793,7 @@ def main(argv: list[str] | None = None) -> int:
         block_size=args.block_size,
         decoder_dtype=args.decoder_dtype,
         include_vision=not args.text_only,
+        vision_dtype=args.vision_dtype,
     )
     print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     return 0 if report.ok else 1

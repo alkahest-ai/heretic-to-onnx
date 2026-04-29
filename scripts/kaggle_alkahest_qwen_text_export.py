@@ -37,6 +37,13 @@ EXPECTED_VISION_ONNX_FILES = [
     "onnx/vision_encoder_fp16.onnx",
     "onnx/vision_encoder_fp16.onnx_data",
 ]
+EXPECTED_VISION_ONNX_FILES_BY_DTYPE = {
+    "fp16": EXPECTED_VISION_ONNX_FILES,
+    "q4": [
+        "onnx/vision_encoder_q4.onnx",
+        "onnx/vision_encoder_q4.onnx_data",
+    ],
+}
 
 
 @dataclass(slots=True)
@@ -47,6 +54,7 @@ class TextExportReport:
     base_model_id: str
     target_repo_id: str
     include_vision: bool
+    vision_dtype: str
     package_dir: str
     package_size_gb: float
     transplant: dict[str, Any]
@@ -64,6 +72,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--package-dir", default="")
     parser.add_argument("--block-size", type=int, default=32)
     parser.add_argument("--include-vision", action="store_true", default=False)
+    parser.add_argument("--vision-dtype", choices=["fp16", "q4"], default="fp16")
     parser.add_argument("--runtime-smoke", action="store_true", default=True)
     parser.add_argument("--no-runtime-smoke", dest="runtime_smoke", action="store_false")
     parser.add_argument("--upload", action="store_true", default=True)
@@ -99,17 +108,24 @@ def _snapshot_download(repo_id: str, local_dir: Path, *, allow_patterns: list[st
     return local_dir
 
 
-def _write_readme(package_dir: Path, *, repo_id: str, source_repo_id: str, include_vision: bool) -> None:
+def _write_readme(
+    package_dir: Path,
+    *,
+    repo_id: str,
+    source_repo_id: str,
+    include_vision: bool,
+    vision_dtype: str,
+) -> None:
     included_sessions = [
         "- `onnx/embed_tokens_q4.onnx`",
         "- `onnx/decoder_model_merged_q4.onnx`",
     ]
     if include_vision:
-        included_sessions.append("- `onnx/vision_encoder_fp16.onnx`")
+        included_sessions.append(f"- `onnx/vision_encoder_{vision_dtype}.onnx`")
     footer = (
-        "The fp16 vision encoder is included for text+image browser use."
+        f"The {vision_dtype} vision encoder is included for text+image browser use."
         if include_vision
-        else "The fp16 vision encoder is intentionally omitted to reduce browser cold-load size."
+        else "The vision encoder is intentionally omitted to reduce browser cold-load size."
     )
     package_dir.joinpath("README.md").write_text(
         "\n".join(
@@ -137,11 +153,19 @@ def _write_readme(package_dir: Path, *, repo_id: str, source_repo_id: str, inclu
     )
 
 
-def _manifest(repo_id: str, source_id: str, base_model_id: str, manifest_dir: Path, *, include_vision: bool) -> Manifest:
+def _manifest(
+    repo_id: str,
+    source_id: str,
+    base_model_id: str,
+    manifest_dir: Path,
+    *,
+    include_vision: bool,
+    vision_dtype: str = "fp16",
+) -> Manifest:
     expected_onnx_files = list(EXPECTED_TEXT_ONNX_FILES)
     modalities = ["text"]
     if include_vision:
-        expected_onnx_files.extend(EXPECTED_VISION_ONNX_FILES)
+        expected_onnx_files.extend(EXPECTED_VISION_ONNX_FILES_BY_DTYPE[vision_dtype])
         modalities.append("image")
     return Manifest(
         source_model_id=source_id,
@@ -172,7 +196,7 @@ def _upload(package_dir: Path, repo_id: str, *, private: bool) -> dict[str, Any]
         repo_id=repo_id,
         repo_type="model",
         folder_path=str(package_dir),
-        commit_message="Upload text-only Alkahest Qwen q4 ONNX package",
+        commit_message="Upload Alkahest Qwen q4 ONNX browser package",
     )
     return {"ok": True, "repo_id": repo_id, "private": private}
 
@@ -211,17 +235,10 @@ def main() -> int:
             "preprocessor_config.json",
             "tokenizer_config.json",
             "onnx/embed_tokens_q4.onnx",
-            "onnx/embed_tokens_q4.onnx_data",
+            "onnx/embed_tokens_q4.onnx_data*",
             "onnx/decoder_model_merged_q4.onnx",
-            "onnx/decoder_model_merged_q4.onnx_data",
-            *(
-                [
-                    "onnx/vision_encoder_fp16.onnx",
-                    "onnx/vision_encoder_fp16.onnx_data",
-                ]
-                if args.include_vision
-                else []
-            ),
+            "onnx/decoder_model_merged_q4.onnx_data*",
+            *(EXPECTED_VISION_ONNX_FILES_BY_DTYPE[args.vision_dtype] if args.include_vision else []),
         ],
     )
 
@@ -232,12 +249,14 @@ def main() -> int:
         block_size=args.block_size,
         decoder_dtype="q4",
         include_vision=args.include_vision,
+        vision_dtype=args.vision_dtype,
     )
     _write_readme(
         package_dir,
         repo_id=args.target_repo_id,
         source_repo_id=args.source_repo_id,
         include_vision=args.include_vision,
+        vision_dtype=args.vision_dtype,
     )
 
     manifest = _manifest(
@@ -246,6 +265,7 @@ def main() -> int:
         args.base_model_id,
         package_dir,
         include_vision=args.include_vision,
+        vision_dtype=args.vision_dtype,
     )
     validation = validate_package(manifest, package_dir, strict_onnx=True, runtime_smoke=args.runtime_smoke)
     upload_report = _upload(package_dir, args.target_repo_id, private=args.private) if args.upload and validation.ok else {
@@ -261,6 +281,7 @@ def main() -> int:
         base_model_id=args.base_model_id,
         target_repo_id=args.target_repo_id,
         include_vision=args.include_vision,
+        vision_dtype=args.vision_dtype,
         package_dir=str(package_dir),
         package_size_gb=round(_folder_size(package_dir) / 1024**3, 3),
         transplant=transplant.to_dict(),

@@ -50,6 +50,17 @@ const QWEN35_WEBGPU_DTYPE = Object.freeze({
   vision_encoder: "fp16",
 });
 
+const QWEN35_WEBGPU_TEXT_DTYPE = Object.freeze({
+  embed_tokens: "q4",
+  decoder_model_merged: "q4",
+});
+
+const QWEN35_WEBGPU_Q4_VISION_DTYPE = Object.freeze({
+  embed_tokens: "q4",
+  decoder_model_merged: "q4",
+  vision_encoder: "q4",
+});
+
 const QWEN35_WEBGPU_Q8_DTYPE = Object.freeze({
   embed_tokens: "q8",
   decoder_model_merged: "q8",
@@ -377,6 +388,12 @@ export function inferCustomModelDtype(modelId, family) {
   if (family === "qwen3_5") {
     if (value.includes("q8-onnx")) {
       return QWEN35_WEBGPU_Q8_DTYPE;
+    }
+    if (value.endsWith("-text") || value.includes("-text/") || value.includes("-text")) {
+      return QWEN35_WEBGPU_TEXT_DTYPE;
+    }
+    if (value.includes("q4vision")) {
+      return QWEN35_WEBGPU_Q4_VISION_DTYPE;
     }
     if (value.includes("q4-onnx")) {
       return QWEN35_WEBGPU_DTYPE;

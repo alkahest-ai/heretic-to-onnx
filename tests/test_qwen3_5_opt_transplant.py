@@ -7,8 +7,10 @@ from pathlib import Path
 
 from tools.heretic_to_onnx.qwen3_5_opt_transplant import (
     _needs_qwen35_rmsnorm_offset,
+    _resolve_vision_dtype,
     _state_key_for_matmul,
     _state_key_for_plain_initializer,
+    _vision_artifact_stem,
     _write_tokenizer_config,
     _write_browser_config,
 )
@@ -46,6 +48,10 @@ class Qwen35OptTransplantTests(unittest.TestCase):
             _state_key_for_plain_initializer("model.layers.24.final_norm_layernorm.weight"),
             "model.language_model.norm.weight",
         )
+        self.assertEqual(
+            _state_key_for_plain_initializer("model.layers.35.final_norm_layernorm.weight"),
+            "model.language_model.norm.weight",
+        )
 
     def test_only_plain_qwen_rmsnorm_initializers_need_offset_gamma(self) -> None:
         self.assertTrue(_needs_qwen35_rmsnorm_offset("model.layers.0.input_layernorm.weight"))
@@ -53,6 +59,7 @@ class Qwen35OptTransplantTests(unittest.TestCase):
         self.assertTrue(_needs_qwen35_rmsnorm_offset("model.layers.3.attn.q_norm.layernorm.weight"))
         self.assertTrue(_needs_qwen35_rmsnorm_offset("model.layers.3.attn.k_norm.layernorm.weight"))
         self.assertTrue(_needs_qwen35_rmsnorm_offset("model.layers.24.final_norm_layernorm.weight"))
+        self.assertTrue(_needs_qwen35_rmsnorm_offset("model.layers.35.final_norm_layernorm.weight"))
         self.assertFalse(_needs_qwen35_rmsnorm_offset("model.layers.0.gdn.norm.weight"))
         self.assertFalse(_needs_qwen35_rmsnorm_offset("model.layers.0.gdn.dt_bias"))
 
@@ -144,6 +151,11 @@ class Qwen35OptTransplantTests(unittest.TestCase):
         self.assertEqual(tokenizer_config["bos_token_id"], 248044)
         self.assertEqual(tokenizer_config["pad_token_id"], 248044)
         self.assertEqual(tokenizer_config["chat_template"], "official {{ messages[0].content }}")
+
+    def test_vision_dtype_auto_preserves_existing_defaults(self) -> None:
+        self.assertEqual(_resolve_vision_dtype(decoder_dtype="q4", vision_dtype="auto"), "fp16")
+        self.assertEqual(_resolve_vision_dtype(decoder_dtype="q8", vision_dtype="auto"), "q8")
+        self.assertEqual(_vision_artifact_stem("q4"), "vision_encoder_q4")
 
 
 if __name__ == "__main__":

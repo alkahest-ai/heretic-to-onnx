@@ -12,9 +12,11 @@ Keep these visible in browser-chat until the next quality decision:
 - `thomasjvu/alkahest-0.8b-heretic-q4-onnx` - stable Heretic-only 0.8B q4 baseline.
 - `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` - definitive 0.8B RP baseline promoted from the A100+B100 two-stage SFT package.
 - `thomasjvu/alkahest-2b-heretic-q4-onnx` - current 2B Heretic q4 browser target.
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-text` - planned chat-only 2B Heretic speed target.
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-text` - built and validated on Kaggle; upload/browser smoke pending.
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` - planned 2B RP target after 2B two-stage SFT/export.
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` - planned chat-only 2B RP speed target.
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-text` - planned chat-only 4B Heretic target.
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text` - planned chat-only 4B RP target.
 
 ## Hidden From Browser Picker
 
@@ -85,6 +87,8 @@ Never delete without a separate action-time confirmation:
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-text`
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-rp`
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text`
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-text`
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text`
 - source merged checkpoints such as `thomasjvu/alkahest-0.8b-heretic-merged` and `thomasjvu/alkahest-2b-heretic-merged`
 
 ## Removal Rule
