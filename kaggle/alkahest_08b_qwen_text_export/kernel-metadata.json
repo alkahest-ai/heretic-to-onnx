@@ -1,6 +1,6 @@
 {
-  "id": "alkahestai/alkahest-4b-rp-qwen-export",
-  "title": "Alkahest 4B RP Qwen Export",
+  "id": "alkahestai/alkahest-08b-qwen-text-export",
+  "title": "Alkahest 0.8B Qwen Text Export",
   "code_file": "__notebook__.ipynb",
   "language": "python",
   "kernel_type": "notebook",
@@ -9,7 +9,5 @@
   "enable_internet": true,
   "dataset_sources": [],
   "competition_sources": [],
-  "kernel_sources": [
-    "alkahestai/alkahest-4b-two-stage-sft-t4"
-  ]
+  "kernel_sources": []
 }

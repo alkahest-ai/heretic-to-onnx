@@ -117,6 +117,27 @@ class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):
         self.assertFalse(report.ok)
         self.assertTrue(any("too large for the 0.8B q4 WebGPU contract" in error for error in report.errors))
 
+    def test_qwen_q4_webgpu_contract_allows_q4_vision_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_qwen_package_config(package_dir)
+
+            report = validate_package(
+                _qwen_q4_manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/vision_encoder_q4.onnx",
+                        "onnx/embed_tokens_q4.onnx",
+                        "onnx/decoder_model_merged_q4.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertTrue(report.ok)
+
     @unittest.skipUnless(
         importlib.util.find_spec("onnx") is not None,
         "onnx is required for Qwen WebGPU graph contract tests",

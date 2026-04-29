@@ -143,9 +143,19 @@ def _validate_qwen_webgpu_contract(manifest: Manifest, package_path: Path, repor
             + ", ".join(missing_required)
         )
 
-    if "image" in manifest.modalities and "onnx/vision_encoder_fp16.onnx" not in expected:
-        report.ok = False
-        report.errors.append("Qwen WebGPU q4 image packages must declare onnx/vision_encoder_fp16.onnx")
+    if "image" in manifest.modalities:
+        declared_vision_sessions = {
+            "onnx/vision_encoder_fp16.onnx",
+            "onnx/vision_encoder_q4.onnx",
+            "onnx/vision_encoder_quantized.onnx",
+        }
+        if not (expected & declared_vision_sessions):
+            report.ok = False
+            report.errors.append(
+                "Qwen WebGPU q4 image packages must declare a supported vision session: "
+                "onnx/vision_encoder_fp16.onnx, onnx/vision_encoder_q4.onnx, "
+                "or onnx/vision_encoder_quantized.onnx"
+            )
 
     if "0.8b" in manifest.target_repo_id.lower():
         embed_data = package_path / "onnx" / "embed_tokens_q4.onnx_data"
