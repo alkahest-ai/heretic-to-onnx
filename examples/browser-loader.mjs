@@ -98,15 +98,6 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Definitive 0.8B RP baseline promoted from the A100+B100 two-stage SFT package.",
   },
   {
-    label: "Alkahest 2B Heretic Q4",
-    modelId: ownedModel("alkahest-2b-heretic-q4-onnx"),
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~2.2 GB",
-    dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Current 2B Heretic q4 browser package. This is heavier than 0.8B and should be smoked after the smaller candidates.",
-  },
-  {
     label: "Alkahest 2B Heretic Q4 Text",
     modelId: ownedModel("alkahest-2b-heretic-q4-onnx-text"),
     family: "qwen3_5",
@@ -114,6 +105,15 @@ export const DEFAULT_MODEL_PRESETS = [
     approxDownload: "~1.45 GB",
     dtype: QWEN35_WEBGPU_TEXT_DTYPE,
     note: "Text-only 2B Heretic q4 package. This avoids loading the vision encoder for browser chat.",
+  },
+  {
+    label: "Alkahest 4B Heretic Q4 Text",
+    modelId: ownedModel("alkahest-4b-heretic-q4-onnx-text"),
+    family: "qwen3_5",
+    modalities: "text",
+    approxDownload: "~2.95 GB",
+    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
+    note: "Text-only 4B Heretic q4 package. Use this only after 2B smoke because it has a much larger cold load.",
   },
 ];
 
