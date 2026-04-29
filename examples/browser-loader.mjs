@@ -107,6 +107,15 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Text-only 2B Heretic q4 package. This avoids loading the vision encoder for browser chat.",
   },
   {
+    label: "Alkahest 2B Heretic RP Q4 Text",
+    modelId: ownedModel("alkahest-2b-heretic-q4-onnx-rp-text"),
+    family: "qwen3_5",
+    modalities: "text",
+    approxDownload: "~1.45 GB",
+    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
+    note: "Text-only 2B RP q4 package exported from the two-stage RP SFT merge.",
+  },
+  {
     label: "Alkahest 4B Heretic Q4 Text",
     modelId: ownedModel("alkahest-4b-heretic-q4-onnx-text"),
     family: "qwen3_5",
