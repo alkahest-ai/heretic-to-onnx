@@ -124,6 +124,15 @@ export const DEFAULT_MODEL_PRESETS = [
     dtype: QWEN35_WEBGPU_TEXT_DTYPE,
     note: "Text-only 4B Heretic q4 package. Use this only after 2B smoke because it has a much larger cold load.",
   },
+  {
+    label: "Alkahest 4B Heretic RP Q4 Text",
+    modelId: ownedModel("alkahest-4b-heretic-q4-onnx-rp-text"),
+    family: "qwen3_5",
+    modalities: "text",
+    approxDownload: "~2.95 GB",
+    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
+    note: "Text-only 4B RP q4 package exported from the two-stage RP SFT merge.",
+  },
 ];
 
 function normalizeMessages(messages) {
