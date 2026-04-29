@@ -207,7 +207,10 @@ def _quantize_matmul_weight(
     from onnx import TensorProto, helper, numpy_helper
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 
-    weight_np = np.ascontiguousarray(_tensor_to_numpy(weight, dtype=np.float32).T.astype(np.float32, copy=False))
+    weight_np = _tensor_to_numpy(weight, dtype=np.float32).T
+    temporary_dtype = np.float16 if weight_np.size * np.dtype(np.float32).itemsize > 1_000_000_000 else np.float32
+    temporary_tensor_type = TensorProto.FLOAT16 if temporary_dtype == np.float16 else TensorProto.FLOAT
+    weight_np = np.ascontiguousarray(weight_np.astype(temporary_dtype, copy=False))
     k_dim, n_dim = weight_np.shape
     graph = helper.make_graph(
         [
@@ -219,8 +222,8 @@ def _quantize_matmul_weight(
             )
         ],
         "quantize_weight",
-        [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1, k_dim])],
-        [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1, n_dim])],
+        [helper.make_tensor_value_info("x", temporary_tensor_type, [1, k_dim])],
+        [helper.make_tensor_value_info("y", temporary_tensor_type, [1, n_dim])],
         [numpy_helper.from_array(weight_np, "W")],
     )
     model = helper.make_model(
