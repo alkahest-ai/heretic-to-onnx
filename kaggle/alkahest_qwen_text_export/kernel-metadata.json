@@ -1,0 +1,13 @@
+{
+  "id": "alkahestai/alkahest-qwen-text-export",
+  "title": "Alkahest Qwen Text Export",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

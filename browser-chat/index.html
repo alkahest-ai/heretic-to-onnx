@@ -41,8 +41,8 @@
           <section class="status-panel">
             <p class="status-label">selected model</p>
             <p id="preset-note">
-              Rally 2B RP | text + image + audio + video | ~3.4-3.5 GB full load | Roleplay-tuned
-              Rally browser package on the Gemma v2 multimodal contract.
+              Alkahest 0.8B Heretic Q4 | text + image | ~850 MB first load | Stable Heretic-only q4
+              browser package for baseline smoke tests.
             </p>
           </section>
         </div>
@@ -64,7 +64,7 @@
                 id="model-id"
                 type="text"
                 spellcheck="false"
-                value="thomasjvu/rally-2b-rp"
+                value="thomasjvu/alkahest-0.8b-heretic-q4-onnx"
               />
             </label>
 
@@ -146,7 +146,7 @@
               <li>Text-only warm loads stay lighter; image, audio, and video sessions load on first media prompt.</li>
               <li>Full multimodal loads are still large and may take several minutes on consumer hardware.</li>
               <li>Best results are desktop Safari or Chromium with WebGPU enabled.</li>
-              <li>This picker covers known-good published Alkahest and Rally browser repos only.</li>
+              <li>This picker is limited to the current Alkahest smoke targets to avoid legacy clutter.</li>
             </ul>
           </section>
         </aside>
@@ -170,6 +170,6 @@
       </main>
     </div>
 
-    <script type="module" src="./app.js?v=27"></script>
+    <script type="module" src="./app.js?v=28"></script>
   </body>
 </html>

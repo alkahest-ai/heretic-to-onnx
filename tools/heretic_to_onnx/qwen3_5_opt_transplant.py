@@ -59,16 +59,18 @@ def _normalize_browser_config(value):
     return value
 
 
-def _write_browser_config(source_config: Path, output_config: Path) -> None:
+def _write_browser_config(source_config: Path, output_config: Path, *, include_vision: bool = True) -> None:
     config = json.loads(source_config.read_text(encoding="utf-8"))
     config = _normalize_browser_config(config)
+    external_data_format = {
+        "decoder_model_merged.onnx": 2,
+        "embed_tokens": 1,
+        "decoder_model_merged": 1,
+    }
+    if include_vision:
+        external_data_format["vision_encoder"] = 1
     config["transformers.js_config"] = {
-        "use_external_data_format": {
-            "decoder_model_merged.onnx": 2,
-            "vision_encoder": 1,
-            "embed_tokens": 1,
-            "decoder_model_merged": 1,
-        },
+        "use_external_data_format": external_data_format,
         "kv_cache_dtype": {
             "q4": "float16",
             "q4f16": "float16",
@@ -78,18 +80,20 @@ def _write_browser_config(source_config: Path, output_config: Path) -> None:
     output_config.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _write_q8_browser_config(source_config: Path, output_config: Path) -> None:
+def _write_q8_browser_config(source_config: Path, output_config: Path, *, include_vision: bool = True) -> None:
     config = json.loads(source_config.read_text(encoding="utf-8"))
     config = _normalize_browser_config(config)
+    external_data_format = {
+        "embed_tokens.onnx": 1,
+        "decoder_model_merged.onnx": 2,
+        "embed_tokens_quantized.onnx": 1,
+        "decoder_model_merged_quantized.onnx": 1,
+    }
+    if include_vision:
+        external_data_format["vision_encoder.onnx"] = 1
+        external_data_format["vision_encoder_quantized.onnx"] = 1
     config["transformers.js_config"] = {
-        "use_external_data_format": {
-            "embed_tokens.onnx": 1,
-            "vision_encoder.onnx": 1,
-            "decoder_model_merged.onnx": 2,
-            "embed_tokens_quantized.onnx": 1,
-            "vision_encoder_quantized.onnx": 1,
-            "decoder_model_merged_quantized.onnx": 1,
-        },
+        "use_external_data_format": external_data_format,
         "kv_cache_dtype": {
             "q4f16": "float16",
             "fp16": "float16",
@@ -647,6 +651,7 @@ def build_optimized_qwen35_package(
     output_dir: str | Path,
     block_size: int = 32,
     decoder_dtype: str = "q4",
+    include_vision: bool = True,
 ) -> TransplantReport:
     source = Path(source_dir).expanduser().resolve()
     template = Path(template_dir).expanduser().resolve()
@@ -659,9 +664,9 @@ def build_optimized_qwen35_package(
 
     if (source / "config.json").exists():
         if decoder_dtype == "q8":
-            _write_q8_browser_config(source / "config.json", output / "config.json")
+            _write_q8_browser_config(source / "config.json", output / "config.json", include_vision=include_vision)
         else:
-            _write_browser_config(source / "config.json", output / "config.json")
+            _write_browser_config(source / "config.json", output / "config.json", include_vision=include_vision)
         copied.append(str(output / "config.json"))
     else:
         errors.append(f"missing required file: {source / 'config.json'}")
@@ -678,7 +683,7 @@ def build_optimized_qwen35_package(
     else:
         errors.append(f"missing required file: {template / 'tokenizer_config.json'}")
     _copy_required_file(template / "preprocessor_config.json", output / "preprocessor_config.json", copied, errors)
-    if decoder_dtype == "q8":
+    if include_vision and decoder_dtype == "q8":
         _copy_required_file(template / "onnx" / "vision_encoder_quantized.onnx", output / "onnx" / "vision_encoder_quantized.onnx", copied, errors)
         _copy_required_file(
             template / "onnx" / "vision_encoder_quantized.onnx_data",
@@ -686,7 +691,7 @@ def build_optimized_qwen35_package(
             copied,
             errors,
         )
-    else:
+    elif include_vision:
         _copy_required_file(
             template / "onnx" / "vision_encoder_fp16.onnx",
             output / "onnx" / "vision_encoder_fp16.onnx",
@@ -765,6 +770,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--block-size", type=int, default=32)
     parser.add_argument("--decoder-dtype", choices=["q4", "fp16", "q8"], default="q4")
+    parser.add_argument("--text-only", action="store_true", help="Do not copy/package vision encoder ONNX files.")
     args = parser.parse_args(argv)
 
     report = build_optimized_qwen35_package(
@@ -773,6 +779,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir,
         block_size=args.block_size,
         decoder_dtype=args.decoder_dtype,
+        include_vision=not args.text_only,
     )
     print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     return 0 if report.ok else 1

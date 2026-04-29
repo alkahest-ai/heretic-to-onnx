@@ -10,7 +10,7 @@ This is the actual browser chat integration for running a public ONNX LLM entire
 
 Current default model:
 
-- `thomasjvu/rally-2b-rp`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
 
 The browser app lives in:
 
@@ -43,7 +43,7 @@ This app gives you:
 - model loading with progress updates
 - a worker-backed runtime so downloads and WebGPU session setup stay off the main UI thread when the browser supports it
 - streaming token output
-- a model picker for the published public Alkahest and Rally ONNX repos
+- a model picker for the current Alkahest Qwen3.5 ONNX smoke targets
 - image upload for multimodal prompts
 - audio upload for Rally / Gemma multimodal prompts
 - a browser-cache clear action so users can remove downloaded model files from the web UI and unload the active model
@@ -53,12 +53,12 @@ This app gives you:
 
 ## Important Constraint
 
-This only works cleanly with:
+For end-user deployment, this only works cleanly with:
 
 - public Hugging Face model repos
 - or self-hosted public model files
 
-Do not plan around direct browser loading from private Hugging Face repos. That would require shipping a client-side token, which defeats the point.
+Local/private smoke can use the browser-chat HF token field or the local `/__hf_token` helper, but do not ship a client-side token in production. Private repo smoke is for validation only.
 
 So for user-facing free chat:
 
@@ -79,35 +79,29 @@ Then open:
 
 You can override the model from the URL:
 
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-v2`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-v2`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/rally-2b`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/rally-2b-v2`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/rally-2b-rp`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/rally-4b`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/rally-4b-v2`
+- `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-0.8B-ONNX-OPT`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx`
 
 ## Recommended Deployment Shape
 
 For the first real deployment:
 
 1. ship the static app
-2. point the default at `thomasjvu/rally-2b-rp`, `thomasjvu/rally-2b-v2`, or `thomasjvu/alkahest-2b-v2`
-3. keep `thomasjvu/rally-2b` and `thomasjvu/alkahest-2b` as lighter direct tiers
-4. offer `thomasjvu/rally-4b`, `thomasjvu/rally-4b-v2`, `thomasjvu/alkahest-4b`, and `thomasjvu/alkahest-4b-v2` as heavier desktop tiers
+2. point the default at the best validated public Alkahest q4 ONNX repo
+3. keep the 0.8B Heretic repo as the stable fallback while SFT quality is still moving
+4. expose the 2B Heretic q4 repo only after a cold browser load and first-generation smoke pass
 5. move the owner namespace constant when repo ownership moves from the personal account to the org
 
 For the current browser tester, prioritize:
 
-- `thomasjvu/rally-2b-rp`
-- `thomasjvu/rally-2b-v2`
-- `thomasjvu/alkahest-2b-v2`
-- `thomasjvu/rally-2b`
-- `thomasjvu/alkahest-2b`
+- `onnx-community/Qwen3.5-0.8B-ONNX-OPT`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
+- `thomasjvu/alkahest-2b-heretic-q4-onnx`
 
-Those are better default browser-chat candidates than the larger 4B lanes.
+Older q4f16 exports and rejected SFT experiments are intentionally hidden from the picker to avoid confusing smoke results.
 
 Plain text chat is now intentionally cheaper than full multimodal use:
 

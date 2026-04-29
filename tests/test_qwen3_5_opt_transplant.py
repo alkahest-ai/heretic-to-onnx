@@ -89,6 +89,34 @@ class Qwen35OptTransplantTests(unittest.TestCase):
         )
         self.assertEqual(config["transformers.js_config"]["kv_cache_dtype"]["q4"], "float16")
 
+    def test_text_only_browser_config_omits_vision_external_data_map(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source = root / "config.json"
+            output = root / "out.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "architectures": ["Qwen3_5ForConditionalGeneration"],
+                        "torch_dtype": "bfloat16",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            _write_browser_config(source, output, include_vision=False)
+
+            config = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            config["transformers.js_config"]["use_external_data_format"],
+            {
+                "decoder_model_merged.onnx": 2,
+                "embed_tokens": 1,
+                "decoder_model_merged": 1,
+            },
+        )
+
     def test_tokenizer_config_uses_template_metadata_and_chat_template(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
