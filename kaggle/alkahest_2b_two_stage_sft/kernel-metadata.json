@@ -1,0 +1,13 @@
+{
+  "id": "alkahestai/alkahest-2b-two-stage-sft-t4",
+  "title": "Alkahest 2B Two Stage SFT T4",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

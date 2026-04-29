@@ -366,9 +366,9 @@ def main() -> int:
                             "private: true",
                             "---",
                             "",
-                            "# Alkahest 0.8B Heretic RP SFT",
+                            "# Alkahest Heretic RP SFT",
                             "",
-                            "Experimental roleplay SFT checkpoint produced from `thomasjvu/alkahest-0.8b-heretic-merged`.",
+                            f"Experimental roleplay SFT checkpoint produced from `{args.model_name}`.",
                             "This is a merged Hugging Face checkpoint intended for ONNX/WebGPU export after validation.",
                             "",
                         ]

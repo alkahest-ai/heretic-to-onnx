@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Build and optionally upload a text-only Qwen3.5 q4 browser ONNX package.
+"""Build and optionally upload a Qwen3.5 q4 browser ONNX package.
 
 This is intended for Kaggle. It keeps the official-style Qwen text artifacts
-but omits the fp16 vision encoder to reduce cold browser download size.
+and can either omit the fp16 vision encoder for text-only chat or include it
+for the full text+image browser package.
 """
 
 from __future__ import annotations
@@ -32,6 +33,10 @@ EXPECTED_TEXT_ONNX_FILES = [
     "onnx/decoder_model_merged_q4.onnx",
     "onnx/decoder_model_merged_q4.onnx_data",
 ]
+EXPECTED_VISION_ONNX_FILES = [
+    "onnx/vision_encoder_fp16.onnx",
+    "onnx/vision_encoder_fp16.onnx_data",
+]
 
 
 @dataclass(slots=True)
@@ -41,6 +46,7 @@ class TextExportReport:
     template_model_id: str
     base_model_id: str
     target_repo_id: str
+    include_vision: bool
     package_dir: str
     package_size_gb: float
     transplant: dict[str, Any]
@@ -57,6 +63,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--work-dir", default="/kaggle/working/alkahest-qwen-text-export")
     parser.add_argument("--package-dir", default="")
     parser.add_argument("--block-size", type=int, default=32)
+    parser.add_argument("--include-vision", action="store_true", default=False)
     parser.add_argument("--runtime-smoke", action="store_true", default=True)
     parser.add_argument("--no-runtime-smoke", dest="runtime_smoke", action="store_false")
     parser.add_argument("--upload", action="store_true", default=True)
@@ -92,7 +99,18 @@ def _snapshot_download(repo_id: str, local_dir: Path, *, allow_patterns: list[st
     return local_dir
 
 
-def _write_readme(package_dir: Path, *, repo_id: str, source_repo_id: str) -> None:
+def _write_readme(package_dir: Path, *, repo_id: str, source_repo_id: str, include_vision: bool) -> None:
+    included_sessions = [
+        "- `onnx/embed_tokens_q4.onnx`",
+        "- `onnx/decoder_model_merged_q4.onnx`",
+    ]
+    if include_vision:
+        included_sessions.append("- `onnx/vision_encoder_fp16.onnx`")
+    footer = (
+        "The fp16 vision encoder is included for text+image browser use."
+        if include_vision
+        else "The fp16 vision encoder is intentionally omitted to reduce browser cold-load size."
+    )
     package_dir.joinpath("README.md").write_text(
         "\n".join(
             [
@@ -104,16 +122,14 @@ def _write_readme(package_dir: Path, *, repo_id: str, source_repo_id: str) -> No
                 "---",
                 f"# {repo_id}",
                 "",
-                "Text-only q4 WebGPU ONNX package for Alkahest Qwen3.5.",
+                "q4 WebGPU ONNX package for Alkahest Qwen3.5.",
                 "",
                 f"Source checkpoint: `{source_repo_id}`",
                 "",
                 "Included ONNX sessions:",
-                "- `onnx/embed_tokens_q4.onnx`",
-                "- `onnx/decoder_model_merged_q4.onnx`",
+                *included_sessions,
                 "",
-                "The fp16 vision encoder is intentionally omitted to reduce browser cold-load size.",
-                "Use a multimodal Alkahest package when image support is required.",
+                footer,
                 "",
             ]
         ),
@@ -121,7 +137,12 @@ def _write_readme(package_dir: Path, *, repo_id: str, source_repo_id: str) -> No
     )
 
 
-def _manifest(repo_id: str, source_id: str, base_model_id: str, manifest_dir: Path) -> Manifest:
+def _manifest(repo_id: str, source_id: str, base_model_id: str, manifest_dir: Path, *, include_vision: bool) -> Manifest:
+    expected_onnx_files = list(EXPECTED_TEXT_ONNX_FILES)
+    modalities = ["text"]
+    if include_vision:
+        expected_onnx_files.extend(EXPECTED_VISION_ONNX_FILES)
+        modalities.append("image")
     return Manifest(
         source_model_id=source_id,
         base_model_id=base_model_id,
@@ -129,10 +150,10 @@ def _manifest(repo_id: str, source_id: str, base_model_id: str, manifest_dir: Pa
         target_repo_id=repo_id,
         target_dtype="q4",
         target_device="webgpu",
-        modalities=["text"],
+        modalities=modalities,
         inherit_assets=InheritAssets(),
         expected_architecture="Qwen3_5ForConditionalGeneration",
-        expected_onnx_files=list(EXPECTED_TEXT_ONNX_FILES),
+        expected_onnx_files=expected_onnx_files,
         validation=ValidationConfig(browser_loader_class="Qwen3_5ForConditionalGeneration"),
         manifest_path=manifest_dir / "manifest.yaml",
     )
@@ -193,6 +214,14 @@ def main() -> int:
             "onnx/embed_tokens_q4.onnx_data",
             "onnx/decoder_model_merged_q4.onnx",
             "onnx/decoder_model_merged_q4.onnx_data",
+            *(
+                [
+                    "onnx/vision_encoder_fp16.onnx",
+                    "onnx/vision_encoder_fp16.onnx_data",
+                ]
+                if args.include_vision
+                else []
+            ),
         ],
     )
 
@@ -202,11 +231,22 @@ def main() -> int:
         output_dir=package_dir,
         block_size=args.block_size,
         decoder_dtype="q4",
-        include_vision=False,
+        include_vision=args.include_vision,
     )
-    _write_readme(package_dir, repo_id=args.target_repo_id, source_repo_id=args.source_repo_id)
+    _write_readme(
+        package_dir,
+        repo_id=args.target_repo_id,
+        source_repo_id=args.source_repo_id,
+        include_vision=args.include_vision,
+    )
 
-    manifest = _manifest(args.target_repo_id, args.source_repo_id, args.base_model_id, package_dir)
+    manifest = _manifest(
+        args.target_repo_id,
+        args.source_repo_id,
+        args.base_model_id,
+        package_dir,
+        include_vision=args.include_vision,
+    )
     validation = validate_package(manifest, package_dir, strict_onnx=True, runtime_smoke=args.runtime_smoke)
     upload_report = _upload(package_dir, args.target_repo_id, private=args.private) if args.upload and validation.ok else {
         "ok": False,
@@ -220,6 +260,7 @@ def main() -> int:
         template_model_id=args.template_model_id,
         base_model_id=args.base_model_id,
         target_repo_id=args.target_repo_id,
+        include_vision=args.include_vision,
         package_dir=str(package_dir),
         package_size_gb=round(_folder_size(package_dir) / 1024**3, 3),
         transplant=transplant.to_dict(),

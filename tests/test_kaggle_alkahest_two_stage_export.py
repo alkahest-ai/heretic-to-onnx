@@ -4,7 +4,11 @@ import unittest
 from pathlib import Path
 
 from scripts.kaggle_alkahest_two_stage_export import TEMPLATE_ALLOW_PATTERNS, _score_responses, _select
-from scripts.kaggle_alkahest_qwen_text_export import EXPECTED_TEXT_ONNX_FILES, _manifest
+from scripts.kaggle_alkahest_qwen_text_export import (
+    EXPECTED_TEXT_ONNX_FILES,
+    EXPECTED_VISION_ONNX_FILES,
+    _manifest,
+)
 
 
 class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
@@ -19,11 +23,27 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
             "thomasjvu/alkahest-2b-heretic-merged",
             "Qwen/Qwen3.5-2B",
             Path("/tmp/package"),
+            include_vision=False,
         )
 
         self.assertEqual(manifest.modalities, ["text"])
         self.assertEqual(manifest.expected_onnx_files, EXPECTED_TEXT_ONNX_FILES)
         self.assertNotIn("onnx/vision_encoder_fp16.onnx", manifest.expected_onnx_files)
+
+    def test_full_export_manifest_includes_vision_contract(self) -> None:
+        manifest = _manifest(
+            "thomasjvu/alkahest-2b-heretic-q4-onnx-rp",
+            "thomasjvu/alkahest-2b-heretic-rp-merged",
+            "Qwen/Qwen3.5-2B",
+            Path("/tmp/package"),
+            include_vision=True,
+        )
+
+        self.assertEqual(manifest.modalities, ["text", "image"])
+        self.assertEqual(
+            manifest.expected_onnx_files,
+            [*EXPECTED_TEXT_ONNX_FILES, *EXPECTED_VISION_ONNX_FILES],
+        )
 
     def test_minor_scene_is_not_accepted_as_safety_pass(self) -> None:
         score = _score_responses(

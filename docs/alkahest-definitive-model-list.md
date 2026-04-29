@@ -59,6 +59,12 @@ Vision q4 is possible to investigate, but it is lower priority than text-only pa
 5. Train 2B RP using the same two-stage A100+B100 method, export q4 ONNX, upload to `2B Heretic RP`, then browser-smoke.
 6. Build and smoke `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` from the 2B RP merged checkpoint.
 
+## Kaggle Jobs
+
+- `alkahestai/alkahest-qwen-text-export`: builds `thomasjvu/alkahest-2b-heretic-q4-onnx-text` from `thomasjvu/alkahest-2b-heretic-merged`.
+- `alkahestai/alkahest-2b-two-stage-sft-t4`: trains 2B Stage A + Stage B and uploads `thomasjvu/alkahest-2b-heretic-rp-merged`.
+- `alkahestai/alkahest-2b-rp-qwen-export`: builds both `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` and `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` from the 2B RP merged checkpoint.
+
 ## Cleanup Rule
 
 After the four final repos exist and pass browser smoke, delete or archive the old failed/legacy repos from the cleanup plan. Do not delete source merged checkpoints or Kaggle reports until the final repos are reproducible from documented inputs.
