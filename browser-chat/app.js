@@ -41,6 +41,7 @@ const state = {
   messages: [],
   loading: false,
   generating: false,
+  runtimeReady: false,
   loadedModelId: null,
   loadedTextOnly: null,
   composerMedia: {
@@ -215,6 +216,7 @@ function pushRuntimeLog(text, key = text) {
 }
 
 function beginRuntimeActivity(statusMessage, { detail = statusMessage, resetProgress = false } = {}) {
+  state.runtimeReady = false;
   if (resetProgress) {
     runtimeState.percent = 0;
   }
@@ -226,6 +228,7 @@ function beginRuntimeActivity(statusMessage, { detail = statusMessage, resetProg
 }
 
 function finishRuntimeActivity(statusMessage, { detail = statusMessage, percent = 100 } = {}) {
+  state.runtimeReady = true;
   runtimeState.percent = percent;
   runtimeState.detail = detail;
   runtimeState.lastUpdateAt = Date.now();
@@ -235,6 +238,7 @@ function finishRuntimeActivity(statusMessage, { detail = statusMessage, percent 
 }
 
 function failRuntimeActivity(statusMessage) {
+  state.runtimeReady = false;
   runtimeState.detail = statusMessage;
   runtimeState.lastUpdateAt = Date.now();
   pushRuntimeLog(statusMessage);
@@ -305,6 +309,9 @@ function buildRuntimeDetail(info, message) {
 function handleRuntimeProgress(info, message) {
   const nextStatus = message || "Loading model...";
   const next = buildRuntimeDetail(info, nextStatus);
+  if (info?.status !== "sessions_warm") {
+    state.runtimeReady = false;
+  }
   if (next.percent != null) {
     runtimeState.percent = next.percent;
   }
@@ -312,6 +319,7 @@ function handleRuntimeProgress(info, message) {
   runtimeState.lastUpdateAt = Date.now();
   pushRuntimeLog(next.logText, next.logKey);
   setStatus(nextStatus);
+  applyInteractivity();
   renderRuntimePanel();
 }
 
@@ -339,17 +347,21 @@ function setStatus(message, { immediate = false } = {}) {
   statusState.timer = setTimeout(flushStatus, 120);
 }
 
-function setBusy({ loading = state.loading, generating = state.generating } = {}) {
-  state.loading = loading;
-  state.generating = generating;
+function selectedModelIsReady() {
+  const modelId = elements.modelId.value.trim();
+  return Boolean(modelId && state.loadedModelId === modelId && state.runtimeReady);
+}
+
+function applyInteractivity() {
   const disabled = state.loading || state.generating;
   const modelSelectionDisabled = state.generating;
+  const promptLocked = disabled || !selectedModelIsReady();
 
   elements.loadModel.disabled = disabled;
   elements.clearChat.disabled = disabled;
   elements.clearCache.disabled = disabled;
-  elements.sendMessage.disabled = disabled;
-  elements.promptInput.disabled = disabled;
+  elements.sendMessage.disabled = promptLocked;
+  elements.promptInput.disabled = promptLocked;
   elements.modelId.disabled = modelSelectionDisabled;
   elements.presetModel.disabled = modelSelectionDisabled;
   elements.hfToken.disabled = disabled;
@@ -359,6 +371,12 @@ function setBusy({ loading = state.loading, generating = state.generating } = {}
   elements.systemPrompt.disabled = disabled;
   elements.maxTokens.disabled = disabled;
   elements.temperature.disabled = disabled;
+}
+
+function setBusy({ loading = state.loading, generating = state.generating } = {}) {
+  state.loading = loading;
+  state.generating = generating;
+  applyInteractivity();
 }
 
 function hasComposerMedia() {
@@ -476,6 +494,7 @@ function syncPresetSelection() {
   elements.presetModel.value = selected?.modelId || "__custom__";
   elements.presetNote.textContent = formatPresetSummary(selected);
   syncComposerMediaState();
+  applyInteractivity();
 }
 
 function selectedPresetSupports(modality) {
@@ -749,6 +768,7 @@ function clearChat() {
   resetComposerMedia();
   state.messages = [];
   renderMessages();
+  state.runtimeReady = Boolean(state.loadedModelId);
   setStatus(state.loadedModelId ? `Ready: ${state.loadedModelId}` : "Chat cleared.", { immediate: true });
   renderRuntimePanel();
 }
@@ -761,6 +781,7 @@ async function clearCache() {
       resetProgress: true,
     });
     const result = await state.runtime.clearCache();
+    state.runtimeReady = false;
     state.loadedModelId = null;
     state.loadedTextOnly = null;
     if (!result.supported) {
@@ -889,6 +910,7 @@ syncComposerMediaState();
 renderRuntimeLog();
 renderRuntimePanel();
 initializeLocalAuthToken();
+applyInteractivity();
 setInterval(() => {
   if (runtimeState.lastUpdateAt) {
     renderRuntimeAge();
