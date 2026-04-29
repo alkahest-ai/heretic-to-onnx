@@ -106,6 +106,15 @@ export const DEFAULT_MODEL_PRESETS = [
     dtype: QWEN35_WEBGPU_DTYPE,
     note: "Current 2B Heretic q4 browser package. This is heavier than 0.8B and should be smoked after the smaller candidates.",
   },
+  {
+    label: "Alkahest 2B Heretic Q4 Text",
+    modelId: ownedModel("alkahest-2b-heretic-q4-onnx-text"),
+    family: "qwen3_5",
+    modalities: "text",
+    approxDownload: "~1.45 GB",
+    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
+    note: "Text-only 2B Heretic q4 package. This avoids loading the vision encoder for browser chat.",
+  },
 ];
 
 function normalizeMessages(messages) {

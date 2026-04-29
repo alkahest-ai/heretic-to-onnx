@@ -19,7 +19,7 @@ Text-only variants are separate speed targets for chat-only browser use:
 
 | Slot | Final repo target | Current source/status |
 | --- | --- | --- |
-| 2B Heretic Text | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | Built and validated on Kaggle at ~1.44 GB; upload pending HF secret availability in the Kaggle job. |
+| 2B Heretic Text | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | Built, validated, and uploaded as a private Hub repo at ~1.44 GB; browser smoke pending. |
 | 2B Heretic RP Text | `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` | Build after the 2B RP merged checkpoint exists. |
 | 4B Heretic Text | `thomasjvu/alkahest-4b-heretic-q4-onnx-text` | Build from `tvall43/Qwen3.5-4B-heretic`; expected to be materially heavier than 2B and desktop-only for browser use. |
 | 4B Heretic RP Text | `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text` | Build after the 4B RP merged checkpoint exists. |
