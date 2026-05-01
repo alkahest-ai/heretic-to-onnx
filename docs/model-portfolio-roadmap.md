@@ -32,14 +32,14 @@ These are the fastest wins because they avoid training in the first pass.
 - Source: `p-e-w/gemma-4-E2B-it-heretic-ara`
 - Goal: convert to browser/WebGPU ONNX
 - Public name: `alkahest-ai/rally-2b`
-- Status: current primary converter target
+- Status: postponed until the Alkahest Qwen 0.8B/2B browser lane is fully promoted.
 
 ### Gemma 4 E4B
 
 - Source: `coder3101/gemma-4-E4B-it-heretic`
 - Goal: convert to browser/WebGPU ONNX
 - Public name: `alkahest-ai/rally-4b`
-- Status: next Gemma 4 target
+- Status: parked; do not expose E4B in the browser app during the Alkahest 0.8B/2B finish pass.
 
 Reason to do these first:
 
@@ -146,16 +146,14 @@ Audio remains outside the working browser export path right now, so the two publ
 
 ## Recommended H200 Work Order
 
-For the first paid 24-hour GPU TEE window:
+Current browser-first order:
 
-1. convert Gemma 4 E2B Heretic
-2. convert Gemma 4 E4B Heretic
-3. convert Qwen3.5 4B Heretic
-4. convert Qwen3.5 2B Heretic
-5. convert Qwen3.5 0.8B Heretic
-6. begin roleplay fine-tune on E2B
-7. queue E4B roleplay fine-tune
-8. queue Qwen3.5 2B and 0.8B roleplay fine-tunes before 4B if browser-first deployment is the priority
+1. keep the default picker limited to promoted direct Qwen3.5 0.8B/2B Heretic targets
+2. finish smoke and scorecard capture for Qwen3.5 0.8B/2B RP targets by URL override
+3. promote RP only after a scorecard win over the same-size direct model
+4. keep the old 0.8B RP influence variants as historical audit candidates
+5. keep Rally/Gemma out of the browser picker until the Alkahest targets are stable
+6. return to Rally E2B before any Rally E4B pass
 
 That ordering minimizes the chance that the whole window disappears into training/debug overhead without any shipped model.
 

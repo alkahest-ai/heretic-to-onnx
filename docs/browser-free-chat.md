@@ -21,10 +21,10 @@ The browser app lives in:
 
 Current scope:
 
-- the sample browser runtime now supports both Gemma 4 and Qwen 3.5 presets
+- the sample browser picker is limited to promoted direct Alkahest Qwen 3.5 0.8B/2B targets
 - the browser UI now supports text chat plus a single image input for all shipped presets
-- the browser UI now supports a single audio input for Rally / Gemma multimodal presets
-- the browser UI now supports a single video input for shipped `v2` presets
+- audio and video inputs remain in the UI for future multimodal lanes, but Rally/Gemma presets are parked until Alkahest 0.8B/2B is complete
+- RP and upstream diagnostic repos can still be loaded by URL override for smoke/scorecard work, but they are hidden from the default picker until promoted
 
 ## Release Gate
 
@@ -43,9 +43,8 @@ This app gives you:
 - model loading with progress updates
 - a worker-backed runtime so downloads and WebGPU session setup stay off the main UI thread when the browser supports it
 - streaming token output
-- a model picker for the current Alkahest Qwen3.5 ONNX smoke targets
+- a model picker for promoted direct Alkahest Qwen3.5 ONNX targets
 - image upload for multimodal prompts
-- audio upload for Rally / Gemma multimodal prompts
 - a browser-cache clear action so users can remove downloaded model files from the web UI and unload the active model
 - browser-only inference with no server-side inference bill
 - size and modality notes for each preset
@@ -79,10 +78,18 @@ Then open:
 
 You can override the model from the URL:
 
-- `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-0.8B-ONNX-OPT`
 - `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-text`
 - `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx-text`
+
+Diagnostic-only URL overrides:
+
+- `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-0.8B-ONNX-OPT`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx-rp`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text`
 
 ## Recommended Deployment Shape
 
@@ -91,23 +98,33 @@ For the first real deployment:
 1. ship the static app
 2. point the default at the best validated public Alkahest q4 ONNX repo
 3. keep the 0.8B Heretic repo as the stable fallback while SFT quality is still moving
-4. expose the 2B Heretic q4 repo only after a cold browser load and first-generation smoke pass
+4. expose the direct 2B Heretic q4 repos as desktop-class targets after cold browser load and first-generation smoke pass
 5. move the owner namespace constant when repo ownership moves from the personal account to the org
 
-For the current browser tester, prioritize:
+For the current default picker, keep only:
+
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text`
+- `thomasjvu/alkahest-2b-heretic-q4-onnx`
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-text`
+
+Keep these as diagnostic URL-only targets until they pass the RP scorecard:
 
 - `onnx-community/Qwen3.5-0.8B-ONNX-OPT`
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
 - `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
-- `thomasjvu/alkahest-2b-heretic-q4-onnx`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text`
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp`
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text`
 
-Older q4f16 exports and rejected SFT experiments are intentionally hidden from the picker to avoid confusing smoke results.
+The 2026-05-01 RP scorecard did not promote any RP target. Both RP variants failed the minor-boundary gate and did not beat the same-size direct model, so direct Heretic remains the app default lane.
 
-Plain text chat is now intentionally cheaper than full multimodal use:
+Older q4f16 exports, rejected SFT experiments, upstream controls, and RP candidates are intentionally hidden from the picker to avoid confusing smoke results.
+
+Plain text chat is intentionally cheaper than full multimodal use:
 
 - clicking `Load model` warms text sessions first
 - sending a text-only prompt without preloading also stays on the text-only path
-- attaching image, audio, or video upgrades the same model to its full multimodal session set on demand
+- attaching an image upgrades full Alkahest packages to their multimodal session set on demand
 
 The preset modality claims in this doc assume that release gate has passed for the repo being tested or published.
 
@@ -123,4 +140,4 @@ Do not promise:
 
 - “works on phones”
 
-The model packages remain multimodal at the architecture level after text-only fine-tuning. Use image, audio, and video prompts against the shipped preset set according to each preset’s advertised inputs, and regression-test direct lanes as text + image first.
+The full model packages remain multimodal at the architecture level after text-only fine-tuning. Use image prompts against full Alkahest presets according to each preset’s advertised inputs, and regression-test direct lanes as text + image first.

@@ -3,6 +3,7 @@
 .env.*
 .ipynb_checkpoints/
 .venv/
+tmp/
 __pycache__/
 *.py[cod]
 

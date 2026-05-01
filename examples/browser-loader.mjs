@@ -71,15 +71,6 @@ export const DEFAULT_MODEL_ID = ownedModel("alkahest-0.8b-heretic-q4-onnx");
 
 export const DEFAULT_MODEL_PRESETS = [
   {
-    label: "Qwen3.5 0.8B Baseline",
-    modelId: "onnx-community/Qwen3.5-0.8B-ONNX-OPT",
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~650-800 MB",
-    dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Known-good upstream WebGPU package for loader/runtime verification.",
-  },
-  {
     label: "Alkahest 0.8B Heretic Q4 (stable)",
     modelId: ownedModel("alkahest-0.8b-heretic-q4-onnx"),
     family: "qwen3_5",
@@ -87,15 +78,6 @@ export const DEFAULT_MODEL_PRESETS = [
     approxDownload: "~850 MB",
     dtype: QWEN35_WEBGPU_DTYPE,
     note: "Stable Heretic-only 0.8B q4 browser package. Use this as the baseline for SFT comparisons.",
-  },
-  {
-    label: "Alkahest 0.8B Heretic RP Q4",
-    modelId: ownedModel("alkahest-0.8b-heretic-q4-onnx-rp"),
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~850 MB",
-    dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Definitive 0.8B RP baseline promoted from the A100+B100 two-stage SFT package.",
   },
   {
     label: "Alkahest 0.8B Heretic Q4 Text",
@@ -123,51 +105,6 @@ export const DEFAULT_MODEL_PRESETS = [
     approxDownload: "~1.45 GB",
     dtype: QWEN35_WEBGPU_TEXT_DTYPE,
     note: "Text-only 2B Heretic q4 package. This avoids loading the vision encoder for browser chat.",
-  },
-  {
-    label: "Alkahest 2B Heretic RP Q4 Text",
-    modelId: ownedModel("alkahest-2b-heretic-q4-onnx-rp-text"),
-    family: "qwen3_5",
-    modalities: "text",
-    approxDownload: "~1.45 GB",
-    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
-    note: "Text-only 2B RP q4 package exported from the two-stage RP SFT merge.",
-  },
-  {
-    label: "Alkahest 2B Heretic RP Q4",
-    modelId: ownedModel("alkahest-2b-heretic-q4-onnx-rp"),
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~2.1 GB",
-    dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Full multimodal 2B RP q4 package exported from the two-stage RP SFT merge.",
-  },
-  {
-    label: "Alkahest 4B Heretic Q4 Text",
-    modelId: ownedModel("alkahest-4b-heretic-q4-onnx-text"),
-    family: "qwen3_5",
-    modalities: "text",
-    approxDownload: "~2.95 GB",
-    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
-    note: "Text-only 4B Heretic q4 package. Use this only after 2B smoke because it has a much larger cold load.",
-  },
-  {
-    label: "Alkahest 4B Heretic RP Q4 Text",
-    modelId: ownedModel("alkahest-4b-heretic-q4-onnx-rp-text"),
-    family: "qwen3_5",
-    modalities: "text",
-    approxDownload: "~2.95 GB",
-    dtype: QWEN35_WEBGPU_TEXT_DTYPE,
-    note: "Text-only 4B RP q4 package exported from the two-stage RP SFT merge.",
-  },
-  {
-    label: "Alkahest 4B Heretic RP Q4",
-    modelId: ownedModel("alkahest-4b-heretic-q4-onnx-rp"),
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~3.55 GB",
-    dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Full multimodal 4B RP q4 package. Keep this as the definitive 4B RP target once the Kaggle direct upload completes.",
   },
 ];
 
@@ -274,6 +211,7 @@ function sanitizeBrowserConfig(config, dtype) {
   if (!config || typeof config !== "object") {
     return config;
   }
+
   if (!dtypeUsesBrowserFloat16Metadata(dtype)) {
     return config;
   }
@@ -305,11 +243,19 @@ function resolveModelClass(family, { textOnly = false } = {}) {
       ? textOnly
         ? [Transformers.Gemma4ForCausalLM, Transformers.Gemma4ForConditionalGeneration]
         : [Transformers.Gemma4ForConditionalGeneration]
-      : [
-          Transformers.Qwen3_5ForConditionalGeneration,
-          Transformers.Qwen3VLForConditionalGeneration,
-          Transformers.Qwen2_5_VLForConditionalGeneration,
-        ];
+      : textOnly
+        ? [
+            Transformers.Qwen3_5ForCausalLM,
+            Transformers.Qwen3ForCausalLM,
+            Transformers.Qwen3_5ForConditionalGeneration,
+            Transformers.Qwen3VLForConditionalGeneration,
+            Transformers.Qwen2_5_VLForConditionalGeneration,
+          ]
+        : [
+            Transformers.Qwen3_5ForConditionalGeneration,
+            Transformers.Qwen3VLForConditionalGeneration,
+            Transformers.Qwen2_5_VLForConditionalGeneration,
+          ];
 
   for (const candidate of candidates) {
     if (typeof candidate?.from_pretrained === "function") {
@@ -467,7 +413,7 @@ export function inferCustomModelDtype(modelId, family) {
 
 export function formatPresetSummary(preset) {
   if (!preset) {
-    return "Custom model ID. Use a public Alkahest or Rally ONNX repo with a Transformers.js-compatible package layout.";
+    return "Custom model ID. Use a public Alkahest ONNX repo with a Transformers.js-compatible package layout.";
   }
   const dtypeLabel = typeof preset.dtype === "string" ? preset.dtype : JSON.stringify(preset.dtype);
   return `${preset.label} | ${preset.modalities} | ${preset.approxDownload} first load | ${dtypeLabel} | ${preset.note}`;

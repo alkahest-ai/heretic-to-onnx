@@ -1,22 +1,27 @@
 # Alkahest Hugging Face Cleanup Plan
 
-Date: 2026-04-29
+Date: 2026-04-30
 
 Deletion status: paused. Do not delete or archive any Hugging Face repos until the definitive 0.8B/2B Heretic and RP targets are published, browser-smoked, and explicitly approved again at action time.
 
-## Active Browser Smoke Targets
+## Default Browser Picker Targets
 
-Keep these visible in browser-chat until the next quality decision:
+Keep these visible in browser-chat:
+
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx` - stable Heretic-only 0.8B q4 baseline.
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text` - light direct 0.8B text-only target.
+- `thomasjvu/alkahest-2b-heretic-q4-onnx` - current 2B Heretic q4 browser target.
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-text` - built, validated, uploaded, and browser-smoked.
+
+## Diagnostic Browser Smoke Targets
+
+Keep these loadable by URL override for smoke/scorecard work, but hidden from the default picker until promoted:
 
 - `onnx-community/Qwen3.5-0.8B-ONNX-OPT` - upstream control for loader/runtime regressions.
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx` - stable Heretic-only 0.8B q4 baseline.
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` - definitive 0.8B RP baseline promoted from the A100+B100 two-stage SFT package.
-- `thomasjvu/alkahest-2b-heretic-q4-onnx` - current 2B Heretic q4 browser target.
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-text` - built, validated, and uploaded as private; browser smoke pending.
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` - planned 2B RP target after 2B two-stage SFT/export.
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` - planned chat-only 2B RP speed target.
-- `thomasjvu/alkahest-4b-heretic-q4-onnx-text` - planned chat-only 4B Heretic target.
-- `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text` - planned chat-only 4B RP target.
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` - 0.8B RP baseline promoted from the A100+B100 two-stage SFT package, still pending final RP scorecard.
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text` - light 0.8B RP text-only target recovered from the full RP ONNX package.
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` - built, validated, uploaded, and browser-smoked.
+- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` - built, validated, uploaded, and browser-smoked.
 
 ## Hidden From Browser Picker
 
@@ -32,6 +37,9 @@ These are no longer default smoke targets because they are legacy, rejected, or 
 - `thomasjvu/rally-2b-rp`
 - `thomasjvu/rally-4b`
 - `thomasjvu/rally-4b-v2`
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-text`
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text`
+- `thomasjvu/alkahest-4b-heretic-q4-onnx-rp`
 - `thomasjvu/alkahest-0.8b-heretic-rp-sft-q4-onnx`
 - `thomasjvu/alkahest-0.8b-heretic-rp-sft-v2-q4-onnx`
 - `thomasjvu/alkahest-0.8b-heretic-rp-sft-v3-q4-onnx`
@@ -49,7 +57,7 @@ These are no longer default smoke targets because they are legacy, rejected, or 
 
 ## Final Approval Deletion List
 
-These repos are approved candidates for deletion after the four definitive Alkahest repos exist, pass browser smoke, and have replacement links in docs/model cards:
+These repos are approved candidates for deletion after the definitive 0.8B/2B direct and RP targets exist, pass their required smoke/scorecard gates, and have replacement links in docs/model cards:
 
 - `thomasjvu/alkahest-0.8b-v2`
 - `thomasjvu/alkahest-2b`
@@ -82,7 +90,9 @@ Keep these unless the Gemma/Rally plan is explicitly abandoned:
 Never delete without a separate action-time confirmation:
 
 - `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text`
 - `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
+- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text`
 - `thomasjvu/alkahest-2b-heretic-q4-onnx`
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-text`
 - `thomasjvu/alkahest-2b-heretic-q4-onnx-rp`
