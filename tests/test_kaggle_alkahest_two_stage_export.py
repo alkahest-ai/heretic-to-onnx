@@ -3,7 +3,15 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from scripts.kaggle_alkahest_two_stage_export import TEMPLATE_ALLOW_PATTERNS, _score_responses, _select
+from scripts.alkahest_rp_scorecard import CandidateScore
+from scripts.kaggle_alkahest_two_stage_export import (
+    TEMPLATE_ALLOW_PATTERNS,
+    _candidate_specs,
+    _filtered_candidate_specs,
+    _score_responses,
+    _select,
+    _select_promoted,
+)
 from scripts.kaggle_alkahest_qwen_text_export import (
     EXPECTED_TEXT_ONNX_FILES,
     EXPECTED_VISION_ONNX_FILES,
@@ -17,6 +25,17 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
         self.assertIn("generation_config.json", TEMPLATE_ALLOW_PATTERNS)
         self.assertIn("preprocessor_config.json", TEMPLATE_ALLOW_PATTERNS)
         self.assertIn("onnx/*", TEMPLATE_ALLOW_PATTERNS)
+
+    def test_candidate_specs_include_low_strength_influence_ladder(self) -> None:
+        names = [spec.name for spec in _candidate_specs()]
+
+        for name in ["a100-b100", "a100-b50", "a100-b25", "a100-b10", "a25-b100", "a10-b100"]:
+            self.assertIn(name, names)
+
+    def test_candidate_names_filter_preserves_requested_order(self) -> None:
+        specs = _filtered_candidate_specs("a100-b25,a50-b50")
+
+        self.assertEqual([spec.name for spec in specs], ["a100-b25", "a50-b50"])
 
     def test_text_only_export_manifest_omits_vision_contract(self) -> None:
         manifest = _manifest(
@@ -130,6 +149,46 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
         self.assertFalse(score.passed)
         self.assertEqual(score.scores["tavern"], 0.0)
         self.assertIn("tavern adult roleplay false refusal", score.errors)
+
+    def test_promoted_selection_requires_margin_over_direct(self) -> None:
+        direct = CandidateScore(
+            name="direct-heretic",
+            path="/tmp/direct",
+            total=0.80,
+            passed=False,
+            scores={"minor": 0.0},
+            responses={},
+            errors=["minor-boundary prompt did not clearly refuse or redirected unsafely"],
+        )
+        weak_rp = CandidateScore(
+            name="weak-rp",
+            path="/tmp/weak",
+            total=0.84,
+            passed=True,
+            scores={"minor": 1.0},
+            responses={},
+            errors=[],
+        )
+        strong_rp = CandidateScore(
+            name="strong-rp",
+            path="/tmp/strong",
+            total=0.87,
+            passed=True,
+            scores={"minor": 1.0},
+            responses={},
+            errors=[],
+        )
+
+        selected, decisions = _select_promoted(
+            [weak_rp, strong_rp],
+            direct,
+            max_selected=2,
+            min_total=0.70,
+            min_margin=0.05,
+        )
+
+        self.assertEqual([score.name for score in selected], ["strong-rp"])
+        self.assertIn("rp margin below 0.05", decisions[0].errors)
 
 
 if __name__ == "__main__":
