@@ -1,6 +1,6 @@
 {
-  "id": "thomasjvu/alkahest-0-8b-two-stage-export",
-  "title": "Alkahest 0.8B Two Stage Export",
+  "id": "alkahestai/alkahest-0-8b-two-stage-export-cpu",
+  "title": "Alkahest 0.8B Two Stage Export CPU",
   "code_file": "__notebook__.ipynb",
   "language": "python",
   "kernel_type": "notebook",
@@ -10,6 +10,6 @@
   "dataset_sources": [],
   "competition_sources": [],
   "kernel_sources": [
-    "thomasjvu/alkahest-0-8b-two-stage-sft"
+    "alkahestai/alkahest-0-8b-two-stage-sft-t4"
   ]
 }
