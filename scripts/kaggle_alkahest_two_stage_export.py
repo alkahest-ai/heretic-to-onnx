@@ -89,6 +89,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-upload", dest="upload", action="store_false")
     parser.add_argument("--private", action="store_true", default=True)
     parser.add_argument("--no-private", dest="private", action="store_false")
+    parser.add_argument(
+        "--keep-packages",
+        action="store_true",
+        help="Keep local ONNX packages in the Kaggle output after a successful upload.",
+    )
+    parser.add_argument(
+        "--keep-cache",
+        action="store_true",
+        help="Keep Hugging Face cache and transient candidate directories for debugging.",
+    )
     return parser
 
 
@@ -300,6 +310,44 @@ def _select_promoted(
     return sorted(promoted, key=lambda item: item.total, reverse=True)[:max_selected], decisions
 
 
+def _selected_by_total(scores: list[CandidateScore], max_selected: int) -> list[CandidateScore]:
+    return sorted(scores, key=lambda item: item.total, reverse=True)[:max_selected]
+
+
+def _candidate_decision(
+    score: CandidateScore,
+    baseline: CandidateScore | None,
+    *,
+    min_total: float,
+    min_margin: float,
+) -> PromotionDecision | None:
+    if baseline is None:
+        return None
+    return _promotion_decision(
+        baseline,
+        score,
+        min_total=min_total,
+        min_margin=min_margin,
+    )
+
+
+def _keep_candidate(
+    score: CandidateScore,
+    *,
+    decision: PromotionDecision | None,
+) -> bool:
+    return decision.promoted if decision is not None else score.passed
+
+
+def _write_report(work_dir: Path, report: dict[str, Any]) -> None:
+    (work_dir / "score-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+
+
+def _cleanup_transients(cache_root: Path, candidate_root: Path) -> None:
+    _rm(cache_root)
+    _rm(candidate_root)
+
+
 def _selected_candidate_names(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -439,14 +487,15 @@ def main() -> int:
     )
     report["disk"]["after_downloads"] = _disk(work_dir)
 
-    materialized: dict[str, tuple[Path, bool]] = {}
+    retained: dict[str, tuple[Path, bool]] = {}
     scores: list[CandidateScore] = []
+    decisions: list[PromotionDecision] = []
     specs = {spec.name: spec for spec in _candidate_specs()}
     candidate_specs = _filtered_candidate_specs(args.candidate_names)
     report["candidate_specs"] = [asdict(spec) for spec in candidate_specs]
     direct_selected = _selected_candidate_names(args.selected_candidates)
     if direct_selected:
-        base_dir = None
+        base_dir: Path | None = None
         selected: list[CandidateScore] = []
         for name in direct_selected:
             if name not in specs:
@@ -460,7 +509,7 @@ def main() -> int:
                 base_dir or artifacts / "stage-ab-merged",
                 candidate_root,
             )
-            materialized[spec.name] = (path, should_delete)
+            retained[spec.name] = (path, should_delete)
             selected.append(
                 CandidateScore(
                     name=spec.name,
@@ -473,7 +522,8 @@ def main() -> int:
                 )
             )
         report["scores"] = [asdict(item) for item in selected]
-        (work_dir / "score-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        report["selected"] = [asdict(item) for item in selected]
+        _write_report(work_dir, report)
     else:
         base_dir = _snapshot_download(args.source_model_id, cache_root / "base-heretic-merged")
         baseline_score = None
@@ -484,10 +534,10 @@ def main() -> int:
                 temperature=args.temperature,
             )
             report["baseline_score"] = asdict(baseline_score)
-            (work_dir / "score-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+            _write_report(work_dir, report)
+        selected = []
         for spec in candidate_specs:
             path, should_delete = _materialize_candidate(spec, artifacts, base_dir, candidate_root)
-            materialized[spec.name] = (path, should_delete)
             score = _score_candidate(
                 spec,
                 path,
@@ -495,24 +545,39 @@ def main() -> int:
                 temperature=args.temperature,
             )
             scores.append(score)
-            report["scores"] = [asdict(item) for item in scores]
-            (work_dir / "score-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-
-        if baseline_score is not None:
-            selected, decisions = _select_promoted(
-                scores,
+            decision = _candidate_decision(
+                score,
                 baseline_score,
-                max_selected=args.max_selected,
                 min_total=args.baseline_min_total,
                 min_margin=args.baseline_min_margin,
             )
+            if decision is not None:
+                decisions.append(decision)
+
+            if _keep_candidate(score, decision=decision):
+                retained[score.name] = (path, should_delete)
+                selected = _selected_by_total([*selected, score], args.max_selected)
+                selected_names = {item.name for item in selected}
+                for name, (retained_path, retained_should_delete) in list(retained.items()):
+                    if name not in selected_names:
+                        retained.pop(name, None)
+                        if retained_should_delete:
+                            _rm(retained_path)
+            elif should_delete:
+                _rm(path)
+
+            report["scores"] = [asdict(item) for item in scores]
             report["promotion_decisions"] = [asdict(item) for item in decisions]
-        else:
-            selected = _select(scores, args.max_selected)
+            report["selected"] = [asdict(item) for item in selected]
+            report["disk"][f"after_score_{score.name}"] = _disk(work_dir)
+            _write_report(work_dir, report)
+
     selected_names = {score.name for score in selected}
-    for name, (path, should_delete) in materialized.items():
-        if should_delete and name not in selected_names:
-            _rm(path)
+    for name, (path, should_delete) in list(retained.items()):
+        if name not in selected_names:
+            retained.pop(name, None)
+            if should_delete:
+                _rm(path)
 
     report["selected"] = [asdict(item) for item in selected]
     report["disk"]["after_scoring"] = _disk(work_dir)
@@ -520,6 +585,9 @@ def main() -> int:
     if args.export:
         if not selected:
             report["errors"] = ["no candidates passed the required smoke score; refusing ONNX export"]
+            if not args.keep_cache:
+                _cleanup_transients(cache_root, candidate_root)
+                report["disk"]["after_cleanup_cache"] = _disk(work_dir)
             (work_dir / "post-training-export-report.json").write_text(
                 json.dumps(report, indent=2, sort_keys=True) + "\n"
             )
@@ -537,6 +605,17 @@ def main() -> int:
             )
             report["exports"].append(export_report)
             report["disk"][f"after_export_{score.name}"] = _disk(work_dir)
+            retained_path, retained_should_delete = retained.pop(score.name, (Path(score.path), False))
+            if retained_should_delete and not args.keep_cache:
+                _rm(retained_path)
+                report["disk"][f"after_cleanup_candidate_{score.name}"] = _disk(work_dir)
+            if export_report.get("upload", {}).get("ok") and not args.keep_packages:
+                _rm(Path(export_report["package_dir"]))
+                report["disk"][f"after_cleanup_package_{score.name}"] = _disk(work_dir)
+
+    if not args.keep_cache:
+        _cleanup_transients(cache_root, candidate_root)
+        report["disk"]["after_cleanup_cache"] = _disk(work_dir)
 
     report["ok"] = bool(selected) and all(item.get("validate", {}).get("ok", False) for item in report["exports"])
     (work_dir / "post-training-export-report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
