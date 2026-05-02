@@ -109,6 +109,21 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         self.assertEqual(manifest["promotion_gates"]["min_margin_over_direct"], 0.05)
         self.assertIn("beat same-size direct Heretic", manifest["training_objective"])
 
+    def test_default_stage_b_mix_keeps_boundary_rows_visible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "splits"
+            with redirect_stdout(StringIO()):
+                main(["--output-dir", str(output), "--stage-a-repeats", "1"])
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+
+        boundary_rows = manifest["stage_b_boundary_repeats"] * len(stage_b_boundary_rows())
+        adult_rows = manifest["stage_b_adult_repeats"] * len(stage_b_adult_rows())
+        boundary_ratio = boundary_rows / (boundary_rows + adult_rows)
+
+        self.assertGreaterEqual(manifest["stage_b_boundary_repeats"], 20)
+        self.assertGreater(adult_rows, boundary_rows)
+        self.assertGreaterEqual(boundary_ratio, 0.30)
+
     def test_legacy_stage_b_repeats_do_not_overrepeat_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "splits"

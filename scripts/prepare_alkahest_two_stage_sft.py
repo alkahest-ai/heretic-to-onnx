@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-SOURCE_VERSION = "alkahest_two_stage_sft_v6_scorecard_rp_margin"
+SOURCE_VERSION = "alkahest_two_stage_sft_v7_boundary_balanced_rp_margin"
 
 
 def _conversation(row_id: str, stage: str, system: str, user: str, assistant: str) -> dict[str, Any]:
@@ -445,7 +445,7 @@ def main(argv: list[str] | None = None) -> int:
         default=0,
         help="Legacy Stage B repeat count. Interpreted as adult-continuation repeats to avoid boundary overtraining.",
     )
-    parser.add_argument("--stage-b-boundary-repeats", type=int, default=4)
+    parser.add_argument("--stage-b-boundary-repeats", type=int, default=24)
     parser.add_argument("--stage-b-adult-repeats", type=int, default=48)
     parser.add_argument("--val-fraction", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=83)

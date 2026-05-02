@@ -1,6 +1,6 @@
 # Alkahest Definitive Browser Model List
 
-Date: 2026-05-01
+Date: 2026-05-02
 
 Latest smoke notes: `docs/alkahest-qwen-browser-smoke-2026-04-30.md`.
 
@@ -40,9 +40,9 @@ All four scorecard captures loaded and generated technically. Raw minor-boundary
 
 ## RP Improvement Pass
 
-Active next training dataset: `alkahest_two_stage_sft_v6_scorecard_rp_margin` from `scripts/prepare_alkahest_two_stage_sft.py`.
+Active next training dataset: `alkahest_two_stage_sft_v7_boundary_balanced_rp_margin` from `scripts/prepare_alkahest_two_stage_sft.py`.
 
-This pass keeps the two-stage idea but changes the objective from "make RP stronger" to "make RP stronger than direct Heretic on the exact promotion scorecard." Stage B now includes more scorecard-locked adult continuation anchors for Mira, Kael, and the adult vampire host; more no-system false-refusal corrections; and shorter hard-boundary redirects for the minor probe that avoid words the scorecard treats as unsafe continuation.
+This pass keeps the two-stage idea but changes the objective from "make RP stronger" to "make RP stronger than direct Heretic on the exact promotion scorecard." Stage B now includes more scorecard-locked adult continuation anchors for Mira, Kael, and the adult vampire host; more no-system false-refusal corrections; and shorter hard-boundary redirects for the minor probe that avoid words the scorecard treats as unsafe continuation. The v7 mix raises default boundary repeats from `4` to `24` while keeping adult-continuation rows heavier overall, because the 2026-05-02 v6 Kaggle export scored the ladder successfully but selected no candidates after every candidate failed the minor-boundary gate.
 
 The Kaggle export selector now scores the direct Heretic source baseline before selecting RP candidates. A candidate is export-selected only when it passes the RP scorecard, reaches at least `0.70`, and beats the direct baseline by at least `0.05`, unless `--no-compare-baseline` or `--selected-candidates` is used deliberately for diagnostics. The same script is parameterized for 0.8B and 2B via `--source-model-id`, `--template-model-id`, `--qwen-base-model-id`, and `--artifact-name`.
 
@@ -67,7 +67,8 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 | v5 safety / safety2 | Improved some minor-boundary behavior but regressed adult RP and instruction quality. |
 | v5 safety2 50% | Loaded but failed the minor-boundary gate. |
 | two-stage A100+B100 | Practical current 0.8B RP baseline; promoted under the definitive full RP repo and used to derive the text-only RP package. |
-| two-stage v6 scorecard ladder | Active next pass; not promoted until browser smoke plus direct-baseline margin pass. |
+| two-stage v6 scorecard ladder | Export disk issue fixed; ladder scored on Kaggle, but no candidate passed the minor-boundary gate. |
+| two-stage v7 boundary-balanced ladder | Active next pass; not promoted until browser smoke plus direct-baseline margin pass. |
 
 ## Packaging Notes
 
@@ -92,8 +93,8 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 
 ## Next Gate
 
-1. Generate v6 two-stage splits with `scripts/prepare_alkahest_two_stage_sft.py`.
-2. Run the 0.8B and 2B two-stage Kaggle train notebooks against the v6 splits, then run the parameterized two-stage export notebook/script so `scripts/kaggle_alkahest_two_stage_export.py` scores the full 10/25/50/75/100 ladder against each direct baseline.
+1. Generate v7 two-stage splits with `scripts/prepare_alkahest_two_stage_sft.py`.
+2. Run the 0.8B and 2B two-stage Kaggle train notebooks against the v7 splits, then run the parameterized two-stage export notebook/script so `scripts/kaggle_alkahest_two_stage_export.py` scores the full 10/25/50/75/100 ladder against each direct baseline.
 3. Export/upload only candidates selected by the direct-baseline margin gate.
 4. Browser-smoke any selected RP text/full packages before exposing them.
 5. Capture tavern, ranger, adult vampire, and minor-boundary outputs for direct versus new RP candidates, then run `python3 scripts/alkahest_rp_scorecard.py --input <responses.json> --compare direct-08b:<new-rp> --compare direct-2b:<new-rp-2b> --format markdown`.
