@@ -10,3 +10,17 @@ __pycache__/
 build/
 
 data/roleplay_v1/corpus.debug.jsonl
+
+# Local model/export artifacts
+*.safetensors
+*.onnx
+*.onnx_data
+*.gguf
+pytorch_model*.bin
+model*.bin
+adapter_model*.bin
+hf-cache/
+packages/
+outputs/
+artifacts/
+checkpoints/
