@@ -58,7 +58,7 @@ This pass keeps the two-stage idea but changes the objective from "make RP stron
 
 The Kaggle export selector now scores the direct Heretic source baseline before selecting RP candidates. A candidate is export-selected only when it passes the RP scorecard, reaches at least `0.70`, and beats the direct baseline by at least `0.05`, unless `--no-compare-baseline` or `--selected-candidates` is used deliberately for diagnostics. The same script is parameterized for 0.8B and 2B via `--source-model-id`, `--template-model-id`, `--qwen-base-model-id`, and `--artifact-name`.
 
-Current result: 0.8B v8 produced two export-selected candidates, `a50-b100` and `a25-b100`, both with Kaggle score `1.0000`, clean minor-boundary redirect, no adult false refusal, and `+0.2750` margin over direct 0.8B. Kaggle still had no HF token, so the package outputs were downloaded locally and uploaded privately with local HF auth. The 2B export is being rerun after adding sharded merged-checkpoint support; the available 2B SFT source is v7 until a v8 2B training pass completes.
+Current result: 0.8B v8 produced two export-selected candidates, `a50-b100` and `a25-b100`, both with Kaggle score `1.0000`, clean minor-boundary redirect, no adult false refusal, and `+0.2750` margin over direct 0.8B. Kaggle still had no HF token, so the package outputs were downloaded locally and uploaded privately with local HF auth. The 2B v7 export rerun completed scoring after the sharded-checkpoint and narrowed-template fixes, but selected no candidates because every scored 2B candidate still failed the minor-boundary gate. The next 2B action is a v8 SFT run using the same boundary-dominant recipe that produced the two 0.8B wins.
 
 New influence ladder for the two-stage adapters:
 
@@ -83,7 +83,7 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 | two-stage A100+B100 | Practical current 0.8B RP baseline; promoted under the definitive full RP repo and used to derive the text-only RP package. |
 | two-stage v6 scorecard ladder | Export disk issue fixed; ladder scored on Kaggle, but no candidate passed the minor-boundary gate. |
 | two-stage v7 boundary-balanced ladder | Trained and scored on Kaggle; adult RP remained strong, but no 0.8B candidate passed the minor-boundary gate. |
-| two-stage v8 boundary-dominant ladder | 0.8B produced two passing candidates, A50/B100 and A25/B100, each scoring `1.0000` with `+0.2750` margin over direct. Browser text-session smoke passed for both; keep hidden until image smoke/app gating. 2B export pending. |
+| two-stage v8 boundary-dominant ladder | 0.8B produced two passing candidates, A50/B100 and A25/B100, each scoring `1.0000` with `+0.2750` margin over direct. Browser text-session smoke passed for both; keep hidden until image smoke/app gating. 2B v8 SFT is the next required run because the v7 2B export selected no candidates. |
 
 ## Packaging Notes
 
@@ -105,13 +105,13 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 - The 2B RP merged checkpoint was recovered upload-only from Kaggle `stage-ab-merged` to `thomasjvu/alkahest-2b-heretic-rp-merged`.
 - The 0.8B v8 two-stage export selected and validated A50/B100 and A25/B100 full packages. Kaggle upload skipped because `hf_token_present=False`, so both private HF repos were created/uploaded locally.
 - The 0.8B v8 A50/B100 and A25/B100 packages both passed browser text-session load, first 32-token generation, warm reload/session reuse, and clean app-console checks on 2026-05-03.
-- The 2B two-stage export initially failed because the v7 SFT output uses sharded merged safetensors while the artifact finder required `model.safetensors`. Commit `e388261` fixes sharded artifact detection and sharded scaled LoRA merge loading. The next 2B rerun failed earlier during broad ONNX template download; the template allow-list has been narrowed to q4 text and fp16 vision files only.
+- The 2B two-stage export initially failed because the v7 SFT output uses sharded merged safetensors while the artifact finder required `model.safetensors`. Commit `e388261` fixes sharded artifact detection and sharded scaled LoRA merge loading. A later 2B rerun failed during broad ONNX template download, so the template allow-list was narrowed to q4 text and fp16 vision files only. The latest 2B v7 export then completed scoring with the narrowed allow-list but selected no candidates; the v7 ladder remains blocked by the minor-boundary gate.
 - Keep all repos private unless explicitly promoted for public app deployment.
 
 ## Next Gate
 
 1. Run image prompt smoke for the two new 0.8B v8 full packages before any picker promotion.
-2. Relaunch `alkahestai/alkahest-2b-rp-qwen-export` with the narrowed template allow-list; if v7 2B candidates fail the direct-margin scorecard, launch the already-configured 2B v8 SFT notebook.
-3. Export/upload only 2B candidates selected by the direct-baseline margin gate.
+2. Launch the already-configured 2B v8 SFT notebook, then rerun `alkahestai/alkahest-2b-rp-qwen-export` against that new source artifact.
+3. Export/upload only 2B v8 candidates selected by the direct-baseline margin gate.
 4. Capture tavern, ranger, adult vampire, and minor-boundary outputs for browser-smoked direct versus new RP candidates, then run `python3 scripts/alkahest_rp_scorecard.py --input <responses.json> --compare direct-08b:<new-rp> --compare direct-2b:<new-rp-2b> --format markdown`.
 5. Promote RP only when it beats direct Heretic by at least `0.05`, has score `>= 0.70`, has no minor-boundary failure, has no adult false refusal, and passes browser smoke.
