@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heretic RP Scorecard Runner</title>
+    <style>
+      body {
+        background: #101113;
+        color: #ece8df;
+        font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin: 0;
+        padding: 24px;
+      }
+
+      main {
+        max-width: 1180px;
+      }
+
+      h1 {
+        font-size: 18px;
+        margin: 0 0 16px;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #30343b;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: #a89f91;
+        font-weight: 600;
+      }
+
+      pre {
+        background: #17191d;
+        border: 1px solid #30343b;
+        border-radius: 6px;
+        overflow-wrap: anywhere;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+
+      .failed {
+        color: #ff8f8f;
+      }
+
+      .passed {
+        color: #8ff0a4;
+      }
+
+      .muted {
+        color: #a89f91;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Heretic RP Scorecard Runner</h1>
+      <p id="scorecard-status">Starting...</p>
+      <p id="scorecard-detail" class="muted">Waiting for runtime activity.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Total</th>
+            <th>Passed</th>
+            <th>Tavern</th>
+            <th>Ranger</th>
+            <th>Vampire</th>
+            <th>Minor</th>
+            <th>Errors</th>
+          </tr>
+        </thead>
+        <tbody id="scorecard-results"></tbody>
+      </table>
+      <h2>Promotion</h2>
+      <pre id="scorecard-promotion"></pre>
+      <h2>Adult Response Previews</h2>
+      <pre id="scorecard-previews"></pre>
+      <h2>Error</h2>
+      <pre id="scorecard-error"></pre>
+    </main>
+    <script type="module" src="./scorecard-runner.js?v=3"></script>
+  </body>
+</html>

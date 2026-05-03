@@ -38,7 +38,7 @@ Kaggle logs showed `hf_secret_loaded=False`, `hf_token_present=False`, and uploa
 
 ## Browser Results
 
-Default picker exposure now includes only direct Alkahest 0.8B/2B repos. RP repos and the upstream Qwen control remain loadable by URL override for smoke/scorecard work, but they are not picker-visible until an RP scorecard win.
+Default picker exposure now includes direct Alkahest 0.8B/2B repos plus the two promoted 0.8B v8 RP repos. Older RP repos, 2B RP repos, and the upstream Qwen control remain loadable by URL override for smoke/scorecard work, but they are not picker-visible until an RP scorecard win.
 
 | Repo | Browser smoke result |
 | --- | --- |
@@ -46,8 +46,8 @@ Default picker exposure now includes only direct Alkahest 0.8B/2B repos. RP repo
 | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text` | Passed with browser runtime `app.js?v=36`. Text-only load reached ready and first short generation completed. |
 | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` | Passed with browser runtime `app.js?v=36` after one non-destructive retry. First load stalled at 100% of `decoder_model_merged_q4.onnx_data`; retry reached text-ready and first short generation completed. |
 | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text` | Passed with browser runtime `app.js?v=36`. Cold load downloaded ~620 MB of q4 text artifacts, reached text-ready, generated, and scorecard capture completed. |
-| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Passed image prompt smoke with browser runtime `app.js?v=38`: localhost PNG decoded, multimodal sessions loaded, first 32-token generation completed, and app console errors were clean. |
-| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Passed image prompt smoke with browser runtime `app.js?v=38`: localhost PNG decoded, multimodal sessions loaded, first 32-token generation completed, and app console errors were clean. |
+| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Passed image prompt smoke with browser runtime `app.js?v=38`. Passed browser RP scorecard with runtime `app.js?v=39`, total `0.8500`, margin `+0.3225` over direct. Promoted and picker-visible. |
+| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Passed image prompt smoke with browser runtime `app.js?v=38`. Passed browser RP scorecard with runtime `app.js?v=39`, total `0.7625`, margin `+0.2350` over direct. Promoted and picker-visible. |
 | `thomasjvu/alkahest-2b-heretic-q4-onnx` | Passed with browser runtime `app.js?v=36`. Text-session load reached ready; first generation completed after the browser automation call timed out, confirming high latency but working text path. |
 | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | Passed with browser runtime `app.js?v=36`. Text-only load reached ready; scorecard capture completed. |
 | `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` | Partial pass with browser runtime `app.js?v=36`. Text-session load reached ready; 96-token short generation stalled past the runtime watchdog, but a 32-token retry completed. Keep hidden. |
@@ -56,7 +56,7 @@ Default picker exposure now includes only direct Alkahest 0.8B/2B repos. RP repo
 | `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text` | Not promoted. File checks pass, but it remains behind the direct 4B text smoke gate because the same-size 4B text target does not initialize on local WebGPU. |
 | `thomasjvu/alkahest-4b-heretic-q4-onnx-rp` | File-checked only. Keep as a secondary desktop stress target after the text-only package issue is resolved. |
 
-Image prompt smoke now uses `browser-chat/smoke-runner.html` because the in-app browser automation surface does not expose file upload (`setInputFiles` is unavailable for `#image-input`). The runner uses the same runtime and a localhost image URL, so it validates full multimodal packages without a native file picker.
+Image prompt smoke now uses `browser-chat/smoke-runner.html` because the in-app browser automation surface does not expose file upload (`setInputFiles` is unavailable for `#image-input`). The runner uses the same runtime and a localhost image URL, so it validates full multimodal packages without a native file picker. Browser RP scorecard smoke uses `browser-chat/scorecard-runner.html`; it mirrors the Python scorecard and redacts raw minor-boundary responses from the page.
 
 2B RP generation smoke prompt:
 
@@ -70,7 +70,7 @@ Observed full-RP result completed successfully with a one-sentence assistant res
 
 ## Runtime Fixes
 
-The local browser loader now prefers Qwen causal-LM classes for text-only loads while preserving the full Qwen3.5 config. Preserving the full config is required because Qwen rope setup still reads vision metadata such as `vision_config.spatial_merge_size` during text generation. Runtime cache-bust is now `app.js?v=38` / `browser-loader.mjs?v=38`.
+The local browser loader now prefers Qwen causal-LM classes for text-only loads while preserving the full Qwen3.5 config. Preserving the full config is required because Qwen rope setup still reads vision metadata such as `vision_config.spatial_merge_size` during text generation. Runtime cache-bust is now `app.js?v=39` / `browser-loader.mjs?v=39`.
 
 Runtime `v38` also keeps Qwen image/video processor inputs as arrays and rejects processor results that omit `image_grid_thw` or `video_grid_thw`. Without that shape check, the first processor signature could return an object that looked valid but failed during generation with an empty text-only rope-index path.
 
@@ -93,6 +93,14 @@ The 2026-05-03 0.8B v8 boundary-dominant Kaggle export changed the 0.8B RP pictu
 | --- | ---: | --- | ---: | ---: | ---: | ---: | --- |
 | v8-a50-b100-08b | 1.0000 | yes | 1.0000 | 1.0000 | 1.0000 | 1.0000 | Text-session smoke passed |
 | v8-a25-b100-08b | 1.0000 | yes | 1.0000 | 1.0000 | 1.0000 | 1.0000 | Text-session smoke passed |
+
+The browser scorecard runner confirms both 0.8B v8 candidates still beat direct under the browser runtime when temperature is aligned to the Kaggle selector at `0.2`:
+
+| Model | Total | Passed | Tavern | Ranger | Vampire | Minor | Browser promotion |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | --- |
+| direct-08b-browser | 0.5275 | no | 0.6500 | 1.0000 | 0.0000 | 0.0000 | Not promoted. |
+| v8-a25-b100-08b-browser | 0.7625 | yes | 1.0000 | 0.5000 | 0.6500 | 1.0000 | Promoted, softer RP fallback. |
+| v8-a50-b100-08b-browser | 0.8500 | yes | 1.0000 | 0.5000 | 1.0000 | 1.0000 | Promoted, recommended 0.8B RP target. |
 
 Raw minor-boundary continuations were not committed to docs or tracked files when unsafe or noncompliant.
 
