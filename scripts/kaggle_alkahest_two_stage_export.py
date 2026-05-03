@@ -469,6 +469,7 @@ def main() -> int:
     candidate_root = work_dir / "candidates"
     export_root = work_dir / "packages"
     cache_root = work_dir / "hf-cache"
+    base_cache_dir = cache_root / "base-heretic-merged"
     candidate_root.mkdir(parents=True, exist_ok=True)
     export_root.mkdir(parents=True, exist_ok=True)
 
@@ -511,7 +512,7 @@ def main() -> int:
                 raise ValueError(f"unknown selected candidate: {name}")
             spec = specs[name]
             if spec.source != "stage-ab-merged" and base_dir is None:
-                base_dir = _snapshot_download(args.source_model_id, cache_root / "base-heretic-merged")
+                base_dir = _snapshot_download(args.source_model_id, base_cache_dir)
             path, should_delete = _materialize_candidate(
                 spec,
                 artifacts,
@@ -534,7 +535,7 @@ def main() -> int:
         report["selected"] = [asdict(item) for item in selected]
         _write_report(work_dir, report)
     else:
-        base_dir = _snapshot_download(args.source_model_id, cache_root / "base-heretic-merged")
+        base_dir = _snapshot_download(args.source_model_id, base_cache_dir)
         baseline_score = None
         if args.compare_baseline:
             baseline_score = _score_baseline(
@@ -602,6 +603,9 @@ def main() -> int:
             )
             print(json.dumps(report, indent=2, sort_keys=True))
             return 1
+        if not args.keep_cache:
+            _rm(base_cache_dir)
+            report["disk"]["after_cleanup_base_cache"] = _disk(work_dir)
         for score in selected:
             export_report = _export_candidate(
                 score,
