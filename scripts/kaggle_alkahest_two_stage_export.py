@@ -47,7 +47,12 @@ TEMPLATE_ALLOW_PATTERNS = [
     "tokenizer.json",
     "tokenizer_config.json",
     "chat_template.jinja",
-    "onnx/*",
+    "onnx/decoder_model_merged_q4.onnx",
+    "onnx/decoder_model_merged_q4.onnx_data",
+    "onnx/embed_tokens_q4.onnx",
+    "onnx/embed_tokens_q4.onnx_data",
+    "onnx/vision_encoder_fp16.onnx",
+    "onnx/vision_encoder_fp16.onnx_data",
 ]
 @dataclass(slots=True)
 class CandidateSpec:

@@ -26,7 +26,15 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
     def test_template_download_includes_package_builder_required_files(self) -> None:
         self.assertIn("generation_config.json", TEMPLATE_ALLOW_PATTERNS)
         self.assertIn("preprocessor_config.json", TEMPLATE_ALLOW_PATTERNS)
-        self.assertIn("onnx/*", TEMPLATE_ALLOW_PATTERNS)
+        for name in [
+            "onnx/decoder_model_merged_q4.onnx",
+            "onnx/decoder_model_merged_q4.onnx_data",
+            "onnx/embed_tokens_q4.onnx",
+            "onnx/embed_tokens_q4.onnx_data",
+            "onnx/vision_encoder_fp16.onnx",
+            "onnx/vision_encoder_fp16.onnx_data",
+        ]:
+            self.assertIn(name, TEMPLATE_ALLOW_PATTERNS)
 
     def test_candidate_specs_include_low_strength_influence_ladder(self) -> None:
         names = [spec.name for spec in _candidate_specs()]

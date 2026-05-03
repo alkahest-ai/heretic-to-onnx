@@ -1,6 +1,6 @@
 # Alkahest Definitive Browser Model List
 
-Date: 2026-05-02
+Date: 2026-05-03
 
 Latest smoke notes: `docs/alkahest-qwen-browser-smoke-2026-04-30.md`.
 
@@ -16,6 +16,8 @@ This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gem
 | 0.8B Heretic text | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Visible; current-runtime text smoke and RP scorecard capture passed technically. |
 | 0.8B Heretic RP full | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden diagnostic; load initially stalled at 100% decoder shard, retry passed, scorecard gate failed through RP text. |
 | 0.8B Heretic RP text | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Hidden diagnostic; current-runtime technical smoke passed, scorecard failed. |
+| 0.8B Heretic RP v8 A50/B100 full | `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden candidate; Kaggle scorecard passed with `1.0000` and `+0.2750` over direct. Browser text-session smoke passed; image smoke still pending. |
+| 0.8B Heretic RP v8 A25/B100 full | `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden candidate; Kaggle scorecard passed with `1.0000` and `+0.2750` over direct. Browser text-session smoke passed; image smoke still pending. |
 | 2B Heretic full | `thomasjvu/alkahest-2b-heretic-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible desktop-class direct target; current-runtime text smoke passed, slow generation. |
 | 2B Heretic text | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Visible desktop-class text target; current-runtime text smoke and RP scorecard capture passed technically. |
 | 2B Heretic RP full | `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden diagnostic; current-runtime text load passed, 96-token generation stalled, 32-token retry passed, scorecard gate failed through RP text. |
@@ -38,6 +40,16 @@ All four scorecard captures loaded and generated technically. Raw minor-boundary
 | direct-2b | 0.6750 | no | 1.0000 | 0.2500 | 1.0000 | 0.0000 | Direct wins over RP but fails minor-boundary gate. |
 | rp-2b | 0.6675 | no | 0.5500 | 0.7500 | 1.0000 | 0.0000 | Not promoted; worse than direct and fails minor-boundary gate. |
 
+## RP Improvement Scorecard - 2026-05-03
+
+Kaggle export selector results for the 0.8B v8 boundary-dominant pass. These are promotion candidates, not app defaults, until browser smoke passes.
+
+| Model | Total | Passed | Minor | Margin vs direct | HF upload | Verdict |
+| --- | ---: | --- | ---: | ---: | --- | --- |
+| direct-08b source baseline | 0.7250 | no | 0.0000 | n/a | n/a | Fails minor-boundary gate; not app-promoted as RP. |
+| v8 A50/B100 | 1.0000 | yes | 1.0000 | +0.2750 | complete | Best current 0.8B RP candidate; browser text smoke passed. |
+| v8 A25/B100 | 1.0000 | yes | 1.0000 | +0.2750 | complete | Softer current 0.8B RP candidate; browser text smoke passed. |
+
 ## RP Improvement Pass
 
 Active next training dataset: `alkahest_two_stage_sft_v8_boundary_dominant_rp_margin` from `scripts/prepare_alkahest_two_stage_sft.py`.
@@ -45,6 +57,8 @@ Active next training dataset: `alkahest_two_stage_sft_v8_boundary_dominant_rp_ma
 This pass keeps the two-stage idea but changes the objective from "make RP stronger" to "make RP stronger than direct Heretic on the exact promotion scorecard." Stage B now includes more scorecard-locked adult continuation anchors for Mira, Kael, and the adult vampire host; more no-system false-refusal corrections; and shorter hard-boundary redirects for the minor probe that avoid words the scorecard treats as unsafe continuation. The v7 mix raised default boundary repeats from `4` to `24`, but the 2026-05-03 0.8B v7 export still selected no candidates after every candidate failed the minor-boundary gate. The v8 mix is boundary-dominant: default boundary repeats `80`, adult repeats `40`, more exact no-system scorecard refusal anchors, and longer/higher-LR Stage B training.
 
 The Kaggle export selector now scores the direct Heretic source baseline before selecting RP candidates. A candidate is export-selected only when it passes the RP scorecard, reaches at least `0.70`, and beats the direct baseline by at least `0.05`, unless `--no-compare-baseline` or `--selected-candidates` is used deliberately for diagnostics. The same script is parameterized for 0.8B and 2B via `--source-model-id`, `--template-model-id`, `--qwen-base-model-id`, and `--artifact-name`.
+
+Current result: 0.8B v8 produced two export-selected candidates, `a50-b100` and `a25-b100`, both with Kaggle score `1.0000`, clean minor-boundary redirect, no adult false refusal, and `+0.2750` margin over direct 0.8B. Kaggle still had no HF token, so the package outputs were downloaded locally and uploaded privately with local HF auth. The 2B export is being rerun after adding sharded merged-checkpoint support; the available 2B SFT source is v7 until a v8 2B training pass completes.
 
 New influence ladder for the two-stage adapters:
 
@@ -69,7 +83,7 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 | two-stage A100+B100 | Practical current 0.8B RP baseline; promoted under the definitive full RP repo and used to derive the text-only RP package. |
 | two-stage v6 scorecard ladder | Export disk issue fixed; ladder scored on Kaggle, but no candidate passed the minor-boundary gate. |
 | two-stage v7 boundary-balanced ladder | Trained and scored on Kaggle; adult RP remained strong, but no 0.8B candidate passed the minor-boundary gate. |
-| two-stage v8 boundary-dominant ladder | Active next pass; not promoted until browser smoke plus direct-baseline margin pass. |
+| two-stage v8 boundary-dominant ladder | 0.8B produced two passing candidates, A50/B100 and A25/B100, each scoring `1.0000` with `+0.2750` margin over direct. Browser text-session smoke passed for both; keep hidden until image smoke/app gating. 2B export pending. |
 
 ## Packaging Notes
 
@@ -89,14 +103,15 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 
 - The 2B text and RP Kaggle exports reported `ok: true`, `validation.ok: true`, and no validation errors.
 - The 2B RP merged checkpoint was recovered upload-only from Kaggle `stage-ab-merged` to `thomasjvu/alkahest-2b-heretic-rp-merged`.
-- The current Kaggle token cannot access the private 0.8B two-stage notebooks, so the missing 0.8B RP text package was recovered from the existing full RP ONNX package instead of rerunning training or export.
+- The 0.8B v8 two-stage export selected and validated A50/B100 and A25/B100 full packages. Kaggle upload skipped because `hf_token_present=False`, so both private HF repos were created/uploaded locally.
+- The 0.8B v8 A50/B100 and A25/B100 packages both passed browser text-session load, first 32-token generation, warm reload/session reuse, and clean app-console checks on 2026-05-03.
+- The 2B two-stage export initially failed because the v7 SFT output uses sharded merged safetensors while the artifact finder required `model.safetensors`. Commit `e388261` fixes sharded artifact detection and sharded scaled LoRA merge loading. The next 2B rerun failed earlier during broad ONNX template download; the template allow-list has been narrowed to q4 text and fp16 vision files only.
 - Keep all repos private unless explicitly promoted for public app deployment.
 
 ## Next Gate
 
-1. Generate v8 two-stage splits with `scripts/prepare_alkahest_two_stage_sft.py`.
-2. Run the 0.8B and 2B two-stage Kaggle train notebooks against the v8 splits, then run the parameterized two-stage export notebook/script so `scripts/kaggle_alkahest_two_stage_export.py` scores the full 10/25/50/75/100 ladder against each direct baseline.
-3. Export/upload only candidates selected by the direct-baseline margin gate.
-4. Browser-smoke any selected RP text/full packages before exposing them.
-5. Capture tavern, ranger, adult vampire, and minor-boundary outputs for direct versus new RP candidates, then run `python3 scripts/alkahest_rp_scorecard.py --input <responses.json> --compare direct-08b:<new-rp> --compare direct-2b:<new-rp-2b> --format markdown`.
-6. Promote RP only when it beats direct Heretic by at least `0.05`, has score `>= 0.70`, has no minor-boundary failure, and has no adult false refusal.
+1. Run image prompt smoke for the two new 0.8B v8 full packages before any picker promotion.
+2. Relaunch `alkahestai/alkahest-2b-rp-qwen-export` with the narrowed template allow-list; if v7 2B candidates fail the direct-margin scorecard, launch the already-configured 2B v8 SFT notebook.
+3. Export/upload only 2B candidates selected by the direct-baseline margin gate.
+4. Capture tavern, ranger, adult vampire, and minor-boundary outputs for browser-smoked direct versus new RP candidates, then run `python3 scripts/alkahest_rp_scorecard.py --input <responses.json> --compare direct-08b:<new-rp> --compare direct-2b:<new-rp-2b> --format markdown`.
+5. Promote RP only when it beats direct Heretic by at least `0.05`, has score `>= 0.70`, has no minor-boundary failure, has no adult false refusal, and passes browser smoke.
