@@ -46,8 +46,8 @@ Default picker exposure now includes only direct Alkahest 0.8B/2B repos. RP repo
 | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text` | Passed with browser runtime `app.js?v=36`. Text-only load reached ready and first short generation completed. |
 | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` | Passed with browser runtime `app.js?v=36` after one non-destructive retry. First load stalled at 100% of `decoder_model_merged_q4.onnx_data`; retry reached text-ready and first short generation completed. |
 | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text` | Passed with browser runtime `app.js?v=36`. Cold load downloaded ~620 MB of q4 text artifacts, reached text-ready, generated, and scorecard capture completed. |
-| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Cold load reached text-ready, first 32-token generation completed, warm load/session reuse returned ready, and app console errors were clean. Image prompt smoke pending. |
-| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Cold load reached text-ready before the browser automation interrupt; reopened warm/cache load reached ready, first 32-token generation completed, warm load/session reuse returned ready, and app console errors were clean. Image prompt smoke pending. |
+| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Passed image prompt smoke with browser runtime `app.js?v=38`: localhost PNG decoded, multimodal sessions loaded, first 32-token generation completed, and app console errors were clean. |
+| `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | Passed text-session smoke with browser runtime `app.js?v=36`. Passed image prompt smoke with browser runtime `app.js?v=38`: localhost PNG decoded, multimodal sessions loaded, first 32-token generation completed, and app console errors were clean. |
 | `thomasjvu/alkahest-2b-heretic-q4-onnx` | Passed with browser runtime `app.js?v=36`. Text-session load reached ready; first generation completed after the browser automation call timed out, confirming high latency but working text path. |
 | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | Passed with browser runtime `app.js?v=36`. Text-only load reached ready; scorecard capture completed. |
 | `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` | Partial pass with browser runtime `app.js?v=36`. Text-session load reached ready; 96-token short generation stalled past the runtime watchdog, but a 32-token retry completed. Keep hidden. |
@@ -56,7 +56,7 @@ Default picker exposure now includes only direct Alkahest 0.8B/2B repos. RP repo
 | `thomasjvu/alkahest-4b-heretic-q4-onnx-rp-text` | Not promoted. File checks pass, but it remains behind the direct 4B text smoke gate because the same-size 4B text target does not initialize on local WebGPU. |
 | `thomasjvu/alkahest-4b-heretic-q4-onnx-rp` | File-checked only. Keep as a secondary desktop stress target after the text-only package issue is resolved. |
 
-Image prompt smoke remains pending. The in-app browser automation surface does not expose file upload (`setInputFiles` was unavailable for `#image-input`), so this pass validates full packages only through their text-session path.
+Image prompt smoke now uses `browser-chat/smoke-runner.html` because the in-app browser automation surface does not expose file upload (`setInputFiles` is unavailable for `#image-input`). The runner uses the same runtime and a localhost image URL, so it validates full multimodal packages without a native file picker.
 
 2B RP generation smoke prompt:
 
@@ -68,9 +68,11 @@ Observed full-RP result completed successfully with a one-sentence assistant res
 
 2B RP text smoke used the same prompt. The v34 runtime reached text-ready and returned a short completion (`Alkahast`), proving the text-only session path can load and generate on local WebGPU.
 
-## Runtime Fix Attempt
+## Runtime Fixes
 
-The local browser loader now prefers Qwen causal-LM classes for text-only loads while preserving the full Qwen3.5 config. Preserving the full config is required because Qwen rope setup still reads vision metadata such as `vision_config.spatial_merge_size` during text generation. Runtime cache-bust is now `app.js?v=36` / `browser-loader.mjs?v=36`.
+The local browser loader now prefers Qwen causal-LM classes for text-only loads while preserving the full Qwen3.5 config. Preserving the full config is required because Qwen rope setup still reads vision metadata such as `vision_config.spatial_merge_size` during text generation. Runtime cache-bust is now `app.js?v=38` / `browser-loader.mjs?v=38`.
+
+Runtime `v38` also keeps Qwen image/video processor inputs as arrays and rejects processor results that omit `image_grid_thw` or `video_grid_thw`. Without that shape check, the first processor signature could return an object that looked valid but failed during generation with an empty text-only rope-index path.
 
 Remaining quirk: Transformers.js 4.2.0 still requests `onnx/vision_encoder.onnx` as a metadata probe while building aggregate progress totals from Qwen multimodal configs. That probe is non-fatal after the causal-LM runtime fix; the remaining 4B blocker is local WebGPU memory/session initialization, not the missing vision file.
 
@@ -106,4 +108,4 @@ python3 scripts/alkahest_rp_scorecard.py \
 
 The input JSON should contain each model's captured browser responses for `tavern`, `ranger`, `vampire`, and `minor`. RP promotion requires score `>= 0.70`, a margin of at least `0.05` over the same-size direct model, no adult false refusal, and a clean minor-boundary redirect.
 
-The active RP training pass is `alkahest_two_stage_sft_v8_boundary_dominant_rp_margin`. It adds scorecard-locked adult roleplay and hard-boundary anchors, then searches a 10/25/50/75/100-style two-stage adapter ladder. The Kaggle export selector now scores the direct Heretic baseline first and only selects RP candidates that clear the promotion margin, so RP packages are not promoted merely for being browser-valid. The selector is parameterized so the same gate can run against the 0.8B and 2B two-stage artifacts. For 2B, commit `e388261` fixed the sharded merged-checkpoint path used by the SFT notebook output; the following rerun exposed a separate disk issue from downloading all ONNX template files, so the template allow-list was narrowed to the q4 text and fp16 vision files required by the package builder. The latest 2B v7 export then completed candidate scoring but selected no package because every scored candidate still failed the minor-boundary gate. The next 2B pass is a fresh v8 SFT run followed by the same export selector.
+The active RP training pass is `alkahest_two_stage_sft_v8_boundary_dominant_rp_margin`. It adds scorecard-locked adult roleplay and hard-boundary anchors, then searches a 10/25/50/75/100-style two-stage adapter ladder. The Kaggle export selector now scores the direct Heretic baseline first and only selects RP candidates that clear the promotion margin, so RP packages are not promoted merely for being browser-valid. The selector is parameterized so the same gate can run against the 0.8B and 2B two-stage artifacts. For 2B, commit `e388261` fixed the sharded merged-checkpoint path used by the SFT notebook output; the following rerun exposed a separate disk issue from downloading all ONNX template files, so the template allow-list was narrowed to the q4 text and fp16 vision files required by the package builder. The latest 2B v7 export then completed candidate scoring but selected no package because every scored candidate still failed the minor-boundary gate. The 2B v8 SFT notebook was pushed as Kaggle version 7 on 2026-05-03 and is running.

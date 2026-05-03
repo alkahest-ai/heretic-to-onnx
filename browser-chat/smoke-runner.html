@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heretic Browser Smoke Runner</title>
+    <style>
+      body {
+        background: #101113;
+        color: #ece8df;
+        font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin: 0;
+        padding: 24px;
+      }
+
+      main {
+        max-width: 960px;
+      }
+
+      h1 {
+        font-size: 18px;
+        margin: 0 0 16px;
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 8px 16px;
+      }
+
+      dt {
+        color: #a89f91;
+      }
+
+      dd {
+        margin: 0;
+      }
+
+      pre {
+        background: #17191d;
+        border: 1px solid #30343b;
+        border-radius: 6px;
+        overflow-wrap: anywhere;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+
+      .failed {
+        color: #ff8f8f;
+      }
+
+      .passed {
+        color: #8ff0a4;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Heretic Browser Smoke Runner</h1>
+      <dl>
+        <dt>status</dt>
+        <dd id="smoke-status">Starting...</dd>
+        <dt>model</dt>
+        <dd id="smoke-model"></dd>
+        <dt>image</dt>
+        <dd id="smoke-image"></dd>
+        <dt>detail</dt>
+        <dd id="smoke-detail">Waiting for runtime activity.</dd>
+        <dt>elapsed</dt>
+        <dd id="smoke-elapsed">0s</dd>
+      </dl>
+      <h2>Output</h2>
+      <pre id="smoke-output"></pre>
+      <h2>Error</h2>
+      <pre id="smoke-error"></pre>
+    </main>
+    <script type="module" src="./smoke-runner.js?v=3"></script>
+  </body>
+</html>

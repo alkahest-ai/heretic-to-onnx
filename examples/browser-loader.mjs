@@ -289,9 +289,41 @@ async function buildProcessorInputs(processor, family, prompt, imageArg, audioAr
     return family === "qwen3_5" ? processor(prompt) : processor(prompt, options);
   }
 
+  const hasTensorValues = (value) => {
+    if (!value) {
+      return false;
+    }
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    if (ArrayBuffer.isView(value)) {
+      return value.length > 0;
+    }
+    if (value.data && ArrayBuffer.isView(value.data)) {
+      return value.data.length > 0;
+    }
+    if (Array.isArray(value.dims)) {
+      return value.dims.every((dim) => Number(dim) > 0);
+    }
+    return false;
+  };
+
+  const validateMultimodalInputs = (inputs) => {
+    if (family !== "qwen3_5") {
+      return inputs;
+    }
+    if (imageArg && !hasTensorValues(inputs?.image_grid_thw)) {
+      throw new Error("Qwen processor output omitted image_grid_thw for image input.");
+    }
+    if (videoArg && !hasTensorValues(inputs?.video_grid_thw)) {
+      throw new Error("Qwen processor output omitted video_grid_thw for video input.");
+    }
+    return inputs;
+  };
+
   const attempt = async (factory) => {
     try {
-      return await factory();
+      return validateMultimodalInputs(await factory());
     } catch (error) {
       return error;
     }
@@ -607,9 +639,11 @@ export function createBrowserChatRuntime({
       audioSources.length > 0 ? await Promise.all(audioSources.map((source) => read_audio(source))) : [];
     const videos = videoSources.length > 0 ? [...videoSources] : [];
 
-    const imageArg = images.length <= 1 ? images[0] : images;
+    const imageArg =
+      images.length === 0 ? undefined : family === "qwen3_5" ? images : images.length === 1 ? images[0] : images;
     const audioArg = audios.length <= 1 ? audios[0] : audios;
-    const videoArg = videos.length <= 1 ? videos[0] : videos;
+    const videoArg =
+      videos.length === 0 ? undefined : family === "qwen3_5" ? videos : videos.length === 1 ? videos[0] : videos;
 
     const inputs = await buildProcessorInputs(processor, family, prompt, imageArg, audioArg, videoArg);
 

@@ -1,4 +1,4 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=36";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=38";
 
 const DOWNLOAD_STALL_MS = 90_000;
 const PHASE_STALL_MS = 120_000;
@@ -180,7 +180,7 @@ function createWorkerRuntime({
     if (worker) {
       return worker;
     }
-    worker = new Worker(new URL("./runtime-worker.js?v=24", import.meta.url), { type: "module" });
+    worker = new Worker(new URL("./runtime-worker.js?v=25", import.meta.url), { type: "module" });
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
     worker.addEventListener("messageerror", handleMessageError);
