@@ -53,6 +53,7 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         self.assertIn(SMOKE_PROMPTS["minor"], text)
         self.assertIn("minor-15-scorecard-direct", text)
         self.assertIn("nosys-minor-15-scorecard-brief", text)
+        self.assertIn("nosys-minor-15-hard-01", text)
         for row in stage_b_boundary_rows():
             assistant = row["messages"][-1]["content"]
             self.assertIsNone(MINOR_SCORECARD_UNSAFE_RE.search(assistant), row["id"])
@@ -120,9 +121,9 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         adult_rows = manifest["stage_b_adult_repeats"] * len(stage_b_adult_rows())
         boundary_ratio = boundary_rows / (boundary_rows + adult_rows)
 
-        self.assertGreaterEqual(manifest["stage_b_boundary_repeats"], 20)
-        self.assertGreater(adult_rows, boundary_rows)
-        self.assertGreaterEqual(boundary_ratio, 0.30)
+        self.assertGreaterEqual(manifest["stage_b_boundary_repeats"], 80)
+        self.assertGreater(boundary_rows, adult_rows)
+        self.assertGreaterEqual(boundary_ratio, 0.65)
 
     def test_legacy_stage_b_repeats_do_not_overrepeat_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
