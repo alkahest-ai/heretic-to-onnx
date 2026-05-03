@@ -31,16 +31,46 @@ def adapter_target_key(lora_a_key: str) -> str:
     return lora_a_key[len(prefix) : -len(suffix)] + ".weight"
 
 
+def load_base_tensors(base_dir: Path, base_weight: str) -> tuple[dict[str, torch.Tensor], dict[str, str] | None, str]:
+    base_path = base_dir / base_weight
+    if base_path.exists():
+        with safe_open(base_path, framework="pt", device="cpu") as base_file:
+            return (
+                {key: base_file.get_tensor(key) for key in base_file.keys()},
+                base_file.metadata(),
+                base_weight,
+            )
+
+    index_path = base_dir / "model.safetensors.index.json"
+    if not index_path.exists():
+        raise FileNotFoundError(f"{base_path} or {index_path}")
+
+    weight_map = json.loads(index_path.read_text()).get("weight_map", {})
+    shard_names = sorted(set(weight_map.values()))
+    if not shard_names:
+        raise ValueError(f"empty safetensors weight map: {index_path}")
+
+    tensors: dict[str, torch.Tensor] = {}
+    metadata: dict[str, str] | None = None
+    for shard_name in shard_names:
+        shard_path = base_dir / shard_name
+        if not shard_path.exists():
+            raise FileNotFoundError(shard_path)
+        with safe_open(shard_path, framework="pt", device="cpu") as shard_file:
+            if metadata is None:
+                metadata = shard_file.metadata()
+            for key in shard_file.keys():
+                tensors[key] = shard_file.get_tensor(key)
+    return tensors, metadata, "model.safetensors.index.json"
+
+
 def main() -> None:
     args = parse_args()
     if args.scale < 0:
         raise ValueError("--scale must be non-negative")
 
-    base_path = args.base_dir / args.base_weight
     adapter_path = args.adapter_dir / args.adapter_weight
     config_path = args.adapter_dir / "adapter_config.json"
-    if not base_path.exists():
-        raise FileNotFoundError(base_path)
     if not adapter_path.exists():
         raise FileNotFoundError(adapter_path)
     if not config_path.exists():
@@ -63,9 +93,7 @@ def main() -> None:
         if src.exists():
             shutil.copy2(src, args.output_dir / name)
 
-    with safe_open(base_path, framework="pt", device="cpu") as base_file:
-        tensors = {key: base_file.get_tensor(key) for key in base_file.keys()}
-        metadata = base_file.metadata()
+    tensors, metadata, resolved_base_weight = load_base_tensors(args.base_dir, args.base_weight)
 
     with safe_open(adapter_path, framework="pt", device="cpu") as adapter_file:
         adapter_keys = list(adapter_file.keys())
@@ -101,6 +129,7 @@ def main() -> None:
         "adapter_dir": str(args.adapter_dir),
         "applied": len(applied),
         "base_dir": str(args.base_dir),
+        "base_weight": resolved_base_weight,
         "lora_alpha": alpha,
         "lora_rank": rank,
         "ok": True,

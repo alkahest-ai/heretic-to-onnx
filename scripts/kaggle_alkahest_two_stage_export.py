@@ -134,12 +134,16 @@ def _find_artifacts(explicit: str, artifact_name: str) -> Path:
         ]
     )
     candidates.extend(Path("/kaggle/input").glob(f"**/{artifact_name}"))
+
+    def has_merged_checkpoint(path: Path) -> bool:
+        return (path / "model.safetensors").exists() or (path / "model.safetensors.index.json").exists()
+
     for candidate in candidates:
         if (
             (candidate / "stage-a-adapter" / "adapter_model.safetensors").exists()
             and (candidate / "stage-b-adapter" / "adapter_model.safetensors").exists()
-            and (candidate / "stage-a-merged" / "model.safetensors").exists()
-            and (candidate / "stage-ab-merged" / "model.safetensors").exists()
+            and has_merged_checkpoint(candidate / "stage-a-merged")
+            and has_merged_checkpoint(candidate / "stage-ab-merged")
         ):
             return candidate.resolve()
     checked = "\n".join(str(path) for path in candidates[:20])

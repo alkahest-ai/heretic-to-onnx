@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from scripts.alkahest_rp_scorecard import CandidateScore
 from scripts.kaggle_alkahest_two_stage_export import (
     TEMPLATE_ALLOW_PATTERNS,
     _candidate_specs,
     _filtered_candidate_specs,
+    _find_artifacts,
     _score_responses,
     _select,
     _select_promoted,
@@ -36,6 +38,18 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
         specs = _filtered_candidate_specs("a100-b25,a50-b50")
 
         self.assertEqual([spec.name for spec in specs], ["a100-b25", "a50-b50"])
+
+    def test_find_artifacts_accepts_sharded_merged_checkpoints(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "alkahest-2b-two-stage-sft"
+            for subdir in ["stage-a-adapter", "stage-b-adapter", "stage-a-merged", "stage-ab-merged"]:
+                (root / subdir).mkdir(parents=True)
+            (root / "stage-a-adapter" / "adapter_model.safetensors").write_bytes(b"adapter")
+            (root / "stage-b-adapter" / "adapter_model.safetensors").write_bytes(b"adapter")
+            (root / "stage-a-merged" / "model.safetensors.index.json").write_text('{"weight_map": {}}\n')
+            (root / "stage-ab-merged" / "model.safetensors.index.json").write_text('{"weight_map": {}}\n')
+
+            self.assertEqual(_find_artifacts(str(root), "alkahest-2b-two-stage-sft"), root.resolve())
 
     def test_text_only_export_manifest_omits_vision_contract(self) -> None:
         manifest = _manifest(
