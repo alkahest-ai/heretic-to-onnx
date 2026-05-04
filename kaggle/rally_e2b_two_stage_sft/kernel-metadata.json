@@ -1,0 +1,13 @@
+{
+  "id": "alkahestai/rally-e2b-two-stage-sft-t4",
+  "title": "Rally E2B Two Stage SFT T4",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

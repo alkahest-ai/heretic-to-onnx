@@ -38,17 +38,26 @@ Two Gemma4 E2B text-only manifests were added:
 
 Gemma4 export contract generation now omits `vision_encoder` and `audio_encoder` sessions when the manifest is text-only. Full packages still use the text + image manifest and keep `vision_encoder_q4f16.*`.
 
-## One-Lane Command
+## Kaggle Execution
 
-On the H200/Phala box, after setting `HF_TOKEN`, run:
+Use Kaggle instead of Phala for the active lane. The workflow mirrors the Alkahest notebooks:
+
+1. push and run `kaggle/rally_e2b_two_stage_sft`
+2. when it completes, run `kaggle/rally_e2b_two_stage_export`, which consumes the training kernel as a source
+
+Kernel IDs:
+
+- `alkahestai/rally-e2b-two-stage-sft-t4`
+- `alkahestai/rally-e2b-browser-export`
+
+CLI launch:
 
 ```bash
-export HF_OWNER=thomasjvu
-export HF_PRIVATE=1
-bash scripts/phala_gpu_tee_oneclick.sh rally-e2b
+kaggle kernels push -p kaggle/rally_e2b_two_stage_sft
+kaggle kernels push -p kaggle/rally_e2b_two_stage_export
 ```
 
-That command performs:
+The two-kernel workflow performs:
 
 1. direct Heretic full export and upload
 2. direct Heretic text-only export and upload
@@ -58,6 +67,8 @@ That command performs:
 6. merged checkpoint upload
 7. RP full export and upload
 8. RP text-only export and upload
+
+The equivalent Phala command remains available as a fallback, but it is not the active path for this lane.
 
 ## Promotion Gate
 

@@ -143,14 +143,13 @@ After upload, validate the package contract in a browser/WebGPU environment usin
 
 Desktop Safari / desktop Chromium should be the main validation targets.
 
-## 10. Current E2B One-Click Path
+## 10. Current E2B Kaggle Path
 
-After the Alkahest 0.8B/2B closeout, use the E2B-only lane before touching E4B:
+After the Alkahest 0.8B/2B closeout, use the E2B-only Kaggle lane before touching E4B:
 
 ```bash
-export HF_OWNER=thomasjvu
-export HF_PRIVATE=1
-bash scripts/phala_gpu_tee_oneclick.sh rally-e2b
+kaggle kernels push -p kaggle/rally_e2b_two_stage_sft
+kaggle kernels push -p kaggle/rally_e2b_two_stage_export
 ```
 
 That path publishes the direct Heretic full package, direct Heretic text-only package, A100/B75 RP merged checkpoint, A100/B75 RP full package, and A100/B75 RP text-only package. Keep the resulting Rally presets hidden until browser smoke and the RP scorecard beat the direct Rally E2B baseline.
