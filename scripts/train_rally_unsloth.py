@@ -97,8 +97,34 @@ def _patch_transformers_cache_exports() -> None:
         setattr(transformers, name, type(name, (), {}))
 
 
+def _patch_unsloth_vision_hybrid_cache_import() -> None:
+    target = None
+    for root in _candidate_site_roots():
+        candidate = root / "unsloth/models/vision.py"
+        if candidate.exists():
+            target = candidate
+            break
+    if target is None:
+        return
+    text = target.read_text(encoding="utf-8")
+    needle = "from transformers import GenerationConfig, CompileConfig, HybridCache"
+    if needle not in text:
+        return
+    replacement = (
+        "from transformers import GenerationConfig, CompileConfig\n"
+        "try:\n"
+        "    from transformers import HybridCache\n"
+        "except ImportError:\n"
+        "    class HybridCache:\n"
+        "        pass"
+    )
+    target.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+    importlib.invalidate_caches()
+
+
 _patch_unsloth_transformers5_config_exec()
 _patch_transformers_cache_exports()
+_patch_unsloth_vision_hybrid_cache_import()
 
 try:
     import trl.trainer.utils as trl_trainer_utils
