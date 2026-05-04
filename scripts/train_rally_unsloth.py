@@ -82,12 +82,19 @@ def _patch_unsloth_transformers5_config_exec() -> None:
 def _patch_transformers_cache_exports() -> None:
     try:
         import transformers
-        from transformers import cache_utils
     except Exception:
         return
+    try:
+        from transformers import cache_utils
+    except Exception:
+        cache_utils = None
     for name in ("HybridCache",):
-        if not hasattr(transformers, name) and hasattr(cache_utils, name):
+        if hasattr(transformers, name):
+            continue
+        if cache_utils is not None and hasattr(cache_utils, name):
             setattr(transformers, name, getattr(cache_utils, name))
+            continue
+        setattr(transformers, name, type(name, (), {}))
 
 
 _patch_unsloth_transformers5_config_exec()
