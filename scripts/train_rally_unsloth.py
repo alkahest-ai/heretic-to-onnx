@@ -1,13 +1,85 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
+import site
+import sys
 from copy import deepcopy
 from pathlib import Path
 
 os.environ.setdefault("UNSLOTH_COMPILE_DISABLE", "1")
 os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
+
+
+def _version_tuple(value: str) -> tuple[int, ...]:
+    parts: list[int] = []
+    for raw in value.split("."):
+        digits = ""
+        for char in raw:
+            if not char.isdigit():
+                break
+            digits += char
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def _candidate_site_roots() -> list[Path]:
+    roots: list[Path] = []
+    for getter in (site.getsitepackages, lambda: [site.getusersitepackages()]):
+        try:
+            roots.extend(Path(root) for root in getter() if root)
+        except Exception:
+            pass
+    roots.extend(Path(root) for root in sys.path if root)
+    seen: set[Path] = set()
+    unique_roots: list[Path] = []
+    for root in roots:
+        try:
+            resolved = root.expanduser().resolve()
+        except Exception:
+            continue
+        if resolved not in seen:
+            unique_roots.append(resolved)
+            seen.add(resolved)
+    return unique_roots
+
+
+def _patch_unsloth_transformers5_config_exec() -> None:
+    try:
+        from transformers import __version__ as transformers_version
+    except Exception:
+        return
+    if _version_tuple(transformers_version) < (5, 0, 0):
+        return
+
+    target = None
+    for root in _candidate_site_roots():
+        candidate = root / "unsloth/models/_utils.py"
+        if candidate.exists():
+            target = candidate
+            break
+    if target is None:
+        return
+
+    text = target.read_text(encoding="utf-8")
+    if "_skip_config_exec_patch" in text:
+        return
+    needle = "for model_name in model_architectures:"
+    replacement = (
+        "for model_name in (() if Version(transformers_version) >= Version(\"5.0.0\") "
+        "else model_architectures):"
+    )
+    if needle not in text:
+        return
+    target.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+    importlib.invalidate_caches()
+
+
+_patch_unsloth_transformers5_config_exec()
 
 try:
     import trl.trainer.utils as trl_trainer_utils
