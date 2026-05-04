@@ -221,6 +221,24 @@ from trl import SFTConfig, SFTTrainer
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
+def _patch_sft_trainer_constant_length_dataset() -> None:
+    try:
+        import trl.trainer.utils as trl_trainer_utils
+    except Exception:
+        trl_trainer_utils = None
+    constant_length_dataset = getattr(trl_trainer_utils, "ConstantLengthDataset", None)
+    if constant_length_dataset is None:
+        class ConstantLengthDataset:  # type: ignore[no-redef]
+            pass
+
+        constant_length_dataset = ConstantLengthDataset
+    for name in ("__init__", "_prepare_dataset"):
+        method = getattr(SFTTrainer, name, None)
+        globals_dict = getattr(method, "__globals__", None)
+        if isinstance(globals_dict, dict):
+            globals_dict.setdefault("ConstantLengthDataset", constant_length_dataset)
+
+
 def _apply_thinking_prefix(messages: list[dict], enabled: bool) -> list[dict]:
     if not enabled or not messages:
         return messages
@@ -332,6 +350,7 @@ def main() -> int:
         desc="format validation rows",
     )
 
+    _patch_sft_trainer_constant_length_dataset()
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,
