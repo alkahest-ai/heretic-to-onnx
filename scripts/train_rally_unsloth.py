@@ -11,9 +11,15 @@ os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
 
 try:
     import trl.trainer.utils as trl_trainer_utils
-    from trl.trainer import ConstantLengthDataset
 
     if not hasattr(trl_trainer_utils, "ConstantLengthDataset"):
+        try:
+            from trl.trainer import ConstantLengthDataset
+        except Exception:
+            class ConstantLengthDataset:  # type: ignore[no-redef]
+                def __init__(self, *args, **kwargs):
+                    raise RuntimeError("ConstantLengthDataset compatibility placeholder should not be used")
+
         trl_trainer_utils.ConstantLengthDataset = ConstantLengthDataset
 except Exception:
     pass
