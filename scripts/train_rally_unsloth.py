@@ -11,6 +11,7 @@ from pathlib import Path
 
 os.environ.setdefault("UNSLOTH_COMPILE_DISABLE", "1")
 os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
+os.environ.setdefault("UNSLOTH_TEXT_ONLY_PROCESSOR", "1")
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -122,9 +123,31 @@ def _patch_unsloth_vision_hybrid_cache_import() -> None:
     importlib.invalidate_caches()
 
 
+def _patch_unsloth_text_only_processor() -> None:
+    target = None
+    for root in _candidate_site_roots():
+        candidate = root / "unsloth/models/vision.py"
+        if candidate.exists():
+            target = candidate
+            break
+    if target is None:
+        return
+    text = target.read_text(encoding="utf-8")
+    needle = "auto_processor = AutoProcessor if (is_vlm or is_whisper) else AutoTokenizer"
+    replacement = (
+        "auto_processor = AutoTokenizer if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") == \"1\" "
+        "else (AutoProcessor if (is_vlm or is_whisper) else AutoTokenizer)"
+    )
+    if needle not in text:
+        return
+    target.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+    importlib.invalidate_caches()
+
+
 _patch_unsloth_transformers5_config_exec()
 _patch_transformers_cache_exports()
 _patch_unsloth_vision_hybrid_cache_import()
+_patch_unsloth_text_only_processor()
 
 try:
     import trl.trainer.utils as trl_trainer_utils
