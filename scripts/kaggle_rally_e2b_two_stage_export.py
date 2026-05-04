@@ -94,7 +94,6 @@ def _find_artifacts(explicit: str, artifact_name: str) -> Path:
             (candidate / "stage-a-adapter" / "adapter_model.safetensors").exists()
             and (candidate / "stage-b-adapter" / "adapter_model.safetensors").exists()
             and _has_merged_checkpoint(candidate / "stage-a-merged")
-            and _has_merged_checkpoint(candidate / "stage-ab-merged")
         ):
             return candidate.resolve()
     checked = "\n".join(str(path) for path in candidates[:30])

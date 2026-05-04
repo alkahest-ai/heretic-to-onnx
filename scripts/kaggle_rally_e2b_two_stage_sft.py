@@ -55,6 +55,7 @@ def _train_command(
     learning_rate: float,
     max_steps: int,
     manifest_path: Path,
+    save_merged: bool,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -89,8 +90,9 @@ def _train_command(
         str(args.seed),
         "--dataset-num-proc",
         str(args.dataset_num_proc),
-        "--save-merged",
     ]
+    if save_merged:
+        command.append("--save-merged")
     if args.no_load_in_4bit:
         command.append("--no-load-in-4bit")
     print(f"[train-command] {stage} max_steps={max_steps} lr={learning_rate}", flush=True)
@@ -141,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             learning_rate=args.learning_rate,
             max_steps=args.stage_a_max_steps,
             manifest_path=manifest_path,
+            save_merged=True,
         ),
         cwd=ROOT_DIR,
     )
@@ -156,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
             learning_rate=args.stage_b_learning_rate,
             max_steps=args.stage_b_max_steps,
             manifest_path=manifest_path,
+            save_merged=False,
         ),
         cwd=ROOT_DIR,
     )
