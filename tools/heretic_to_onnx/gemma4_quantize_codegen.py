@@ -240,6 +240,7 @@ def _ensure_ms_opset(model) -> None:
 
 def _quantize_gemma4_embed_tokens_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
     model = onnx.load(str(input_path))
+    float_types = {{TensorProto.FLOAT, TensorProto.FLOAT16, TensorProto.BFLOAT16}}
     conversion_mode = "converted_to_fp16"
     try:
         model = onnx_float16.convert_float_to_float16(

@@ -230,6 +230,7 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         self.assertIn("def _tensor_to_dtype(tensor, dtype):", runner)
         self.assertIn("def _harmonize_float16_elementwise_inputs(model) -> int:", runner)
         self.assertIn("def _quantize_gemma4_embed_tokens_q4f16(", runner)
+        self.assertIn("float_types = {TensorProto.FLOAT, TensorProto.FLOAT16, TensorProto.BFLOAT16}", runner)
         self.assertIn('"GatherBlockQuantized"', runner)
         self.assertIn('if session["name"] == "embed_tokens":', runner)
         self.assertIn('if node.op_type not in {"Add", "Sub", "Mul", "Div", "Pow"}:', runner)
