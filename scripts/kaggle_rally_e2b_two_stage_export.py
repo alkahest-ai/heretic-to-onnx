@@ -44,6 +44,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--export-torch-dtype", default="auto", choices=["auto", "float32", "float16", "bfloat16"])
     parser.add_argument("--skip-direct", action="store_true")
     parser.add_argument("--skip-rp", action="store_true")
+    parser.add_argument("--skip-full-packages", action="store_true")
     parser.add_argument("--score", action="store_true", default=True)
     parser.add_argument("--no-score", dest="score", action="store_false")
     parser.add_argument("--require-score", action="store_true")
@@ -326,6 +327,20 @@ def _process_pair(
     packages_dir = work_dir / "packages"
     full_target = PackageTarget(label + "-full", full_template, source_model_id, full_repo, True)
     text_target = PackageTarget(label + "-text", text_template, source_model_id, text_repo, False)
+    results: list[dict[str, Any]] = []
+
+    if args.skip_full_packages:
+        text_manifest = _render_manifest(text_target, manifests_dir, base_model_id)
+        text_paths = _convert_full(
+            text_target,
+            text_manifest,
+            work_dir / "work" / text_target.name,
+            packages_dir / text_target.name,
+            args,
+        )
+        text_publish = _publish(text_manifest, Path(text_paths["package_dir"]), args)
+        results.append({"target": asdict(text_target), "paths": text_paths, "publish": text_publish})
+        return results
 
     full_manifest = _render_manifest(full_target, manifests_dir, base_model_id)
     full_paths = _convert_full(
@@ -346,10 +361,13 @@ def _process_pair(
         Path(full_paths["quantized_dir"]),
     )
     text_publish = _publish(text_manifest, Path(text_paths["package_dir"]), args)
-    return [
-        {"target": asdict(full_target), "paths": full_paths, "publish": full_publish},
-        {"target": asdict(text_target), "paths": text_paths, "publish": text_publish},
-    ]
+    results.extend(
+        [
+            {"target": asdict(full_target), "paths": full_paths, "publish": full_publish},
+            {"target": asdict(text_target), "paths": text_paths, "publish": text_publish},
+        ]
+    )
+    return results
 
 
 def main(argv: list[str] | None = None) -> int:

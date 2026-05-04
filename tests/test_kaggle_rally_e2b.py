@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from scripts.kaggle_rally_e2b_two_stage_export import _find_artifacts, _has_merged_checkpoint
+from scripts.kaggle_rally_e2b_two_stage_export import _find_artifacts, _has_merged_checkpoint, _parser as export_parser
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
 from scripts.train_rally_unsloth import _patch_unsloth_text_only_processor
 
@@ -30,6 +30,11 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertEqual(args.stage_b_boundary_repeats, 80)
         self.assertEqual(args.stage_b_adult_repeats, 40)
         self.assertEqual(args.stage_b_max_steps, 450)
+
+    def test_export_can_skip_full_packages(self) -> None:
+        args = export_parser().parse_args(["--skip-full-packages"])
+
+        self.assertTrue(args.skip_full_packages)
 
     def test_stage_b_command_can_skip_full_merge(self) -> None:
         args = sft_parser().parse_args([])
