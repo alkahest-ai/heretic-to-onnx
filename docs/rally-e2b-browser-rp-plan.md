@@ -25,10 +25,18 @@ As of 2026-05-04, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Artifact | Status | Notes |
 | --- | --- | --- |
 | Two-stage SFT | Complete | `alkahestai/rally-e2b-two-stage-sft-t4` completed Stage A and Stage B on Kaggle T4. |
-| Direct Heretic text | Uploaded | `thomasjvu/rally-2b-text`, HF commit `0ed67b21d4a6aa23614451587dd0e48a06f93dc1`, package report `ok: true`. |
-| RP A100/B75 text | Uploaded | `thomasjvu/rally-2b-rp-text`, HF commit `cf64df4088314cc96a98786de1a0a963bc87e1d4`, package report `ok: true`. |
+| Direct Heretic text | Needs re-export | Legacy uploaded revisions reached the browser but failed WebGPU init on the decoder. Re-export with Gemma4 opset 21 before another scorecard run. |
+| RP A100/B75 text | Needs re-export | Legacy uploaded revisions reached the browser but failed before generation for the same decoder contract issue. Re-export only; do not retrain yet. |
 | RP A100/B75 merged checkpoint | Uploaded | `thomasjvu/rally-2b-rp-a100-b75-merged`, HF commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; `scaled_lora_merge.json` verifies `ok: true`, scale `0.75`, 148 applied LoRA targets. |
 | Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
+
+The confirmed browser failure on the pinned diagnostic scorecard was:
+
+```text
+Provider type for MatMulNBits node with name '/language_model/per_layer_model_projection/MatMul_Q4' is not set.
+```
+
+Local graph inspection showed the failed Rally text decoders were generated as ONNX opset 17 / IR 8, while the Lisper-trained and ONNX Community Gemma4 q4f16 reference decoders use opset 21 with `com.microsoft` custom ops. The next Kaggle pass is therefore an export compatibility pass, not a new RP training pass.
 
 ## Training Shape
 
@@ -49,6 +57,11 @@ Two Gemma4 E2B text-only manifests were added:
 - `configs/heretic-to-onnx.gemma4-e2b-rp-text.yaml`
 
 Gemma4 export contract generation now omits `vision_encoder` and `audio_encoder` sessions when the manifest is text-only. Full packages still use the text + image manifest and keep `vision_encoder_q4f16.*`.
+
+Gemma4 Rally export now defaults to ONNX opset 21, matching the Lisper/reference q4f16 WebGPU contract. Package validation also inspects Gemma4 q4f16 text graphs when ONNX is available and rejects legacy decoder graphs that do not import `com.microsoft` opset 1 or that omit the required custom ops:
+
+- decoder: `MatMulNBits`
+- embed: `GatherBlockQuantized`
 
 ## Kaggle Execution
 
@@ -75,12 +88,14 @@ The two-kernel workflow performs:
 
 1. direct Heretic full export and upload
 2. direct Heretic text-only export and upload
-3. two-stage RP Stage A training
-4. two-stage RP Stage B training
+3. two-stage RP Stage A training, only if the existing merged checkpoint is not reused
+4. two-stage RP Stage B training, only if the existing merged checkpoint is not reused
 5. A100/B75 scaled merge
 6. merged checkpoint upload
 7. RP full export and upload
 8. RP text-only export and upload
+
+For the immediate recovery pass, run export/upload only against the existing direct source and A100/B75 merged checkpoint. Do not start a new Rally RP sweep until the text-only browser runtime can load and complete the scorecard.
 
 The equivalent Phala command remains available as a fallback, but it is not the active path for this lane.
 
@@ -98,3 +113,11 @@ Do not add Rally presets to the default app picker until all of these are true:
 - image smoke passes for the full packages
 
 Until then, Rally repos are URL-override diagnostics only.
+
+## Next Recovery Pass
+
+1. Push the updated `kaggle/rally_e2b_two_stage_export` notebook.
+2. Run it with `--skip-full-packages` first so Kaggle only rebuilds `rally-2b-text` and `rally-2b-rp-text`.
+3. Confirm each package report is `ok: true` and each decoder graph is opset 21 with `com.microsoft:1`.
+4. Pin the new HF revisions in `scorecard-runner.html` and rerun the browser scorecard.
+5. Only after the text-only scorecard passes, resume full text+image package export.

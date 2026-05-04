@@ -14,6 +14,14 @@ _QWEN_WEBGPU_REQUIRED_DECODER_OPS = {
     "MatMulNBits",
     "SkipSimplifiedLayerNormalization",
 }
+_GEMMA4_WEBGPU_REQUIRED_TEXT_SESSIONS = {
+    "onnx/embed_tokens_q4f16.onnx",
+    "onnx/decoder_model_merged_q4f16.onnx",
+}
+_GEMMA4_WEBGPU_FORBIDDEN_TEXT_ONLY_SESSION_NAMES = {
+    "audio_encoder_q4f16.onnx",
+    "vision_encoder_q4f16.onnx",
+}
 
 
 @dataclass(slots=True)
@@ -201,6 +209,89 @@ def _validate_qwen_webgpu_contract(manifest: Manifest, package_path: Path, repor
         )
 
 
+def _opset_versions(model: Any) -> dict[str, int]:
+    return {opset.domain: int(opset.version) for opset in model.opset_import}
+
+
+def _validate_gemma4_webgpu_contract(manifest: Manifest, package_path: Path, report: ValidationReport) -> None:
+    if manifest.architecture != "gemma4_conditional_generation" or manifest.target_dtype != "q4f16":
+        return
+
+    expected = set(manifest.expected_onnx_files)
+    target_id = manifest.target_repo_id.lower()
+    should_validate_reference_contract = (
+        _GEMMA4_WEBGPU_REQUIRED_TEXT_SESSIONS <= expected
+        or "rally" in target_id
+        or "gemma" in target_id
+    )
+    if not should_validate_reference_contract:
+        return
+
+    missing_required = sorted(_GEMMA4_WEBGPU_REQUIRED_TEXT_SESSIONS - expected)
+    if missing_required:
+        report.warnings.append(
+            "Gemma4 q4f16 WebGPU packages must declare reference text sessions: "
+            + ", ".join(missing_required)
+        )
+
+    if manifest.modalities == ["text"]:
+        packaged_onnx = {path.name for path in (package_path / "onnx").glob("*.onnx")}
+        forbidden = sorted(packaged_onnx & _GEMMA4_WEBGPU_FORBIDDEN_TEXT_ONLY_SESSION_NAMES)
+        if forbidden:
+            report.ok = False
+            report.errors.append(
+                "Gemma4 text-only packages must not include multimodal sessions: " + ", ".join(forbidden)
+            )
+
+    decoder_path = package_path / "onnx" / "decoder_model_merged_q4f16.onnx"
+    embed_path = package_path / "onnx" / "embed_tokens_q4f16.onnx"
+    existing_graphs = [
+        ("decoder_model_merged_q4f16.onnx", decoder_path),
+        ("embed_tokens_q4f16.onnx", embed_path),
+    ]
+    if not any(path.exists() for _, path in existing_graphs):
+        return
+
+    try:
+        import onnx
+    except Exception as exc:
+        report.ok = False
+        report.errors.append(f"Gemma4 WebGPU contract requires onnx graph inspection: {exc}")
+        return
+
+    for label, onnx_path in existing_graphs:
+        if not onnx_path.exists():
+            continue
+        try:
+            model = onnx.load(str(onnx_path), load_external_data=False)
+        except Exception as exc:
+            report.ok = False
+            report.errors.append(f"Gemma4 {label} graph could not be inspected: {exc}")
+            continue
+
+        opsets = _opset_versions(model)
+        default_opset = opsets.get("", 0)
+        if default_opset < 21:
+            report.ok = False
+            report.errors.append(
+                f"Gemma4 {label} must use ONNX opset >= 21 for the reference q4f16 WebGPU contract; "
+                f"got {default_opset}"
+            )
+        if opsets.get("com.microsoft") != 1:
+            report.ok = False
+            report.errors.append(
+                f"Gemma4 {label} must import com.microsoft opset 1 for the q4f16 WebGPU contract"
+            )
+
+        custom_ops = {node.op_type for node in model.graph.node if node.domain == "com.microsoft"}
+        if label == "decoder_model_merged_q4f16.onnx" and "MatMulNBits" not in custom_ops:
+            report.ok = False
+            report.errors.append("Gemma4 decoder graph is missing com.microsoft MatMulNBits custom ops")
+        if label == "embed_tokens_q4f16.onnx" and "GatherBlockQuantized" not in custom_ops:
+            report.ok = False
+            report.errors.append("Gemma4 embed graph is missing com.microsoft GatherBlockQuantized custom ops")
+
+
 def validate_package(
     manifest: Manifest,
     package_dir: str | Path,
@@ -259,6 +350,7 @@ def validate_package(
                     )
 
     _validate_qwen_webgpu_contract(manifest, package_path, report)
+    _validate_gemma4_webgpu_contract(manifest, package_path, report)
 
     missing_onnx = [
         relative_path for relative_path in manifest.expected_onnx_files if not (package_path / relative_path).exists()

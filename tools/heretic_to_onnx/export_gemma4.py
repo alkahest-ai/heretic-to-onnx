@@ -39,7 +39,7 @@ def export_gemma4(
     python_exec: str = "python3",
     device: str = "cpu",
     torch_dtype: str = "auto",
-    opset_version: int = 17,
+    opset_version: int = 21,
 ) -> ExportReport:
     layout = resolve_work_dir(manifest, work_dir).ensure()
     output_dir = (layout.export_raw / "gemma4").resolve()

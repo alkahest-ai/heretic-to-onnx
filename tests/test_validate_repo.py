@@ -50,6 +50,101 @@ def _qwen_q4_manifest(root: Path, *, expected_onnx_files: list[str]) -> Manifest
     )
 
 
+@unittest.skipUnless(
+    importlib.util.find_spec("onnx") is not None,
+    "onnx is required for Gemma4 WebGPU graph contract tests",
+)
+class ValidateRepoGemma4WebgpuContractTests(unittest.TestCase):
+    def _write_gemma_package_config(self, package_dir: Path) -> None:
+        _write_json(
+            package_dir / "config.json",
+            {
+                "architectures": ["Gemma4ForConditionalGeneration"],
+                "dtype": "float16",
+                "transformers.js_config": {
+                    "use_external_data_format": True,
+                    "kv_cache_dtype": {"q4f16": "float16"},
+                },
+            },
+        )
+
+    def _write_custom_op_model(self, path: Path, *, opset: int, op_type: str) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        graph = helper.make_graph(
+            [helper.make_node(op_type, ["x"], ["y"], domain="com.microsoft")],
+            "gemma4_contract_graph",
+            [helper.make_tensor_value_info("x", TensorProto.FLOAT16, [1])],
+            [helper.make_tensor_value_info("y", TensorProto.FLOAT16, [1])],
+        )
+        model = helper.make_model(
+            graph,
+            opset_imports=[
+                helper.make_opsetid("", opset),
+                helper.make_opsetid("com.microsoft", 1),
+            ],
+        )
+        onnx.save_model(model, path)
+
+    def test_gemma4_q4f16_contract_accepts_reference_style_text_graphs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_gemma_package_config(package_dir)
+            self._write_custom_op_model(
+                package_dir / "onnx" / "decoder_model_merged_q4f16.onnx",
+                opset=21,
+                op_type="MatMulNBits",
+            )
+            self._write_custom_op_model(
+                package_dir / "onnx" / "embed_tokens_q4f16.onnx",
+                opset=21,
+                op_type="GatherBlockQuantized",
+            )
+
+            report = validate_package(
+                _manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/embed_tokens_q4f16.onnx",
+                        "onnx/decoder_model_merged_q4f16.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertTrue(report.ok, report.errors)
+
+    def test_gemma4_q4f16_contract_rejects_legacy_opset_decoder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_gemma_package_config(package_dir)
+            self._write_custom_op_model(
+                package_dir / "onnx" / "decoder_model_merged_q4f16.onnx",
+                opset=17,
+                op_type="MatMulNBits",
+            )
+
+            report = validate_package(
+                _manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/embed_tokens_q4f16.onnx",
+                        "onnx/decoder_model_merged_q4f16.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("must use ONNX opset >= 21" in error for error in report.errors))
+
+
 class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):
     def _write_qwen_package_config(self, package_dir: Path) -> None:
         _write_json(

@@ -179,6 +179,8 @@ def _convert_full(target: PackageTarget, manifest_path: Path, work_dir: Path, pa
             args.export_device,
             "--export-torch-dtype",
             args.export_torch_dtype,
+            "--opset-version",
+            "21",
         ],
         cwd=ROOT_DIR,
     )

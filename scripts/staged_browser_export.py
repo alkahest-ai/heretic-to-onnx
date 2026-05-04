@@ -12,7 +12,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from tools.heretic_to_onnx.config import load_manifest
-from tools.heretic_to_onnx.convert import _raw_export_dir
+from tools.heretic_to_onnx.convert import _default_opset_version, _raw_export_dir
 from tools.heretic_to_onnx.export_gemma4 import export_gemma4
 from tools.heretic_to_onnx.export_qwen3_5 import export_qwen3_5
 from tools.heretic_to_onnx.package_repo import package_repo
@@ -112,7 +112,12 @@ def _parser() -> argparse.ArgumentParser:
         choices=["auto", "float32", "float16", "bfloat16"],
         help="torch dtype for export runners",
     )
-    parser.add_argument("--opset-version", default=17, type=int)
+    parser.add_argument(
+        "--opset-version",
+        default=None,
+        type=int,
+        help="ONNX opset version; defaults to 21 for Gemma4 and 17 for Qwen3.5",
+    )
     parser.add_argument("--block-size", default=32, type=int)
     parser.add_argument("--trim-source-weights", action="store_true")
     parser.add_argument("--delete-raw-onnx", action="store_true")
@@ -147,7 +152,7 @@ def main() -> int:
         python_exec=args.python_exec,
         device=args.export_device,
         torch_dtype=args.export_torch_dtype,
-        opset_version=args.opset_version,
+        opset_version=args.opset_version or _default_opset_version(manifest),
     )
     report["export"] = export_report.to_dict()
     report["disk"]["after_export"] = _disk_snapshot(layout.root)

@@ -72,6 +72,12 @@ def _run_export(
     raise ValueError(f"unsupported architecture family: {manifest.architecture}")
 
 
+def _default_opset_version(manifest: Manifest) -> int:
+    if manifest.architecture == "gemma4_conditional_generation":
+        return 21
+    return 17
+
+
 def _run_quantize(
     manifest: Manifest,
     layout,
@@ -119,7 +125,7 @@ def run_convert(
     python_exec: str = "python3",
     export_device: str = "cpu",
     export_torch_dtype: str = "auto",
-    opset_version: int = 17,
+    opset_version: int | None = None,
     block_size: int = 32,
 ) -> ConvertReport:
     resolved_runtime_smoke = (
@@ -154,7 +160,7 @@ def run_convert(
         python_exec=python_exec,
         device=export_device,
         torch_dtype=export_torch_dtype,
-        opset_version=opset_version,
+        opset_version=opset_version or _default_opset_version(manifest),
     )
     quantize_report = _run_quantize(
         manifest,

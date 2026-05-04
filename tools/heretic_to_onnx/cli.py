@@ -114,9 +114,9 @@ def _base_parser() -> argparse.ArgumentParser:
     )
     convert_parser.add_argument(
         "--opset-version",
-        default=17,
+        default=None,
         type=int,
-        help="ONNX opset version for export when convert drives export-gemma4",
+        help="ONNX opset version for export; defaults to 21 for Gemma4 and 17 for Qwen3.5",
     )
     convert_parser.add_argument(
         "--block-size",
@@ -152,7 +152,7 @@ def _base_parser() -> argparse.ArgumentParser:
     )
     export_parser.add_argument(
         "--opset-version",
-        default=17,
+        default=21,
         type=int,
         help="ONNX opset version for the generated Gemma 4 exporter",
     )
