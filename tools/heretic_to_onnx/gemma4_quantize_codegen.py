@@ -44,7 +44,8 @@ def _tensor_to_dtype(tensor, dtype):
 
 
 def _harmonize_float16_elementwise_inputs(model) -> int:
-    float_types = {{TensorProto.FLOAT, TensorProto.FLOAT16}}
+    float_types = {{TensorProto.FLOAT, TensorProto.FLOAT16, TensorProto.BFLOAT16}}
+    writable_float_types = {{TensorProto.FLOAT, TensorProto.FLOAT16}}
     value_types = {{}}
 
     def set_value_type(name, dtype) -> bool:
@@ -78,13 +79,13 @@ def _harmonize_float16_elementwise_inputs(model) -> int:
 
     def input_target_type(node, input_types, output_types):
         for input_name, input_type in zip(node.input, input_types):
-            if input_type in float_types and not convertible_input(input_name):
+            if input_type in writable_float_types and not convertible_input(input_name):
                 return input_type
         for output_type in output_types:
-            if output_type in float_types:
+            if output_type in writable_float_types:
                 return output_type
         for input_type in input_types:
-            if input_type in float_types:
+            if input_type in writable_float_types:
                 return input_type
         return None
 
@@ -132,7 +133,7 @@ def _harmonize_float16_elementwise_inputs(model) -> int:
                 continue
 
             target_type = input_target_type(node, input_types, output_types)
-            if target_type not in float_types:
+            if target_type not in writable_float_types:
                 continue
 
             for input_name, input_type in zip(node.input, input_types):
