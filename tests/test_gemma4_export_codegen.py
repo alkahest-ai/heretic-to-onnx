@@ -227,6 +227,9 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         self.assertIn("disable_shape_infer=True", runner)
         self.assertIn('conversion_mode = "converted_to_fp16"', runner)
         self.assertIn('if "already converted to float16" not in str(exc):', runner)
+        self.assertIn("def _harmonize_float16_elementwise_inputs(model) -> int:", runner)
+        self.assertIn('if node.op_type not in {"Add", "Sub", "Mul", "Div"}:', runner)
+        self.assertIn('"fixed_elementwise_inputs": fixed_elementwise_inputs', runner)
         self.assertIn('"conversion_mode": conversion_mode', runner)
 
 

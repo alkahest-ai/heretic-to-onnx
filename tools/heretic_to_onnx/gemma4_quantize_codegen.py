@@ -25,7 +25,62 @@ import argparse
 import json
 from pathlib import Path
 
+import numpy as np
+
 CONTRACT = {contract_literal}
+
+
+def _tensor_to_float16(tensor):
+    if tensor.data_type != TensorProto.FLOAT:
+        return tensor
+    converted = numpy_helper.from_array(numpy_helper.to_array(tensor).astype(np.float16), name=tensor.name)
+    return converted
+
+
+def _harmonize_float16_elementwise_inputs(model) -> int:
+    value_types = {{}}
+    for initializer in model.graph.initializer:
+        value_types[initializer.name] = initializer.data_type
+    for collection in (model.graph.input, model.graph.output, model.graph.value_info):
+        for value_info in collection:
+            tensor_type = value_info.type.tensor_type
+            if tensor_type.elem_type:
+                value_types[value_info.name] = tensor_type.elem_type
+
+    constant_outputs = {{}}
+    for node in model.graph.node:
+        if node.op_type != "Constant" or not node.output:
+            continue
+        for attr in node.attribute:
+            if attr.name == "value" and attr.HasField("t"):
+                value_types[node.output[0]] = attr.t.data_type
+                constant_outputs[node.output[0]] = attr
+
+    initializers = {{initializer.name: initializer for initializer in model.graph.initializer}}
+    fixed = 0
+    for node in model.graph.node:
+        if node.op_type not in {{"Add", "Sub", "Mul", "Div"}}:
+            continue
+        input_types = [value_types.get(name) for name in node.input]
+        output_types = [value_types.get(name) for name in node.output]
+        if TensorProto.FLOAT16 not in input_types + output_types or TensorProto.FLOAT not in input_types:
+            continue
+
+        for input_name in node.input:
+            initializer = initializers.get(input_name)
+            if initializer is not None and initializer.data_type == TensorProto.FLOAT:
+                initializer.CopyFrom(_tensor_to_float16(initializer))
+                value_types[input_name] = TensorProto.FLOAT16
+                fixed += 1
+                continue
+
+            attr = constant_outputs.get(input_name)
+            if attr is not None and attr.t.data_type == TensorProto.FLOAT:
+                attr.t.CopyFrom(_tensor_to_float16(attr.t))
+                value_types[input_name] = TensorProto.FLOAT16
+                fixed += 1
+
+    return fixed
 
 
 def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
@@ -45,6 +100,7 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
             raise
         q4f16_model = q4_model
         conversion_mode = "already_fp16_ready"
+    fixed_elementwise_inputs = _harmonize_float16_elementwise_inputs(q4f16_model)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     external_data_path = output_path.with_name(f"{{output_path.name}}_data")
@@ -63,6 +119,7 @@ def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dic
 
     return {{
         "conversion_mode": conversion_mode,
+        "fixed_elementwise_inputs": fixed_elementwise_inputs,
         "output_path": str(output_path),
         "external_data_path": str(external_data_path),
     }}
@@ -114,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     import onnx
+    from onnx import TensorProto, numpy_helper
     from onnxconverter_common import float16 as onnx_float16
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 
