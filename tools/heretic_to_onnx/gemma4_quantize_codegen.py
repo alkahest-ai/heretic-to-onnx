@@ -30,15 +30,31 @@ import numpy as np
 CONTRACT = {contract_literal}
 
 
-def _tensor_to_float16(tensor):
-    if tensor.data_type != TensorProto.FLOAT:
+def _tensor_to_dtype(tensor, dtype):
+    if tensor.data_type == dtype:
         return tensor
-    converted = numpy_helper.from_array(numpy_helper.to_array(tensor).astype(np.float16), name=tensor.name)
+    if dtype == TensorProto.FLOAT:
+        np_dtype = np.float32
+    elif dtype == TensorProto.FLOAT16:
+        np_dtype = np.float16
+    else:
+        return tensor
+    converted = numpy_helper.from_array(numpy_helper.to_array(tensor).astype(np_dtype), name=tensor.name)
     return converted
 
 
 def _harmonize_float16_elementwise_inputs(model) -> int:
+    float_types = {{TensorProto.FLOAT, TensorProto.FLOAT16}}
     value_types = {{}}
+
+    def set_value_type(name, dtype) -> bool:
+        if not name or dtype not in float_types | {{TensorProto.BFLOAT16}}:
+            return False
+        if value_types.get(name) == dtype:
+            return False
+        value_types[name] = dtype
+        return True
+
     for initializer in model.graph.initializer:
         value_types[initializer.name] = initializer.data_type
     for collection in (model.graph.input, model.graph.output, model.graph.value_info):
@@ -57,28 +73,87 @@ def _harmonize_float16_elementwise_inputs(model) -> int:
                 constant_outputs[node.output[0]] = attr
 
     initializers = {{initializer.name: initializer for initializer in model.graph.initializer}}
-    fixed = 0
-    for node in model.graph.node:
-        if node.op_type not in {{"Add", "Sub", "Mul", "Div"}}:
-            continue
-        input_types = [value_types.get(name) for name in node.input]
-        output_types = [value_types.get(name) for name in node.output]
-        if TensorProto.FLOAT16 not in input_types + output_types or TensorProto.FLOAT not in input_types:
-            continue
+    def convertible_input(name) -> bool:
+        return name in initializers or name in constant_outputs
 
-        for input_name in node.input:
-            initializer = initializers.get(input_name)
-            if initializer is not None and initializer.data_type == TensorProto.FLOAT:
-                initializer.CopyFrom(_tensor_to_float16(initializer))
-                value_types[input_name] = TensorProto.FLOAT16
-                fixed += 1
+    def input_target_type(node, input_types, output_types):
+        for input_name, input_type in zip(node.input, input_types):
+            if input_type in float_types and not convertible_input(input_name):
+                return input_type
+        for output_type in output_types:
+            if output_type in float_types:
+                return output_type
+        for input_type in input_types:
+            if input_type in float_types:
+                return input_type
+        return None
+
+    def propagate_float_types() -> None:
+        for _ in range(8):
+            changed = False
+            for node in model.graph.node:
+                if node.op_type == "Cast":
+                    cast_type = None
+                    for attr in node.attribute:
+                        if attr.name == "to":
+                            cast_type = attr.i
+                            break
+                    if cast_type is not None:
+                        for output_name in node.output:
+                            changed = set_value_type(output_name, cast_type) or changed
+                    continue
+
+                input_types = [value_types.get(name) for name in node.input]
+                known_float_inputs = [dtype for dtype in input_types if dtype in float_types]
+                output_type = None
+                if node.op_type in {{"ReduceMean", "Identity", "Neg", "Sqrt", "Reciprocal"}} and known_float_inputs:
+                    output_type = known_float_inputs[0]
+                elif node.op_type in {{"Add", "Sub", "Mul", "Div", "Pow"}} and known_float_inputs:
+                    if len(set(known_float_inputs)) == 1:
+                        output_type = known_float_inputs[0]
+
+                if output_type is not None:
+                    for output_name in node.output:
+                        changed = set_value_type(output_name, output_type) or changed
+            if not changed:
+                break
+
+    fixed = 0
+
+    for _ in range(8):
+        propagate_float_types()
+        changed = False
+        for node in model.graph.node:
+            if node.op_type not in {{"Add", "Sub", "Mul", "Div", "Pow"}}:
+                continue
+            input_types = [value_types.get(name) for name in node.input]
+            output_types = [value_types.get(name) for name in node.output]
+            if len({{dtype for dtype in input_types if dtype in float_types}}) < 2:
                 continue
 
-            attr = constant_outputs.get(input_name)
-            if attr is not None and attr.t.data_type == TensorProto.FLOAT:
-                attr.t.CopyFrom(_tensor_to_float16(attr.t))
-                value_types[input_name] = TensorProto.FLOAT16
-                fixed += 1
+            target_type = input_target_type(node, input_types, output_types)
+            if target_type not in float_types:
+                continue
+
+            for input_name, input_type in zip(node.input, input_types):
+                if input_type == target_type:
+                    continue
+                initializer = initializers.get(input_name)
+                if initializer is not None and initializer.data_type in float_types:
+                    initializer.CopyFrom(_tensor_to_dtype(initializer, target_type))
+                    value_types[input_name] = target_type
+                    fixed += 1
+                    changed = True
+                    continue
+
+                attr = constant_outputs.get(input_name)
+                if attr is not None and attr.t.data_type in float_types:
+                    attr.t.CopyFrom(_tensor_to_dtype(attr.t, target_type))
+                    value_types[input_name] = target_type
+                    fixed += 1
+                    changed = True
+        if not changed:
+            break
 
     return fixed
 
