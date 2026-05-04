@@ -138,9 +138,21 @@ def _patch_unsloth_text_only_processor() -> None:
         "auto_processor = AutoTokenizer if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") == \"1\" "
         "else (AutoProcessor if (is_vlm or is_whisper) else AutoTokenizer)"
     )
-    if needle not in text:
+    saving_needle = "patch_saving_functions(tokenizer, vision = True)"
+    saving_replacement = (
+        "if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") != \"1\":\n"
+        "            patch_saving_functions(tokenizer, vision = True)"
+    )
+    changed = False
+    if needle in text:
+        text = text.replace(needle, replacement, 1)
+        changed = True
+    if saving_needle in text:
+        text = text.replace(saving_needle, saving_replacement, 1)
+        changed = True
+    if not changed:
         return
-    target.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+    target.write_text(text, encoding="utf-8")
     importlib.invalidate_caches()
 
 
