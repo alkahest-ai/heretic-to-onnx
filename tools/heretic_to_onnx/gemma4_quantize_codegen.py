@@ -107,7 +107,26 @@ def _harmonize_float16_elementwise_inputs(model) -> int:
                 input_types = [value_types.get(name) for name in node.input]
                 known_float_inputs = [dtype for dtype in input_types if dtype in float_types]
                 output_type = None
-                if node.op_type in {{"ReduceMean", "Identity", "Neg", "Sqrt", "Reciprocal"}} and known_float_inputs:
+                if (
+                    node.op_type
+                    in {{
+                        "ReduceMean",
+                        "Identity",
+                        "Neg",
+                        "Sqrt",
+                        "Reciprocal",
+                        "Sin",
+                        "Cos",
+                        "Transpose",
+                        "Concat",
+                        "Unsqueeze",
+                        "Expand",
+                        "Slice",
+                        "Reshape",
+                        "MatMul",
+                    }}
+                    and known_float_inputs
+                ):
                     output_type = known_float_inputs[0]
                 elif node.op_type in {{"Add", "Sub", "Mul", "Div", "Pow"}} and known_float_inputs:
                     if len(set(known_float_inputs)) == 1:
