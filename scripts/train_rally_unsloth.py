@@ -174,11 +174,30 @@ def _patch_unsloth_zoo_pad_token_config() -> None:
     importlib.invalidate_caches()
 
 
+def _patch_unsloth_loader_torch_dtype_default() -> None:
+    target = None
+    for root in _candidate_site_roots():
+        candidate = root / "unsloth/models/loader.py"
+        if candidate.exists():
+            target = candidate
+            break
+    if target is None:
+        return
+    text = target.read_text(encoding="utf-8")
+    needle = 'model.config.to_dict()["torch_dtype"]'
+    replacement = 'model.config.to_dict().get("torch_dtype", "float16")'
+    if needle not in text:
+        return
+    target.write_text(text.replace(needle, replacement), encoding="utf-8")
+    importlib.invalidate_caches()
+
+
 _patch_unsloth_transformers5_config_exec()
 _patch_transformers_cache_exports()
 _patch_unsloth_vision_hybrid_cache_import()
 _patch_unsloth_text_only_processor()
 _patch_unsloth_zoo_pad_token_config()
+_patch_unsloth_loader_torch_dtype_default()
 
 try:
     import trl.trainer.utils as trl_trainer_utils
