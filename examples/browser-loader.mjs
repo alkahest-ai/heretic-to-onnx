@@ -124,6 +124,15 @@ export const DEFAULT_MODEL_PRESETS = [
     dtype: QWEN35_WEBGPU_TEXT_DTYPE,
     note: "Text-only 2B Heretic q4 package. This avoids loading the vision encoder for browser chat.",
   },
+  {
+    label: "Alkahest 2B Heretic RP v8 A100/B75 Q4",
+    modelId: ownedModel("alkahest-2b-heretic-rp-sft-two-stage-a100-b75-q4-onnx"),
+    family: "qwen3_5",
+    modalities: "text + image",
+    approxDownload: "~2.1 GB",
+    dtype: QWEN35_WEBGPU_DTYPE,
+    note: "Promoted 2B RP candidate. Browser scorecard total 0.8025 with a +0.2350 margin over direct.",
+  },
 ];
 
 function normalizeMessages(messages) {
