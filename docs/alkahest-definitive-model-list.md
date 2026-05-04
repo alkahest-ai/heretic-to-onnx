@@ -4,6 +4,8 @@ Date: 2026-05-04
 
 Latest smoke notes: `docs/alkahest-qwen-browser-smoke-2026-04-30.md`.
 
+Closeout checkpoint: `docs/alkahest-closeout-2026-05-04.md`.
+
 ## Active Scope
 
 This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gemma is parked, and 4B remains a desktop stress lane until 0.8B/2B are stable.
