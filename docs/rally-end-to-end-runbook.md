@@ -143,7 +143,19 @@ After upload, validate the package contract in a browser/WebGPU environment usin
 
 Desktop Safari / desktop Chromium should be the main validation targets.
 
-## 10. One-Click H200 Path
+## 10. Current E2B One-Click Path
+
+After the Alkahest 0.8B/2B closeout, use the E2B-only lane before touching E4B:
+
+```bash
+export HF_OWNER=thomasjvu
+export HF_PRIVATE=1
+bash scripts/phala_gpu_tee_oneclick.sh rally-e2b
+```
+
+That path publishes the direct Heretic full package, direct Heretic text-only package, A100/B75 RP merged checkpoint, A100/B75 RP full package, and A100/B75 RP text-only package. Keep the resulting Rally presets hidden until browser smoke and the RP scorecard beat the direct Rally E2B baseline.
+
+## 11. Legacy One-Click H200 Path
 
 If you want the whole Gemma loop in one terminal command on Phala GPU TEE, use:
 
@@ -161,6 +173,12 @@ That path will:
 6. convert tuned `rally-2b-rp` to ONNX
 7. fine-tune E4B into tuned `rally-4b-rp`
 8. convert tuned `rally-4b-rp` to ONNX
+
+The old one-stage Rally RP tune is still available as:
+
+```bash
+bash scripts/phala_gpu_tee_oneclick.sh rally-legacy
+```
 
 If you also want the Qwen training pass in the same window:
 

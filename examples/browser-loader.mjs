@@ -67,6 +67,17 @@ const QWEN35_WEBGPU_Q8_DTYPE = Object.freeze({
   vision_encoder: "q8",
 });
 
+const GEMMA4_WEBGPU_DTYPE = Object.freeze({
+  embed_tokens: "q4f16",
+  decoder_model_merged: "q4f16",
+  vision_encoder: "q4f16",
+});
+
+const GEMMA4_WEBGPU_TEXT_DTYPE = Object.freeze({
+  embed_tokens: "q4f16",
+  decoder_model_merged: "q4f16",
+});
+
 export const DEFAULT_MODEL_ID = ownedModel("alkahest-0.8b-heretic-q4-onnx");
 
 export const DEFAULT_MODEL_PRESETS = [
@@ -465,6 +476,14 @@ export function inferCustomModelDtype(modelId, family) {
     }
     if (value.includes("q4-onnx")) {
       return QWEN35_WEBGPU_DTYPE;
+    }
+  }
+  if (family === "gemma4") {
+    if (value.endsWith("-text") || value.includes("-text/") || value.includes("-text")) {
+      return GEMMA4_WEBGPU_TEXT_DTYPE;
+    }
+    if (value.includes("q4f16") || value.includes("rally-2b")) {
+      return GEMMA4_WEBGPU_DTYPE;
     }
   }
   return null;

@@ -150,11 +150,14 @@ Publish the ONNX repo and load it in a minimal Transformers.js WebGPU page.
 
 Measure cold start, VRAM, memory use, and first-token latency on real browser hardware.
 
-## What to do next
+## Current E2B Pass
 
-The next concrete implementation step should be:
+The current pass is E2B-only and mirrors the Alkahest 2B RP promotion rule:
 
-1. choose whether the first pass is `E2B` or `E4B`
-2. decide whether the first pass is text-only or full multimodal
-3. assemble a small roleplay dataset of 500 to 5,000 high-quality chat examples
-4. run one LoRA training pass and inspect behavior before worrying about ONNX export
+1. export direct Rally E2B Heretic full and text-only browser packages
+2. train the v8 two-stage RP mix
+3. select the A100/B75 scaled merge as the first candidate
+4. export both RP full and RP text-only packages
+5. promote only after browser smoke plus RP scorecard win over direct Rally E2B
+
+See `/Users/area/heretic/docs/rally-e2b-browser-rp-plan.md` for the concrete command and repo targets.

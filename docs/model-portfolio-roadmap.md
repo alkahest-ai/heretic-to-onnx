@@ -32,7 +32,7 @@ These are the fastest wins because they avoid training in the first pass.
 - Source: `p-e-w/gemma-4-E2B-it-heretic-ara`
 - Goal: convert to browser/WebGPU ONNX
 - Public name: `alkahest-ai/rally-2b`
-- Status: postponed until the Alkahest Qwen 0.8B/2B browser lane is fully promoted.
+- Status: next active lane after the Alkahest Qwen 0.8B/2B browser checkpoint. See `/Users/area/heretic/docs/rally-e2b-browser-rp-plan.md`.
 
 ### Gemma 4 E4B
 
@@ -153,7 +153,7 @@ Current browser-first order:
 3. promote RP only after a scorecard win over the same-size direct model
 4. keep the old 0.8B RP influence variants as historical audit candidates
 5. keep Rally/Gemma out of the browser picker until the Alkahest targets are stable
-6. return to Rally E2B before any Rally E4B pass
+6. run Rally E2B with direct full, direct text, RP merged, RP full, and RP text outputs before any Rally E4B pass
 
 That ordering minimizes the chance that the whole window disappears into training/debug overhead without any shipped model.
 

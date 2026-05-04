@@ -44,6 +44,26 @@ def _sample_manifest(*, include_audio: bool = False, include_video: bool = False
     )
 
 
+def _sample_text_manifest() -> Manifest:
+    return Manifest(
+        source_model_id="google/gemma-4-E2B-it",
+        base_model_id="google/gemma-4-E2B-it",
+        architecture="gemma4_conditional_generation",
+        target_repo_id="alkahest-ai/rally-2b-text",
+        target_dtype="q4f16",
+        target_device="webgpu",
+        modalities=["text"],
+        inherit_assets=InheritAssets(),
+        expected_architecture="Gemma4ForConditionalGeneration",
+        expected_onnx_files=[
+            "onnx/embed_tokens_q4f16.onnx",
+            "onnx/decoder_model_merged_q4f16.onnx",
+        ],
+        validation=ValidationConfig(),
+        manifest_path=Path("/tmp/heretic-gemma4-text-test.yaml"),
+    )
+
+
 def _write_source_config(root: Path) -> None:
     config = {
         "architectures": ["Gemma4ForConditionalGeneration"],
@@ -138,6 +158,31 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         )
         self.assertEqual(contract.sessions[0].outputs, ["image_features", "video_features"])
         self.assertEqual(contract.sessions[1].name, "audio_encoder")
+
+    def test_build_contract_text_only_omits_vision_and_audio_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir)
+            _write_source_config(source_path)
+            contract = build_gemma4_export_contract(_sample_text_manifest(), source_path)
+
+        self.assertEqual([session.name for session in contract.sessions], ["embed_tokens", "decoder_model_merged"])
+
+    def test_runner_loads_image_processor_only_when_vision_session_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir)
+            _write_source_config(source_path)
+            contract = build_gemma4_export_contract(_sample_text_manifest(), source_path)
+            runner = render_gemma4_export_runner(
+                contract,
+                source_path="/tmp/source",
+                base_path="/tmp/base",
+                output_dir="/tmp/output",
+                report_path="/tmp/report.json",
+                opset_version=17,
+            )
+
+        self.assertIn('has_vision_session = any(session["name"] == "vision_encoder"', runner)
+        self.assertIn("if has_vision_session else None", runner)
 
     def test_runner_contains_v2_multimodal_helpers(self) -> None:
         runner = render_gemma4_export_runner(

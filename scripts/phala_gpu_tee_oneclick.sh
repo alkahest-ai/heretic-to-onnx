@@ -42,6 +42,7 @@ ALKAHEST2_SOURCE_MODEL="${ALKAHEST2_SOURCE_MODEL:-tvall43/Qwen3.5-2B-heretic-v3b
 ALKAHEST08_SOURCE_MODEL="${ALKAHEST08_SOURCE_MODEL:-tvall43/Qwen3.5-0.8B-heretic-v3}"
 
 RALLY2_DIRECT_REPO="${RALLY2_DIRECT_REPO:-${HF_OWNER}/rally-2b}"
+RALLY2_DIRECT_TEXT_REPO="${RALLY2_DIRECT_TEXT_REPO:-${HF_OWNER}/rally-2b-text}"
 RALLY4_DIRECT_REPO="${RALLY4_DIRECT_REPO:-${HF_OWNER}/rally-4b}"
 ALKAHEST4_DIRECT_REPO="${ALKAHEST4_DIRECT_REPO:-${HF_OWNER}/alkahest-4b}"
 ALKAHEST2_DIRECT_REPO="${ALKAHEST2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b}"
@@ -52,12 +53,21 @@ ALKAHEST4_V2_DIRECT_REPO="${ALKAHEST4_V2_DIRECT_REPO:-${HF_OWNER}/alkahest-4b-v2
 ALKAHEST2_V2_DIRECT_REPO="${ALKAHEST2_V2_DIRECT_REPO:-${HF_OWNER}/alkahest-2b-v2}"
 ALKAHEST08_V2_DIRECT_REPO="${ALKAHEST08_V2_DIRECT_REPO:-${HF_OWNER}/alkahest-0.8b-v2}"
 RALLY2_TUNED_REPO="${RALLY2_TUNED_REPO:-${HF_OWNER}/rally-2b-rp}"
+RALLY2_TUNED_TEXT_REPO="${RALLY2_TUNED_TEXT_REPO:-${HF_OWNER}/rally-2b-rp-text}"
+RALLY2_MERGED_REPO="${RALLY2_MERGED_REPO:-${HF_OWNER}/rally-2b-rp-a100-b75-merged}"
 RALLY4_TUNED_REPO="${RALLY4_TUNED_REPO:-${HF_OWNER}/rally-4b-rp}"
 ALKAHEST4_TUNED_REPO="${ALKAHEST4_TUNED_REPO:-${HF_OWNER}/alkahest-4b-rp}"
 ALKAHEST2_TUNED_REPO="${ALKAHEST2_TUNED_REPO:-${HF_OWNER}/alkahest-2b-rp}"
 ALKAHEST08_TUNED_REPO="${ALKAHEST08_TUNED_REPO:-${HF_OWNER}/alkahest-0.8b-rp}"
 
 RALLY_MAX_STEPS="${RALLY_MAX_STEPS:-300}"
+RALLY_STAGE_A_MAX_STEPS="${RALLY_STAGE_A_MAX_STEPS:-300}"
+RALLY_STAGE_B_MAX_STEPS="${RALLY_STAGE_B_MAX_STEPS:-450}"
+RALLY_TWO_STAGE_DATA_DIR="${RALLY_TWO_STAGE_DATA_DIR:-$WORK_ROOT/rally_two_stage_sft_v8}"
+RALLY_STAGE_A_REPEATS="${RALLY_STAGE_A_REPEATS:-18}"
+RALLY_STAGE_B_BOUNDARY_REPEATS="${RALLY_STAGE_B_BOUNDARY_REPEATS:-80}"
+RALLY_STAGE_B_ADULT_REPEATS="${RALLY_STAGE_B_ADULT_REPEATS:-40}"
+RALLY2_RP_STAGE_B_SCALE="${RALLY2_RP_STAGE_B_SCALE:-0.75}"
 RALLY4_MAX_STEPS="${RALLY4_MAX_STEPS:-250}"
 ALKAHEST4_MAX_STEPS="${ALKAHEST4_MAX_STEPS:-300}"
 ALKAHEST2_MAX_STEPS="${ALKAHEST2_MAX_STEPS:-325}"
@@ -300,6 +310,51 @@ train_model() {
     --save-merged
 }
 
+prepare_rally_two_stage_dataset() {
+  echo "[dataset] preparing Rally E2B two-stage RP v8 splits"
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/prepare_alkahest_two_stage_sft.py" \
+    --output-dir "$RALLY_TWO_STAGE_DATA_DIR" \
+    --stage-a-repeats "$RALLY_STAGE_A_REPEATS" \
+    --stage-b-boundary-repeats "$RALLY_STAGE_B_BOUNDARY_REPEATS" \
+    --stage-b-adult-repeats "$RALLY_STAGE_B_ADULT_REPEATS"
+}
+
+merge_scaled_candidate() {
+  local base_dir="$1"
+  local adapter_dir="$2"
+  local output_dir="$3"
+  local scale="$4"
+
+  echo "[merge] scaled candidate $output_dir with scale=$scale"
+  "$TRAIN_PYTHON_BIN" "$ROOT_DIR/scripts/merge_lora_scaled.py" \
+    --base-dir "$base_dir" \
+    --adapter-dir "$adapter_dir" \
+    --output-dir "$output_dir" \
+    --scale "$scale"
+}
+
+publish_merged_checkpoint() {
+  local label="$1"
+  local merged_dir="$2"
+  local target_repo="$3"
+  local create_args
+
+  require_hf_token "$label merged checkpoint upload"
+  create_args=(hf repos create "$target_repo" --type model --exist-ok)
+  if [[ "$HF_PRIVATE" == "1" ]]; then
+    create_args+=(--private)
+  fi
+
+  echo "[publish] $label merged checkpoint -> $target_repo"
+  "${create_args[@]}"
+  hf upload-large-folder \
+    "$target_repo" \
+    "$merged_dir" \
+    --type model \
+    --num-workers "$HF_UPLOAD_WORKERS" \
+    --no-bars
+}
+
 convert_tuned_model() {
   local label="$1"
   local template="$2"
@@ -337,7 +392,7 @@ convert_tuned_model() {
     "${private_args[@]}"
 }
 
-run_rally() {
+run_rally_legacy() {
   local output_dir="$MODEL_ROOT/rally-2b-rp"
   local merged_dir="$MODEL_ROOT/rally-2b-rp-merged"
   local source_model="$RALLY2_SOURCE_MODEL"
@@ -351,6 +406,46 @@ run_rally() {
     "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara-v2.yaml" \
     "$merged_dir" \
     "$RALLY2_TUNED_REPO"
+}
+
+run_rally() {
+  local stage_a_adapter="$MODEL_ROOT/rally-2b-rp-stage-a-adapter"
+  local stage_a_merged="$MODEL_ROOT/rally-2b-rp-stage-a-merged"
+  local stage_b_adapter="$MODEL_ROOT/rally-2b-rp-stage-b-adapter"
+  local stage_ab_merged="$MODEL_ROOT/rally-2b-rp-stage-ab-merged"
+  local selected_merged="$MODEL_ROOT/rally-2b-rp-a100-b75-merged"
+  local source_model="$RALLY2_SOURCE_MODEL"
+
+  if [[ "$SOURCE_MODE" == "base_plus_heretic" ]]; then
+    resolve_heretic_source "rally-2b-rp"
+    source_model="$HERETIC_SOURCE_MODEL"
+  fi
+
+  prepare_rally_two_stage_dataset
+
+  TRAIN_FILE="$RALLY_TWO_STAGE_DATA_DIR/stage_a/train.jsonl"
+  VAL_FILE="$RALLY_TWO_STAGE_DATA_DIR/stage_a/val.jsonl"
+  DATASET_MANIFEST_PATH="$RALLY_TWO_STAGE_DATA_DIR/manifest.json"
+  train_model "rally-2b-rp-stage-a" "$source_model" "$stage_a_adapter" "$stage_a_merged" "$RALLY_STAGE_A_MAX_STEPS"
+
+  TRAIN_FILE="$RALLY_TWO_STAGE_DATA_DIR/stage_b/train.jsonl"
+  VAL_FILE="$RALLY_TWO_STAGE_DATA_DIR/stage_b/val.jsonl"
+  DATASET_MANIFEST_PATH="$RALLY_TWO_STAGE_DATA_DIR/manifest.json"
+  train_model "rally-2b-rp-stage-b" "$stage_a_merged" "$stage_b_adapter" "$stage_ab_merged" "$RALLY_STAGE_B_MAX_STEPS"
+
+  merge_scaled_candidate "$stage_a_merged" "$stage_b_adapter" "$selected_merged" "$RALLY2_RP_STAGE_B_SCALE"
+  publish_merged_checkpoint "rally-2b-rp-a100-b75" "$selected_merged" "$RALLY2_MERGED_REPO"
+
+  convert_tuned_model \
+    "rally-2b-rp-a100-b75-full" \
+    "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" \
+    "$selected_merged" \
+    "$RALLY2_TUNED_REPO"
+  convert_tuned_model \
+    "rally-2b-rp-a100-b75-text" \
+    "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-rp-text.yaml" \
+    "$selected_merged" \
+    "$RALLY2_TUNED_TEXT_REPO"
 }
 
 run_rally4() {
@@ -424,6 +519,7 @@ modes:
   dataset-batch
   dataset-compile
   rally-2b-direct
+  rally-2b-text
   rally-4b-direct
   alkahest-4b-direct
   alkahest-2b-direct
@@ -434,6 +530,8 @@ modes:
   alkahest-2b-v2-direct
   alkahest-0.8b-v2-direct
   rally
+  rally-legacy
+  rally-e2b
   rally-4b
   alkahest-4b
   alkahest-2b
@@ -459,6 +557,9 @@ case "$MODE" in
     ;;
   rally-2b-direct)
     convert_direct "rally-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" "$RALLY2_DIRECT_REPO"
+    ;;
+  rally-2b-text)
+    convert_direct "rally-2b-text" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara-text.yaml" "$RALLY2_DIRECT_TEXT_REPO"
     ;;
   rally-4b-direct)
     convert_direct "rally-4b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e4b-heretic.yaml" "$RALLY4_DIRECT_REPO"
@@ -488,7 +589,16 @@ case "$MODE" in
     convert_direct "alkahest-0.8b-v2-direct" "$ROOT_DIR/configs/heretic-to-onnx.qwen3-5-0.8b-heretic-v2.yaml" "$ALKAHEST08_V2_DIRECT_REPO"
     ;;
   rally)
+    run_rally
+    ;;
+  rally-legacy)
     prepare_training_dataset
+    run_rally_legacy
+    ;;
+  rally-e2b)
+    bootstrap_env
+    convert_direct "rally-2b-direct" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml" "$RALLY2_DIRECT_REPO"
+    convert_direct "rally-2b-text" "$ROOT_DIR/configs/heretic-to-onnx.gemma4-e2b-heretic-ara-text.yaml" "$RALLY2_DIRECT_TEXT_REPO"
     run_rally
     ;;
   rally-4b)

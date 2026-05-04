@@ -98,6 +98,11 @@ def build_gemma4_export_contract(
     use_bidirectional_attention = text_config.get("use_bidirectional_attention")
     supports_audio = "audio" in manifest.modalities
     supports_video = "video" in manifest.modalities
+    supports_vision = (
+        "image" in manifest.modalities
+        or supports_video
+        or "vision_encoder" in package_filenames
+    )
 
     warnings: list[str] = []
     ok = True
@@ -117,41 +122,43 @@ def build_gemma4_export_contract(
             "Gemma 4 configs with use_bidirectional_attention='vision' are not supported by the current browser contract"
         )
 
-    vision_session = SessionSpec(
-        name="vision_encoder",
-        raw_filename="vision_encoder.onnx",
-        package_filename=package_filenames.get("vision_encoder", "vision_encoder_q4f16.onnx"),
-        inputs=["pixel_values", "pixel_position_ids"],
-        outputs=["image_features"],
-        dynamic_axes={
-            "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
-            "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
-            "image_features": {0: "image_tokens"},
-        },
-        notes=["Matches the Transformers.js Gemma 4 vision session input name `pixel_position_ids`."],
-    )
-    if supports_video:
-        vision_session.inputs = [
-            "pixel_values",
-            "pixel_position_ids",
-            "pixel_values_videos",
-            "video_position_ids",
-        ]
-        vision_session.outputs = ["image_features", "video_features"]
-        vision_session.dynamic_axes = {
-            "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
-            "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
-            "pixel_values_videos": {0: "video_batch", 1: "video_frames", 3: "frame_height", 4: "frame_width"},
-            "video_position_ids": {0: "video_batch", 1: "video_frames", 2: "video_patches"},
-            "image_features": {0: "image_tokens"},
-            "video_features": {0: "video_tokens"},
-        }
-        vision_session.notes.append(
-            "V2 multimodal contracts export both image and video visual features from the shared Gemma 4 vision tower."
+    sessions: list[SessionSpec] = []
+    if supports_vision:
+        vision_session = SessionSpec(
+            name="vision_encoder",
+            raw_filename="vision_encoder.onnx",
+            package_filename=package_filenames.get("vision_encoder", "vision_encoder_q4f16.onnx"),
+            inputs=["pixel_values", "pixel_position_ids"],
+            outputs=["image_features"],
+            dynamic_axes={
+                "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
+                "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
+                "image_features": {0: "image_tokens"},
+            },
+            notes=["Matches the Transformers.js Gemma 4 vision session input name `pixel_position_ids`."],
         )
+        if supports_video:
+            vision_session.inputs = [
+                "pixel_values",
+                "pixel_position_ids",
+                "pixel_values_videos",
+                "video_position_ids",
+            ]
+            vision_session.outputs = ["image_features", "video_features"]
+            vision_session.dynamic_axes = {
+                "pixel_values": {0: "image_batch", 2: "image_height", 3: "image_width"},
+                "pixel_position_ids": {0: "image_batch", 1: "image_patches"},
+                "pixel_values_videos": {0: "video_batch", 1: "video_frames", 3: "frame_height", 4: "frame_width"},
+                "video_position_ids": {0: "video_batch", 1: "video_frames", 2: "video_patches"},
+                "image_features": {0: "image_tokens"},
+                "video_features": {0: "video_tokens"},
+            }
+            vision_session.notes.append(
+                "V2 multimodal contracts export both image and video visual features from the shared Gemma 4 vision tower."
+            )
+        sessions.append(vision_session)
 
-    sessions = [
-        vision_session,
+    sessions.append(
         SessionSpec(
             name="embed_tokens",
             raw_filename="embed_tokens.onnx",
@@ -165,7 +172,7 @@ def build_gemma4_export_contract(
             },
             notes=["Multimodal placeholder token IDs are replaced with PAD before embedding, matching HF Gemma 4."],
         ),
-    ]
+    )
 
     if supports_audio or "audio_encoder" in package_filenames:
         sessions.insert(
@@ -739,18 +746,26 @@ def render_gemma4_export_runner(
             text_config = model.config.text_config
             hidden_dtype = model.model.language_model.embed_tokens.weight.dtype
             device = next(model.parameters()).device
+            has_vision_session = any(session["name"] == "vision_encoder" for session in CONTRACT["sessions"])
 
-            vision_config = model.model.vision_tower.config
-            patch_size = int(getattr(vision_config, "patch_size", 16))
-            pooling_kernel_size = int(model.model.vision_tower.config.pooling_kernel_size)
-            image_height, image_width = _resolve_image_size(processor_config, patch_size, pooling_kernel_size)
-            dummy_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
-            vision_batch = image_processor(images=[dummy_image], return_tensors="pt")
-            pixel_values = vision_batch["pixel_values"].to(device)
-            pixel_position_ids = vision_batch.get("image_position_ids", vision_batch.get("pixel_position_ids"))
-            if pixel_position_ids is None:
-                raise RuntimeError("Gemma 4 image processor did not return image_position_ids/pixel_position_ids")
-            pixel_position_ids = pixel_position_ids.to(device)
+            pixel_values = None
+            pixel_position_ids = None
+            image_height = 384
+            image_width = 384
+            if has_vision_session:
+                if image_processor is None:
+                    raise RuntimeError("Gemma 4 vision export requested, but no image processor was available")
+                vision_config = model.model.vision_tower.config
+                patch_size = int(getattr(vision_config, "patch_size", 16))
+                pooling_kernel_size = int(model.model.vision_tower.config.pooling_kernel_size)
+                image_height, image_width = _resolve_image_size(processor_config, patch_size, pooling_kernel_size)
+                dummy_image = np.zeros((image_height, image_width, 3), dtype=np.uint8)
+                vision_batch = image_processor(images=[dummy_image], return_tensors="pt")
+                pixel_values = vision_batch["pixel_values"].to(device)
+                pixel_position_ids = vision_batch.get("image_position_ids", vision_batch.get("pixel_position_ids"))
+                if pixel_position_ids is None:
+                    raise RuntimeError("Gemma 4 image processor did not return image_position_ids/pixel_position_ids")
+                pixel_position_ids = pixel_position_ids.to(device)
 
             pixel_values_videos = None
             video_position_ids = None
@@ -810,14 +825,14 @@ def render_gemma4_export_runner(
                     *cache_tensors,
                 ),
             }}
-            if CONTRACT.get("supports_video"):
+            if has_vision_session and CONTRACT.get("supports_video"):
                 sample_inputs["vision_encoder"] = (
                     pixel_values,
                     pixel_position_ids,
                     pixel_values_videos,
                     video_position_ids,
                 )
-            else:
+            elif has_vision_session:
                 sample_inputs["vision_encoder"] = (pixel_values, pixel_position_ids)
             if CONTRACT.get("supports_audio"):
                 sample_inputs["audio_encoder"] = (input_features, input_features_mask)
@@ -888,7 +903,8 @@ def render_gemma4_export_runner(
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
             _patch_masking_utils_for_onnx_export()
-            image_processor = _load_image_processor(source_path, base_path)
+            has_vision_session = any(session["name"] == "vision_encoder" for session in CONTRACT["sessions"])
+            image_processor = _load_image_processor(source_path, base_path) if has_vision_session else None
             feature_extractor = _load_feature_extractor(source_path, base_path) if CONTRACT.get("supports_audio") else None
             video_processor = _load_video_processor(source_path, base_path) if CONTRACT.get("supports_video") else None
             processor_config = _resolve_processor_config(source_path, base_path)
