@@ -513,7 +513,7 @@ def render_qwen3_5_export_runner(
                         mask_indices = mask_indices + kv_offset.to(device=padding_mask.device, dtype=mask_indices.dtype)
                     elif kv_offset:
                         mask_indices = mask_indices + int(kv_offset)
-                    padding_mask = padding_mask[:, mask_indices].to(dtype=torch.bool)
+                    padding_mask = padding_mask[:, mask_indices].to(device=cache_position.device, dtype=torch.bool)
 
                 if allow_is_causal_skip:
                     query_length = cache_position.shape[0]
