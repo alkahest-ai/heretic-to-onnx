@@ -312,6 +312,9 @@ def _quantize_gemma4_embed_tokens_q4f16(input_path: Path, output_path: Path, blo
         [initializer for initializer in initializers.values() if initializer.name not in removed_initializers]
     )
     model.graph.initializer.extend(new_initializers)
+    for output in model.graph.output:
+        if output.type.HasField("tensor_type") and output.type.tensor_type.elem_type in float_types:
+            output.type.tensor_type.elem_type = TensorProto.FLOAT16
     _ensure_ms_opset(model)
     fixed_elementwise_inputs = _harmonize_float16_elementwise_inputs(model)
 
