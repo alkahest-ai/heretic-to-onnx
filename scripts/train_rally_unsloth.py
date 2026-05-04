@@ -4,6 +4,7 @@ import argparse
 import importlib
 import json
 import os
+import re
 import site
 import sys
 from copy import deepcopy
@@ -138,18 +139,20 @@ def _patch_unsloth_text_only_processor() -> None:
         "auto_processor = AutoTokenizer if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") == \"1\" "
         "else (AutoProcessor if (is_vlm or is_whisper) else AutoTokenizer)"
     )
-    saving_needle = "patch_saving_functions(tokenizer, vision = True)"
-    saving_replacement = (
-        "if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") != \"1\":\n"
-        "            patch_saving_functions(tokenizer, vision = True)"
-    )
+    saving_marker = "if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") != \"1\":"
     changed = False
     if needle in text:
         text = text.replace(needle, replacement, 1)
         changed = True
-    if saving_needle in text:
-        text = text.replace(saving_needle, saving_replacement, 1)
-        changed = True
+    if saving_marker not in text:
+        pattern = re.compile(r"^(?P<indent>[ \t]*)patch_saving_functions\(tokenizer, vision = True\)", re.MULTILINE)
+
+        def _replace_saving(match: re.Match[str]) -> str:
+            indent = match.group("indent")
+            return f"{indent}{saving_marker}\n{indent}    patch_saving_functions(tokenizer, vision = True)"
+
+        text, count = pattern.subn(_replace_saving, text, count=1)
+        changed = changed or count > 0
     if not changed:
         return
     target.write_text(text, encoding="utf-8")
@@ -214,18 +217,15 @@ try:
 except Exception:
     pass
 
-from unsloth import FastLanguageModel
-from datasets import DatasetDict, load_dataset
-from trl import SFTConfig, SFTTrainer
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
 def _patch_sft_trainer_constant_length_dataset() -> None:
     try:
+        from trl import SFTTrainer
         import trl.trainer.utils as trl_trainer_utils
     except Exception:
-        trl_trainer_utils = None
+        return
     constant_length_dataset = getattr(trl_trainer_utils, "ConstantLengthDataset", None)
     if constant_length_dataset is None:
         class ConstantLengthDataset:  # type: ignore[no-redef]
@@ -302,6 +302,10 @@ def main() -> int:
         help="Dataset preprocessing worker count for TRL. Use 0 to disable multiprocessing.",
     )
     args = parser.parse_args()
+
+    from unsloth import FastLanguageModel
+    from datasets import DatasetDict, load_dataset
+    from trl import SFTConfig, SFTTrainer
 
     dataset = load_dataset(
         "json",
