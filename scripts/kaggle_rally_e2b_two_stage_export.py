@@ -31,6 +31,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--artifact-dir", default="", help="Directory containing the completed Rally E2B SFT output.")
     parser.add_argument("--artifact-name", default="rally-e2b-two-stage-sft")
     parser.add_argument("--work-dir", default="/kaggle/working/rally-e2b-browser-export")
+    parser.add_argument("--scratch-dir", default="", help="Optional non-persisted directory for raw export/quantize intermediates.")
     parser.add_argument("--direct-source-model-id", default="p-e-w/gemma-4-E2B-it-heretic-ara")
     parser.add_argument("--base-model-id", default="google/gemma-4-E2B-it")
     parser.add_argument("--direct-full-repo", default="thomasjvu/rally-2b")
@@ -320,11 +321,13 @@ def _process_pair(
     full_template: str,
     text_template: str,
     work_dir: Path,
+    scratch_dir: Path,
     args: argparse.Namespace,
     base_model_id: str,
 ) -> list[dict[str, Any]]:
     manifests_dir = work_dir / "manifests"
     packages_dir = work_dir / "packages"
+    scratch_work_dir = scratch_dir / "work"
     full_target = PackageTarget(label + "-full", full_template, source_model_id, full_repo, True)
     text_target = PackageTarget(label + "-text", text_template, source_model_id, text_repo, False)
     results: list[dict[str, Any]] = []
@@ -334,7 +337,7 @@ def _process_pair(
         text_paths = _convert_full(
             text_target,
             text_manifest,
-            work_dir / "work" / text_target.name,
+            scratch_work_dir / text_target.name,
             packages_dir / text_target.name,
             args,
         )
@@ -346,7 +349,7 @@ def _process_pair(
     full_paths = _convert_full(
         full_target,
         full_manifest,
-        work_dir / "work" / full_target.name,
+        scratch_work_dir / full_target.name,
         packages_dir / full_target.name,
         args,
     )
@@ -356,7 +359,7 @@ def _process_pair(
     text_paths = _package_text_from_quantized(
         text_target,
         text_manifest,
-        work_dir / "work" / text_target.name,
+        scratch_work_dir / text_target.name,
         packages_dir / text_target.name,
         Path(full_paths["quantized_dir"]),
     )
@@ -373,7 +376,9 @@ def _process_pair(
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     work_dir = Path(args.work_dir).expanduser().resolve()
+    scratch_dir = Path(args.scratch_dir).expanduser().resolve() if args.scratch_dir else work_dir
     work_dir.mkdir(parents=True, exist_ok=True)
+    scratch_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
         "ok": False,
         "work_dir": str(work_dir),
@@ -384,6 +389,7 @@ def main(argv: list[str] | None = None) -> int:
         "merged_upload": {},
         "scorecard": {},
         "disk": {"start": _disk(work_dir)},
+        "scratch_dir": str(scratch_dir),
         "warnings": [],
     }
 
@@ -420,13 +426,14 @@ def main(argv: list[str] | None = None) -> int:
                 full_template="configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml",
                 text_template="configs/heretic-to-onnx.gemma4-e2b-heretic-ara-text.yaml",
                 work_dir=work_dir / "direct",
+                scratch_dir=scratch_dir / "direct",
                 args=args,
                 base_model_id=args.base_model_id,
             )
         )
         report["disk"]["after_direct"] = _disk(work_dir)
         if not args.keep_artifacts:
-            _rm(work_dir / "direct" / "work")
+            _rm(scratch_dir / "direct" / "work")
             report["disk"]["after_direct_work_cleanup"] = _disk(work_dir)
 
     if not args.skip_rp:
@@ -441,13 +448,14 @@ def main(argv: list[str] | None = None) -> int:
                 full_template="configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml",
                 text_template="configs/heretic-to-onnx.gemma4-e2b-rp-text.yaml",
                 work_dir=work_dir / "rp",
+                scratch_dir=scratch_dir / "rp",
                 args=args,
                 base_model_id=args.base_model_id,
             )
         )
         report["disk"]["after_rp"] = _disk(work_dir)
         if not args.keep_artifacts:
-            _rm(work_dir / "rp" / "work")
+            _rm(scratch_dir / "rp" / "work")
             report["disk"]["after_rp_work_cleanup"] = _disk(work_dir)
 
     report["ok"] = all(item.get("publish", {}).get("ok", False) for item in report["exports"]) if args.upload else True
