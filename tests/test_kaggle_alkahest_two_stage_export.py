@@ -7,7 +7,9 @@ from tempfile import TemporaryDirectory
 from scripts.alkahest_rp_scorecard import CandidateScore
 from scripts.kaggle_alkahest_two_stage_export import (
     TEMPLATE_ALLOW_PATTERNS,
+    CandidateSpec,
     _candidate_specs,
+    _candidate_needs_base_model,
     _filtered_candidate_specs,
     _find_artifacts,
     _score_responses,
@@ -46,6 +48,15 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
         specs = _filtered_candidate_specs("a100-b25,a50-b50")
 
         self.assertEqual([spec.name for spec in specs], ["a100-b25", "a50-b50"])
+
+    def test_selected_full_stage_a_candidate_does_not_need_base_download(self) -> None:
+        full_stage_a = CandidateSpec("a100-b50", 1.0, 0.5, "merge")
+        scaled_stage_a = CandidateSpec("a50-b100", 0.5, 1.0, "merge")
+        stage_ab = CandidateSpec("a100-b100", 1.0, 1.0, "stage-ab-merged")
+
+        self.assertFalse(_candidate_needs_base_model(full_stage_a))
+        self.assertFalse(_candidate_needs_base_model(stage_ab))
+        self.assertTrue(_candidate_needs_base_model(scaled_stage_a))
 
     def test_find_artifacts_accepts_sharded_merged_checkpoints(self) -> None:
         with TemporaryDirectory() as tmp:

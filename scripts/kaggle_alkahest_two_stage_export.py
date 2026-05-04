@@ -219,6 +219,10 @@ def _filtered_candidate_specs(value: str) -> list[CandidateSpec]:
     return [by_name[name] for name in names]
 
 
+def _candidate_needs_base_model(spec: CandidateSpec) -> bool:
+    return spec.source != "stage-ab-merged" and spec.stage_a_scale != 1.0
+
+
 def _materialize_candidate(spec: CandidateSpec, artifacts: Path, base_dir: Path, work_dir: Path) -> tuple[Path, bool]:
     if spec.source == "stage-ab-merged":
         return artifacts / "stage-ab-merged", False
@@ -511,7 +515,7 @@ def main() -> int:
             if name not in specs:
                 raise ValueError(f"unknown selected candidate: {name}")
             spec = specs[name]
-            if spec.source != "stage-ab-merged" and base_dir is None:
+            if _candidate_needs_base_model(spec) and base_dir is None:
                 base_dir = _snapshot_download(args.source_model_id, base_cache_dir)
             path, should_delete = _materialize_candidate(
                 spec,
