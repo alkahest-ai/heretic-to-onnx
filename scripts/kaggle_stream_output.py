@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import time
 from pathlib import Path
 
 import requests
@@ -25,6 +26,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--file-pattern", required=True, help="Regex matched against Kaggle output paths.")
     parser.add_argument("--force", action="store_true", help="Overwrite existing files.")
     parser.add_argument("--chunk-size", type=int, default=1024 * 1024 * 16)
+    parser.add_argument("--retries", type=int, default=5, help="Retry count for interrupted downloads.")
     return parser
 
 
@@ -36,22 +38,58 @@ def _list_outputs(api: KaggleApi, owner: str, slug: str):
         return kaggle.kernels.kernels_api_client.list_kernel_session_output(request)
 
 
-def _download(url: str, output_path: Path, *, chunk_size: int, force: bool) -> None:
+def _content_range_total(value: str | None) -> int | None:
+    if not value or "/" not in value:
+        return None
+    total = value.rsplit("/", 1)[-1]
+    if total == "*":
+        return None
+    try:
+        return int(total)
+    except ValueError:
+        return None
+
+
+def _download(url: str, output_path: Path, *, chunk_size: int, force: bool, retries: int) -> None:
     if output_path.exists() and not force:
         print(f"exists: {output_path}")
         return
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     part_path = output_path.with_name(output_path.name + ".part")
-    if part_path.exists():
+    if part_path.exists() and force:
         part_path.unlink()
 
-    with requests.get(url, stream=True, timeout=(30, 600)) as response:
-        response.raise_for_status()
-        with part_path.open("wb") as handle:
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                if chunk:
-                    handle.write(chunk)
+    attempt = 0
+    while True:
+        start = part_path.stat().st_size if part_path.exists() else 0
+        headers = {"Range": f"bytes={start}-"} if start else {}
+        try:
+            with requests.get(url, stream=True, timeout=(30, 600), headers=headers) as response:
+                if start and response.status_code != 206:
+                    part_path.unlink(missing_ok=True)
+                    start = 0
+                    response.close()
+                    continue
+                response.raise_for_status()
+                mode = "ab" if start else "wb"
+                with part_path.open(mode) as handle:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            handle.write(chunk)
+                total = _content_range_total(response.headers.get("content-range"))
+                if total is not None and part_path.stat().st_size < total:
+                    raise requests.exceptions.ChunkedEncodingError(
+                        f"incomplete range download: {part_path.stat().st_size} < {total}"
+                    )
+                break
+        except requests.RequestException as exc:
+            attempt += 1
+            if attempt > retries:
+                raise
+            print(f"retrying: {output_path} attempt={attempt}/{retries} error={type(exc).__name__}: {exc}")
+            time.sleep(min(30, 2**attempt))
+
     os.replace(part_path, output_path)
     print(f"downloaded: {output_path} ({output_path.stat().st_size} bytes)")
 
@@ -75,6 +113,7 @@ def main() -> int:
             target_dir / item.file_name,
             chunk_size=args.chunk_size,
             force=args.force,
+            retries=args.retries,
         )
     if response.log:
         log_path = target_dir / f"{slug}.log"

@@ -27,7 +27,7 @@ As of 2026-05-04, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Two-stage SFT | Complete | `alkahestai/rally-e2b-two-stage-sft-t4` completed Stage A and Stage B on Kaggle T4. |
 | Direct Heretic text | Uploaded | `thomasjvu/rally-2b-text`, HF commit `0ed67b21d4a6aa23614451587dd0e48a06f93dc1`, package report `ok: true`. |
 | RP A100/B75 text | Uploaded | `thomasjvu/rally-2b-rp-text`, HF commit `cf64df4088314cc96a98786de1a0a963bc87e1d4`, package report `ok: true`. |
-| RP A100/B75 merged checkpoint | Upload-only recovery | `kaggle/rally_e2b_rp_merged_upload` uploads the existing export-kernel checkpoint directly from Kaggle output to `thomasjvu/rally-2b-rp-a100-b75-merged`, avoiding local download of the 10 GB `model.safetensors`. |
+| RP A100/B75 merged checkpoint | Uploaded | `thomasjvu/rally-2b-rp-a100-b75-merged`, HF commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; `scaled_lora_merge.json` verifies `ok: true`, scale `0.75`, 148 applied LoRA targets. |
 | Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
 
 ## Training Shape
@@ -83,6 +83,8 @@ The two-kernel workflow performs:
 8. RP text-only export and upload
 
 The equivalent Phala command remains available as a fallback, but it is not the active path for this lane.
+
+The upload-only merged checkpoint kernel is retained for future Kaggle-side recovery, but version 2 could not read the `HF_TOKEN` Kaggle secret in this session. The completed checkpoint was therefore recovered by streaming the Kaggle output to local disk with resumable download support, uploading it to Hugging Face, and deleting the local staging copy afterward.
 
 ## Promotion Gate
 

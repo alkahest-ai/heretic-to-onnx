@@ -166,6 +166,6 @@ Current execution status on 2026-05-04:
 
 - Kaggle two-stage SFT is complete for Rally/Gemma E2B A100/B75.
 - Text-only ONNX packages are uploaded for direct Heretic and RP Heretic.
-- The RP merged HF checkpoint is being recovered with a Kaggle upload-only kernel so the 10 GB merged checkpoint does not have to be downloaded locally.
+- The RP merged HF checkpoint is uploaded to `thomasjvu/rally-2b-rp-a100-b75-merged` at commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; the Kaggle merge report verifies scale `0.75` and 148 applied LoRA targets.
 - Full text+image ONNX packages are not complete on Kaggle yet; the T4 path hit Gemma4 vision-export VRAM limits, and the CPU path hit persistent disk limits for raw full-package intermediates.
 - E4B remains out of scope for this pass.
