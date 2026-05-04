@@ -1,4 +1,4 @@
-import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=39";
+import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=40";
 
 const SMOKE_PROMPTS = {
   tavern:
@@ -142,6 +142,13 @@ function parseModels() {
   return [...repeated, ...listed];
 }
 
+function parseRevisions() {
+  const params = new URL(window.location.href).searchParams;
+  const repeated = params.getAll("revision").map((revision) => revision.trim());
+  const listed = (params.get("revisions") || "").split(",").map((revision) => revision.trim());
+  return [...repeated, ...listed];
+}
+
 function renderScore(score) {
   const row = document.createElement("tr");
   const values = [
@@ -185,6 +192,7 @@ async function scoreModel(runtime, repo, authToken, maxNewTokens, generationOpti
       messages: [{ role: "user", content: prompt }],
       maxNewTokens,
       temperature: generationOptions.temperature,
+      revision: generationOptions.revision,
       authToken,
       onProgress: (_info, message) => {
         if (message) {
@@ -200,6 +208,7 @@ async function scoreModel(runtime, repo, authToken, maxNewTokens, generationOpti
 async function run() {
   const url = new URL(window.location.href);
   const models = parseModels();
+  const revisions = parseRevisions();
   const maxNewTokens = Number.parseInt(url.searchParams.get("maxTokens") || "96", 10);
   const temperature = Number.parseFloat(url.searchParams.get("temperature") || "0.2");
   const minTotal = Number.parseFloat(url.searchParams.get("minTotal") || "0.70");
@@ -212,9 +221,10 @@ async function run() {
   const authToken = await getLocalAuthToken();
   const scores = [];
   setStatus("Running...");
-  for (const repo of models) {
+  for (const [index, repo] of models.entries()) {
     const score = await scoreModel(runtime, repo, authToken, Number.isFinite(maxNewTokens) ? maxNewTokens : 96, {
       temperature: Number.isFinite(temperature) ? temperature : 0.2,
+      revision: revisions[index] || "",
     });
     scores.push(score);
     renderScore(score);

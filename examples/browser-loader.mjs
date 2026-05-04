@@ -535,21 +535,24 @@ export function createBrowserChatRuntime({
   let activeDtype = null;
   let activeTextOnly = null;
   let activeAuthToken = null;
+  let activeRevision = null;
 
-  function reset(modelId, family, dtype, textOnly, authToken) {
+  function reset(modelId, family, dtype, textOnly, authToken, revision) {
     const sameDtype = JSON.stringify(dtype) === JSON.stringify(activeDtype);
     if (
       modelId !== activeModelId ||
       family !== activeFamily ||
       !sameDtype ||
       textOnly !== activeTextOnly ||
-      authToken !== activeAuthToken
+      authToken !== activeAuthToken ||
+      revision !== activeRevision
     ) {
       activeModelId = modelId;
       activeFamily = family;
       activeDtype = dtype;
       activeTextOnly = textOnly;
       activeAuthToken = authToken;
+      activeRevision = revision;
       configPromise = null;
       processorPromise = null;
       modelPromise = null;
@@ -563,6 +566,7 @@ export function createBrowserChatRuntime({
     device = defaultDevice,
     textOnly = true,
     authToken = "",
+    revision = "",
     onProgress,
   } = {}) {
     if (!globalThis.navigator?.gpu && device === "webgpu") {
@@ -582,13 +586,17 @@ export function createBrowserChatRuntime({
       family === activeFamily &&
       JSON.stringify(resolvedDtype) === JSON.stringify(activeDtype) &&
       textOnly === activeTextOnly &&
+      revision === activeRevision &&
       processorPromise &&
       modelPromise;
 
-    const hubOptions = authToken ? { token: authToken } : {};
+    const hubOptions = {
+      ...(authToken ? { token: authToken } : {}),
+      ...(revision ? { revision } : {}),
+    };
     configureHubAuth(authToken);
 
-    reset(modelId, family, resolvedDtype, textOnly, authToken);
+    reset(modelId, family, resolvedDtype, textOnly, authToken, revision);
     if (sessionsWarm) {
       onProgress?.({ status: "sessions_warm", textOnly }, "Runtime sessions already warm.");
     } else {
@@ -650,6 +658,7 @@ export function createBrowserChatRuntime({
     topK = 64,
     repetitionPenalty = 1.05,
     authToken = "",
+    revision = "",
     onToken,
     onProgress,
   }) {
@@ -664,6 +673,7 @@ export function createBrowserChatRuntime({
       modelFamily,
       dtype,
       authToken,
+      revision,
       textOnly,
       onProgress,
     });

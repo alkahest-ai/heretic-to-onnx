@@ -3,7 +3,7 @@ import {
   DEFAULT_MODEL_PRESETS,
   findModelPreset,
   formatPresetSummary,
-} from "../examples/browser-loader.mjs?v=39";
+} from "../examples/browser-loader.mjs?v=40";
 import { formatRuntimeError } from "./runtime-errors.mjs";
 import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=35";
 

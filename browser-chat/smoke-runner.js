@@ -1,4 +1,4 @@
-import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=39";
+import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=40";
 
 const elements = {
   status: document.querySelector("#smoke-status"),
@@ -45,6 +45,7 @@ async function run() {
   const url = new URL(window.location.href);
   const modelId = url.searchParams.get("model")?.trim();
   const imageUrl = url.searchParams.get("image")?.trim();
+  const revision = url.searchParams.get("revision")?.trim() || "";
   const prompt =
     url.searchParams.get("prompt")?.trim() ||
     "Describe the attached image in one short sentence.";
@@ -67,6 +68,7 @@ async function run() {
   const output = await runtime.generate({
     modelId,
     modelFamily: inferModelFamily(modelId) || "qwen3_5",
+    revision,
     messages: [
       {
         role: "user",
