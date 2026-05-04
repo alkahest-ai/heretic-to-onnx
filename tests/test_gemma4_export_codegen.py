@@ -205,7 +205,7 @@ class Gemma4ExportCodegenTests(unittest.TestCase):
         self.assertIn('processed.get("pixel_values_videos")', runner)
         self.assertIn("def _patch_audio_attention_for_onnx_export(model):", runner)
         self.assertIn("def _patch_gemma4_attention_for_onnx_export():", runner)
-        self.assertIn("attention_mask = attention_mask.to(device=query.device)", runner)
+        self.assertIn('arguments["attention_mask"] = attention_mask.to(device=query.device)', runner)
         self.assertIn("def _extract_block_context_export_safe(self, hidden_states: torch.Tensor) -> torch.Tensor:", runner)
         self.assertIn("self_attn._extract_block_context = types.MethodType(_extract_block_context_export_safe, self_attn)", runner)
         self.assertIn('if CONTRACT.get("supports_video"):', runner)

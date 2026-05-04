@@ -445,20 +445,29 @@ def render_gemma4_export_runner(
             original_attention = getattr(modeling_gemma4, "eager_attention_forward", None)
             if original_attention is None or getattr(original_attention, "__name__", "") == "_patched_gemma4_eager_attention_forward":
                 return
+            try:
+                original_signature = inspect.signature(original_attention)
+            except (TypeError, ValueError):
+                original_signature = None
 
-            def _patched_gemma4_eager_attention_forward(module, query, key, value, attention_mask, scaling, dropout=0.0, **kwargs):
-                if torch.is_tensor(attention_mask):
-                    attention_mask = attention_mask.to(device=query.device)
-                return original_attention(
-                    module,
-                    query,
-                    key,
-                    value,
-                    attention_mask,
-                    scaling,
-                    dropout=dropout,
-                    **kwargs,
-                )
+            def _patched_gemma4_eager_attention_forward(*args, **kwargs):
+                if original_signature is not None:
+                    bound = original_signature.bind_partial(*args, **kwargs)
+                    arguments = bound.arguments
+                    query = arguments.get("query")
+                    attention_mask = arguments.get("attention_mask")
+                    if torch.is_tensor(query) and torch.is_tensor(attention_mask):
+                        arguments["attention_mask"] = attention_mask.to(device=query.device)
+                    return original_attention(*bound.args, **bound.kwargs)
+
+                patched_args = list(args)
+                query = patched_args[1] if len(patched_args) > 1 else kwargs.get("query")
+                if "attention_mask" in kwargs and torch.is_tensor(query) and torch.is_tensor(kwargs["attention_mask"]):
+                    kwargs = dict(kwargs)
+                    kwargs["attention_mask"] = kwargs["attention_mask"].to(device=query.device)
+                elif len(patched_args) > 4 and torch.is_tensor(query) and torch.is_tensor(patched_args[4]):
+                    patched_args[4] = patched_args[4].to(device=query.device)
+                return original_attention(*patched_args, **kwargs)
 
             _patched_gemma4_eager_attention_forward.__name__ = "_patched_gemma4_eager_attention_forward"
             modeling_gemma4.eager_attention_forward = _patched_gemma4_eager_attention_forward
