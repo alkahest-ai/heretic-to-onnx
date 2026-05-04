@@ -144,10 +144,29 @@ def _patch_unsloth_text_only_processor() -> None:
     importlib.invalidate_caches()
 
 
+def _patch_unsloth_zoo_pad_token_config() -> None:
+    target = None
+    for root in _candidate_site_roots():
+        candidate = root / "unsloth_zoo/tokenizer_utils.py"
+        if candidate.exists():
+            target = candidate
+            break
+    if target is None:
+        return
+    text = target.read_text(encoding="utf-8")
+    needle = "if model.config.pad_token_id is None:"
+    replacement = "if getattr(model.config, \"pad_token_id\", None) is None:"
+    if needle not in text:
+        return
+    target.write_text(text.replace(needle, replacement), encoding="utf-8")
+    importlib.invalidate_caches()
+
+
 _patch_unsloth_transformers5_config_exec()
 _patch_transformers_cache_exports()
 _patch_unsloth_vision_hybrid_cache_import()
 _patch_unsloth_text_only_processor()
+_patch_unsloth_zoo_pad_token_config()
 
 try:
     import trl.trainer.utils as trl_trainer_utils
