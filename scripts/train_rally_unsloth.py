@@ -9,6 +9,15 @@ from pathlib import Path
 os.environ.setdefault("UNSLOTH_COMPILE_DISABLE", "1")
 os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
 
+try:
+    import trl.trainer.utils as trl_trainer_utils
+    from trl.trainer import ConstantLengthDataset
+
+    if not hasattr(trl_trainer_utils, "ConstantLengthDataset"):
+        trl_trainer_utils.ConstantLengthDataset = ConstantLengthDataset
+except Exception:
+    pass
+
 from unsloth import FastLanguageModel
 from datasets import DatasetDict, load_dataset
 from trl import SFTConfig, SFTTrainer
