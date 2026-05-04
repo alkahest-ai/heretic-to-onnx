@@ -461,6 +461,8 @@ def main(argv: list[str] | None = None) -> int:
         if not args.keep_artifacts:
             _rm(scratch_dir / "rp" / "work")
             report["disk"]["after_rp_work_cleanup"] = _disk(work_dir)
+            _rm(selected_merged)
+            report["disk"]["after_selected_merge_cleanup"] = _disk(work_dir)
 
     report["ok"] = all(item.get("publish", {}).get("ok", False) for item in report["exports"]) if args.upload else True
     report_path = work_dir / "rally-e2b-browser-export-report.json"
