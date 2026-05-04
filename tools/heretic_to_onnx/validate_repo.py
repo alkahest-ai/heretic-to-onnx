@@ -107,6 +107,25 @@ def _runtime_smoke_onnx_sessions(
                 )
             )
             continue
+        if (
+            manifest.architecture == "gemma4_conditional_generation"
+            and manifest.target_dtype == "q4f16"
+            and Path(relative_path).name == "decoder_model_merged_q4f16.onnx"
+        ):
+            report.warnings.append(
+                "runtime smoke skipped for optimized Gemma4 decoder: stock CPU onnxruntime does not "
+                "register ORT-web custom ops; browser smoke is required"
+            )
+            report.runtime_smoke.append(
+                RuntimeSmokeSessionReport(
+                    onnx_path=relative_path,
+                    ok=True,
+                    skipped=True,
+                    providers=[],
+                    error="skipped: optimized Gemma4 decoder requires ORT-web custom ops",
+                )
+            )
+            continue
 
         session_report = RuntimeSmokeSessionReport(
             onnx_path=relative_path,

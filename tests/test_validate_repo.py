@@ -435,6 +435,44 @@ class ValidateRepoRuntimeSmokeTests(unittest.TestCase):
         self.assertIn("decoder_model_merged_q4f16.onnx", report.runtime_smoke[0].onnx_path)
         self.assertIn("float", report.runtime_smoke[0].error.lower())
 
+    def test_runtime_smoke_skips_optimized_gemma4_decoder(self) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            decoder_path = package_dir / "onnx" / "decoder_model_merged_q4f16.onnx"
+            self._write_package_config(package_dir)
+            decoder_path.parent.mkdir(parents=True, exist_ok=True)
+            graph = helper.make_graph(
+                [helper.make_node("MatMulNBits", ["x"], ["y"], domain="com.microsoft")],
+                "optimized_gemma4_decoder",
+                [helper.make_tensor_value_info("x", TensorProto.FLOAT16, [1])],
+                [helper.make_tensor_value_info("y", TensorProto.FLOAT16, [1])],
+            )
+            model = helper.make_model(
+                graph,
+                opset_imports=[
+                    helper.make_opsetid("", 21),
+                    helper.make_opsetid("com.microsoft", 1),
+                ],
+            )
+            onnx.save_model(model, decoder_path)
+
+            report = validate_package(
+                _manifest(root, expected_onnx_files=["onnx/decoder_model_merged_q4f16.onnx"]),
+                package_dir,
+                strict_onnx=True,
+                runtime_smoke=True,
+            )
+
+        self.assertTrue(report.ok, report.errors)
+        self.assertEqual(len(report.runtime_smoke), 1)
+        self.assertTrue(report.runtime_smoke[0].ok)
+        self.assertTrue(report.runtime_smoke[0].skipped)
+        self.assertTrue(any("runtime smoke skipped for optimized Gemma4 decoder" in warning for warning in report.warnings))
+
 
 if __name__ == "__main__":
     unittest.main()
