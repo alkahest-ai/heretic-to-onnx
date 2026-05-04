@@ -226,7 +226,6 @@ def main() -> int:
         model_name=args.model_name,
         max_seq_length=args.max_seq_length,
         load_in_4bit=args.load_in_4bit,
-        load_in_16bit=not args.load_in_4bit,
         full_finetuning=False,
     )
     if tokenizer.pad_token is None:
