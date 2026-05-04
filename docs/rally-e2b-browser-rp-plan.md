@@ -53,8 +53,8 @@ Kernel IDs:
 CLI launch:
 
 ```bash
-kaggle kernels push -p kaggle/rally_e2b_two_stage_sft
-kaggle kernels push -p kaggle/rally_e2b_two_stage_export
+kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_two_stage_export --accelerator NvidiaTeslaT4
 ```
 
 The two-kernel workflow performs:

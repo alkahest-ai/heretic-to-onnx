@@ -148,8 +148,8 @@ Desktop Safari / desktop Chromium should be the main validation targets.
 After the Alkahest 0.8B/2B closeout, use the E2B-only Kaggle lane before touching E4B:
 
 ```bash
-kaggle kernels push -p kaggle/rally_e2b_two_stage_sft
-kaggle kernels push -p kaggle/rally_e2b_two_stage_export
+kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_two_stage_export --accelerator NvidiaTeslaT4
 ```
 
 That path publishes the direct Heretic full package, direct Heretic text-only package, A100/B75 RP merged checkpoint, A100/B75 RP full package, and A100/B75 RP text-only package. Keep the resulting Rally presets hidden until browser smoke and the RP scorecard beat the direct Rally E2B baseline.
