@@ -158,6 +158,167 @@ def _harmonize_float16_elementwise_inputs(model) -> int:
     return fixed
 
 
+def _pack_int4(values):
+    if values.shape[-1] % 2:
+        values = np.pad(values, [(0, 0)] * (values.ndim - 1) + [(0, 1)])
+    low = values[..., 0::2]
+    high = values[..., 1::2]
+    return (low | (high << 4)).astype(np.uint8)
+
+
+def _quantize_embedding_initializer(tensor, block_size: int, prefix: str) -> tuple:
+    weight = numpy_helper.to_array(tensor)
+    if weight.ndim != 2:
+        raise ValueError(f"expected 2D embedding weight for {{tensor.name}}, got shape {{weight.shape}}")
+    vocab_size, hidden_size = weight.shape
+    if hidden_size % block_size:
+        raise ValueError(
+            f"embedding hidden size {{hidden_size}} for {{tensor.name}} is not divisible by block size {{block_size}}"
+        )
+
+    num_blocks = hidden_size // block_size
+    packed_quant = np.empty((vocab_size, hidden_size // 2), dtype=np.uint8)
+    scales = np.empty((vocab_size, num_blocks), dtype=np.float32)
+    zero_points = np.empty((vocab_size, num_blocks), dtype=np.uint8)
+    chunk_rows = 1024
+
+    for start in range(0, vocab_size, chunk_rows):
+        end = min(start + chunk_rows, vocab_size)
+        blocks = weight[start:end].reshape(end - start, num_blocks, block_size).astype(np.float32)
+        mins = blocks.min(axis=-1)
+        maxs = blocks.max(axis=-1)
+        chunk_scales = (maxs - mins) / 15.0
+        chunk_scales = np.where(chunk_scales == 0, 1.0, chunk_scales).astype(np.float32)
+        chunk_zero_points = np.rint(-mins / chunk_scales).clip(0, 15).astype(np.uint8)
+        quantized = np.rint(blocks / chunk_scales[..., None] + chunk_zero_points[..., None])
+        quantized = quantized.clip(0, 15).astype(np.uint8).reshape(end - start, hidden_size)
+        packed_quant[start:end] = _pack_int4(quantized)
+        scales[start:end] = chunk_scales
+        zero_points[start:end] = chunk_zero_points
+
+    del weight
+    quant_name = f"{{prefix}}_quant"
+    scales_name = f"{{prefix}}_scales"
+    zero_points_name = f"{{prefix}}_zp"
+    return (
+        numpy_helper.from_array(packed_quant, quant_name),
+        numpy_helper.from_array(scales, scales_name),
+        numpy_helper.from_array(_pack_int4(zero_points), zero_points_name),
+        {{
+            "vocab_size": int(vocab_size),
+            "hidden_size": int(hidden_size),
+            "block_size": int(block_size),
+        }},
+    )
+
+
+def _ensure_ms_opset(model) -> None:
+    if any(opset.domain == "com.microsoft" for opset in model.opset_import):
+        return
+    model.opset_import.append(helper.make_opsetid("com.microsoft", 1))
+
+
+def _quantize_gemma4_embed_tokens_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
+    model = onnx.load(str(input_path))
+    conversion_mode = "converted_to_fp16"
+    try:
+        model = onnx_float16.convert_float_to_float16(
+            model,
+            keep_io_types=False,
+            disable_shape_infer=True,
+        )
+    except ValueError as exc:
+        if "already converted to float16" not in str(exc):
+            raise
+        conversion_mode = "already_fp16_ready"
+
+    initializers = {{initializer.name: initializer for initializer in model.graph.initializer}}
+    nodes = list(model.graph.node)
+    rewritten_nodes = []
+    new_initializers = []
+    removed_initializers = set()
+    quantized_embeddings = {{}}
+
+    for node in nodes:
+        if node.op_type != "Gather" or len(node.input) < 2 or node.input[0] not in initializers:
+            rewritten_nodes.append(node)
+            continue
+        weight_name = node.input[0]
+        if "embed_tokens" not in weight_name:
+            rewritten_nodes.append(node)
+            continue
+
+        safe_prefix = weight_name.replace(".", "_").replace("/", "_")
+        quant_tensor, scales_tensor, zero_points_tensor, metadata = _quantize_embedding_initializer(
+            initializers[weight_name],
+            block_size,
+            safe_prefix,
+        )
+        quantized_embeddings[weight_name] = metadata
+        new_initializers.extend([quant_tensor, scales_tensor, zero_points_tensor])
+        removed_initializers.add(weight_name)
+
+        float_output = f"{{node.output[0]}}_q4_float"
+        rewritten_nodes.append(
+            helper.make_node(
+                "GatherBlockQuantized",
+                [quant_tensor.name, node.input[1], scales_tensor.name, zero_points_tensor.name],
+                [float_output],
+                name=f"{{node.name}}_Q4" if node.name else "",
+                domain="com.microsoft",
+                bits=4,
+                block_size=block_size,
+                gather_axis=0,
+                quantize_axis=1,
+            )
+        )
+        rewritten_nodes.append(
+            helper.make_node(
+                "Cast",
+                [float_output],
+                [node.output[0]],
+                name=f"{{node.name}}_Q4_Cast" if node.name else "",
+                to=TensorProto.FLOAT16,
+            )
+        )
+
+    if not quantized_embeddings:
+        raise ValueError("embed_tokens session did not contain Gemma4 embedding Gather initializers to quantize")
+
+    del model.graph.node[:]
+    model.graph.node.extend(rewritten_nodes)
+    del model.graph.initializer[:]
+    model.graph.initializer.extend(
+        [initializer for initializer in initializers.values() if initializer.name not in removed_initializers]
+    )
+    model.graph.initializer.extend(new_initializers)
+    _ensure_ms_opset(model)
+    fixed_elementwise_inputs = _harmonize_float16_elementwise_inputs(model)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    external_data_path = output_path.with_name(f"{{output_path.name}}_data")
+    if external_data_path.exists():
+        external_data_path.unlink()
+
+    onnx.save_model(
+        model,
+        str(output_path),
+        save_as_external_data=True,
+        all_tensors_to_one_file=True,
+        location=external_data_path.name,
+        size_threshold=0,
+        convert_attribute=False,
+    )
+
+    return {{
+        "conversion_mode": f"{{conversion_mode}}+gather_block_quantized_q4",
+        "fixed_elementwise_inputs": fixed_elementwise_inputs,
+        "quantized_embeddings": quantized_embeddings,
+        "output_path": str(output_path),
+        "external_data_path": str(external_data_path),
+    }}
+
+
 def _quantize_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
     model = onnx.load(str(input_path))
     quantizer = MatMulNBitsQuantizer(model, bits=4, block_size=block_size, is_symmetric=True)
@@ -223,7 +384,10 @@ def main(argv: list[str] | None = None) -> int:
             missing_inputs.append(str(raw_path))
             continue
         quantized_path = output_dir / session["package_filename"]
-        result = _quantize_q4f16(raw_path, quantized_path, args.block_size)
+        if session["name"] == "embed_tokens":
+            result = _quantize_gemma4_embed_tokens_q4f16(raw_path, quantized_path, args.block_size)
+        else:
+            result = _quantize_q4f16(raw_path, quantized_path, args.block_size)
         results[session["name"]] = {{
             "input_path": str(raw_path),
             **result,
@@ -246,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     import onnx
-    from onnx import TensorProto, numpy_helper
+    from onnx import TensorProto, helper, numpy_helper
     from onnxconverter_common import float16 as onnx_float16
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 
