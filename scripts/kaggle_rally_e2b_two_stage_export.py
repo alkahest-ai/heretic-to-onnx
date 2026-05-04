@@ -387,14 +387,18 @@ def main(argv: list[str] | None = None) -> int:
         "warnings": [],
     }
 
-    artifacts = _find_artifacts(args.artifact_dir, args.artifact_name)
-    report["artifact_dir"] = str(artifacts)
-    selected_merged = work_dir / f"{args.candidate_name}-merged"
-    _merge_scaled(artifacts / "stage-a-merged", artifacts / "stage-b-adapter", selected_merged, args.stage_b_scale)
-    report["selected_merged"] = str(selected_merged)
-    report["disk"]["after_merge"] = _disk(work_dir)
+    selected_merged: Path | None = None
+    if not args.skip_rp:
+        artifacts = _find_artifacts(args.artifact_dir, args.artifact_name)
+        report["artifact_dir"] = str(artifacts)
+        selected_merged = work_dir / f"{args.candidate_name}-merged"
+        _merge_scaled(artifacts / "stage-a-merged", artifacts / "stage-b-adapter", selected_merged, args.stage_b_scale)
+        report["selected_merged"] = str(selected_merged)
+        report["disk"]["after_merge"] = _disk(work_dir)
+    else:
+        report["warnings"].append("RP merge skipped because --skip-rp was set")
 
-    if args.score:
+    if args.score and selected_merged is not None:
         try:
             report["scorecard"] = _score_models(args.direct_source_model_id, selected_merged)
         except Exception as exc:
@@ -402,8 +406,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.require_score:
                 raise
 
-    report["merged_upload"] = _upload_merged(selected_merged, args.rp_merged_repo, args)
-    report["disk"]["after_merged_upload"] = _disk(work_dir)
+    if selected_merged is not None:
+        report["merged_upload"] = _upload_merged(selected_merged, args.rp_merged_repo, args)
+        report["disk"]["after_merged_upload"] = _disk(work_dir)
 
     if not args.skip_direct:
         report["exports"].extend(
@@ -425,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
             report["disk"]["after_direct_work_cleanup"] = _disk(work_dir)
 
     if not args.skip_rp:
+        if selected_merged is None:
+            raise RuntimeError("selected RP merge was not created")
         report["exports"].extend(
             _process_pair(
                 label="rp-a100-b75",
