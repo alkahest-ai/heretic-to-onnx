@@ -18,6 +18,18 @@ Use `HF_OWNER=thomasjvu` for private app-facing recovery work unless a later rel
 | RP full browser package | `RALLY2_TUNED_REPO=thomasjvu/rally-2b-rp` | A100/B75 text + image browser package. |
 | RP text browser package | `RALLY2_TUNED_TEXT_REPO=thomasjvu/rally-2b-rp-text` | A100/B75 text-only browser package. |
 
+## Current Kaggle Status
+
+As of 2026-05-04, the active Rally/Gemma E2B pass is staying on Kaggle instead of Phala:
+
+| Artifact | Status | Notes |
+| --- | --- | --- |
+| Two-stage SFT | Complete | `alkahestai/rally-e2b-two-stage-sft-t4` completed Stage A and Stage B on Kaggle T4. |
+| Direct Heretic text | Uploaded | `thomasjvu/rally-2b-text`, HF commit `0ed67b21d4a6aa23614451587dd0e48a06f93dc1`, package report `ok: true`. |
+| RP A100/B75 text | Uploaded | `thomasjvu/rally-2b-rp-text`, HF commit `cf64df4088314cc96a98786de1a0a963bc87e1d4`, package report `ok: true`. |
+| RP A100/B75 merged checkpoint | Upload-only recovery | `kaggle/rally_e2b_rp_merged_upload` uploads the existing export-kernel checkpoint directly from Kaggle output to `thomasjvu/rally-2b-rp-a100-b75-merged`, avoiding local download of the 10 GB `model.safetensors`. |
+| Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
+
 ## Training Shape
 
 The `rally` mode in `scripts/phala_gpu_tee_oneclick.sh` now uses the Alkahest v8 two-stage SFT rows:
@@ -49,12 +61,14 @@ Kernel IDs:
 
 - `alkahestai/rally-e2b-two-stage-sft-t4`
 - `alkahestai/rally-e2b-browser-export`
+- `alkahestai/rally-e2b-rp-merged-upload`
 
 CLI launch:
 
 ```bash
 kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT4
 kaggle kernels push -p kaggle/rally_e2b_two_stage_export --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
 ```
 
 The two-kernel workflow performs:

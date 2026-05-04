@@ -161,3 +161,11 @@ The current pass is E2B-only and mirrors the Alkahest 2B RP promotion rule:
 5. promote only after browser smoke plus RP scorecard win over direct Rally E2B
 
 See `/Users/area/heretic/docs/rally-e2b-browser-rp-plan.md` for the concrete command and repo targets.
+
+Current execution status on 2026-05-04:
+
+- Kaggle two-stage SFT is complete for Rally/Gemma E2B A100/B75.
+- Text-only ONNX packages are uploaded for direct Heretic and RP Heretic.
+- The RP merged HF checkpoint is being recovered with a Kaggle upload-only kernel so the 10 GB merged checkpoint does not have to be downloaded locally.
+- Full text+image ONNX packages are not complete on Kaggle yet; the T4 path hit Gemma4 vision-export VRAM limits, and the CPU path hit persistent disk limits for raw full-package intermediates.
+- E4B remains out of scope for this pass.
