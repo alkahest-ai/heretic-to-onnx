@@ -436,6 +436,34 @@ def render_gemma4_export_runner(
                 pass
 
 
+        def _patch_gemma4_attention_for_onnx_export():
+            try:
+                from transformers.models.gemma4 import modeling_gemma4
+            except Exception:
+                return
+
+            original_attention = getattr(modeling_gemma4, "eager_attention_forward", None)
+            if original_attention is None or getattr(original_attention, "__name__", "") == "_patched_gemma4_eager_attention_forward":
+                return
+
+            def _patched_gemma4_eager_attention_forward(module, query, key, value, attention_mask, scaling, dropout=0.0, **kwargs):
+                if torch.is_tensor(attention_mask):
+                    attention_mask = attention_mask.to(device=query.device)
+                return original_attention(
+                    module,
+                    query,
+                    key,
+                    value,
+                    attention_mask,
+                    scaling,
+                    dropout=dropout,
+                    **kwargs,
+                )
+
+            _patched_gemma4_eager_attention_forward.__name__ = "_patched_gemma4_eager_attention_forward"
+            modeling_gemma4.eager_attention_forward = _patched_gemma4_eager_attention_forward
+
+
         def _load_image_processor(source_path: Path, base_path: Path):
             last_error = None
             for root in (source_path, base_path):
@@ -903,6 +931,7 @@ def render_gemma4_export_runner(
                 raise RuntimeError("contract validation failed: " + "; ".join(CONTRACT["warnings"]))
 
             _patch_masking_utils_for_onnx_export()
+            _patch_gemma4_attention_for_onnx_export()
             has_vision_session = any(session["name"] == "vision_encoder" for session in CONTRACT["sessions"])
             image_processor = _load_image_processor(source_path, base_path) if has_vision_session else None
             feature_extractor = _load_feature_extractor(source_path, base_path) if CONTRACT.get("supports_audio") else None
