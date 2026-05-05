@@ -46,6 +46,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-direct", action="store_true")
     parser.add_argument("--skip-rp", action="store_true")
     parser.add_argument("--skip-full-packages", action="store_true")
+    parser.add_argument("--optimized-template-dir", default="", help="Local reference Gemma4 ONNX package/template dir.")
+    parser.add_argument("--optimized-template-model-id", default="onnx-community/gemma-4-E2B-it-ONNX")
+    parser.add_argument("--optimized-template-revision", default="")
     parser.add_argument("--score", action="store_true", default=True)
     parser.add_argument("--no-score", dest="score", action="store_false")
     parser.add_argument("--require-score", action="store_true")
@@ -153,7 +156,7 @@ def _render_manifest(target: PackageTarget, manifest_dir: Path, base_model_id: s
     return manifest_path
 
 
-def _convert_full(target: PackageTarget, manifest_path: Path, work_dir: Path, package_dir: Path, args: argparse.Namespace) -> dict[str, str]:
+def _convert_full(target: PackageTarget, manifest_path: Path, work_dir: Path, package_dir: Path, args: argparse.Namespace) -> dict[str, Any]:
     _run(
         [
             sys.executable,
@@ -193,7 +196,7 @@ def _package_text_from_quantized(
     work_dir: Path,
     package_dir: Path,
     quantized_dir: Path,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     _run(
         [
             sys.executable,
@@ -240,6 +243,74 @@ def _publish(manifest_path: Path, package_dir: Path, args: argparse.Namespace) -
         command.append("--private")
     _run(command, cwd=ROOT_DIR)
     return {"ok": True, "package_dir": str(package_dir)}
+
+
+def _resolve_optimized_template(work_dir: Path, args: argparse.Namespace) -> Path:
+    if args.optimized_template_dir:
+        return Path(args.optimized_template_dir).expanduser().resolve()
+
+    from huggingface_hub import snapshot_download
+
+    target_dir = work_dir / "optimized-template"
+    kwargs: dict[str, Any] = {
+        "repo_id": args.optimized_template_model_id,
+        "local_dir": str(target_dir),
+        "allow_patterns": ["onnx/decoder_model_merged_q4f16.onnx"],
+    }
+    if args.optimized_template_revision:
+        kwargs["revision"] = args.optimized_template_revision
+    snapshot_download(**kwargs)
+    return target_dir
+
+
+def _source_dir_for_optimize(source_model_id: str, convert_work_dir: Path) -> Path:
+    source_path = Path(source_model_id).expanduser()
+    if source_path.exists():
+        return source_path.resolve()
+    return convert_work_dir / "inputs" / "source"
+
+
+def _optimize_text_package(
+    *,
+    source_model_id: str,
+    manifest_path: Path,
+    convert_work_dir: Path,
+    package_dir: Path,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    template_dir = _resolve_optimized_template(convert_work_dir, args)
+    source_dir = _source_dir_for_optimize(source_model_id, convert_work_dir)
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "tools.heretic_to_onnx",
+            "optimize-gemma4-text-package",
+            "--source-dir",
+            str(source_dir),
+            "--template-dir",
+            str(template_dir),
+            "--package-dir",
+            str(package_dir),
+        ],
+        cwd=ROOT_DIR,
+    )
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "tools.heretic_to_onnx",
+            "validate",
+            "--config",
+            str(manifest_path),
+            "--package-dir",
+            str(package_dir),
+            "--strict-onnx",
+            "--skip-runtime-smoke",
+        ],
+        cwd=ROOT_DIR,
+    )
+    return {"source_dir": str(source_dir), "template_dir": str(template_dir), "package_dir": str(package_dir)}
 
 
 def _upload_merged(merged_dir: Path, repo_id: str, args: argparse.Namespace) -> dict[str, Any]:
@@ -345,6 +416,13 @@ def _process_pair(
             packages_dir / text_target.name,
             args,
         )
+        text_paths["optimized"] = _optimize_text_package(
+            source_model_id=source_model_id,
+            manifest_path=text_manifest,
+            convert_work_dir=scratch_work_dir / text_target.name,
+            package_dir=packages_dir / text_target.name,
+            args=args,
+        )
         text_publish = _publish(text_manifest, Path(text_paths["package_dir"]), args)
         results.append({"target": asdict(text_target), "paths": text_paths, "publish": text_publish})
         return results
@@ -366,6 +444,13 @@ def _process_pair(
         scratch_work_dir / text_target.name,
         packages_dir / text_target.name,
         Path(full_paths["quantized_dir"]),
+    )
+    text_paths["optimized"] = _optimize_text_package(
+        source_model_id=source_model_id,
+        manifest_path=text_manifest,
+        convert_work_dir=scratch_work_dir / full_target.name,
+        package_dir=packages_dir / text_target.name,
+        args=args,
     )
     text_publish = _publish(text_manifest, Path(text_paths["package_dir"]), args)
     results.extend(

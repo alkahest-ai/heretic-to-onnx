@@ -63,6 +63,8 @@ Gemma4 Rally export now defaults to ONNX opset 21, matching the Lisper/reference
 - decoder: `MatMulNBits`
 - embed: `GatherBlockQuantized`
 
+The next exporter path is a reference-template transplant instead of another generic Torch trace. The `optimize-gemma4-text-package` command takes the packaged text repo, a local merged Gemma4 checkpoint, and a reference Gemma4 q4f16 ONNX template, then replaces the decoder with the optimized WebGPU graph and re-quantized source weights. The Rally Kaggle export notebook now runs that transplant after text export and before upload/validation.
+
 ## Kaggle Execution
 
 Use Kaggle instead of Phala for the active lane. The workflow mirrors the Alkahest notebooks:
@@ -118,7 +120,7 @@ Until then, Rally repos are URL-override diagnostics only.
 
 1. Replace the generic traced Gemma4 decoder path with a reference-style optimized text decoder path before another Kaggle export.
 2. Use the Lisper/reference contract as the template: decoder inputs `inputs_embeds`, `attention_mask`, `position_ids`, `num_logits_to_keep`, `per_layer_inputs`; float32 embed/per-layer tensors; int64 attention mask; `GroupQueryAttention`, `RotaryEmbedding`, and `MatMulNBits` custom ops.
-3. Re-run Kaggle export/upload disabled first and require validation to pass locally before any HF upload.
+3. Re-run Kaggle export/upload disabled first and require `optimize-gemma4-text-package` plus package validation to pass before any HF upload.
 4. Pin new direct and RP text revisions only after browser cold-load reaches first generation.
 5. Promote Rally only if RP reaches `0.70`, passes the minor-boundary gate, avoids adult false-refusal, and beats direct Rally by at least `0.05`.
 6. Only after the text-only scorecard passes, resume full text+image package export.

@@ -238,9 +238,38 @@ def _ensure_ms_opset(model) -> None:
     model.opset_import.append(helper.make_opsetid("com.microsoft", 1))
 
 
+def _cast_graph_outputs_to_float(model, output_names: set[str]) -> bool:
+    patched = False
+    for output in model.graph.output:
+        if output.name not in output_names:
+            continue
+        tensor_type = output.type.tensor_type
+        if tensor_type.elem_type != TensorProto.FLOAT16:
+            continue
+        original_name = output.name
+        internal_name = f"{{original_name}}_fp16"
+        for node in model.graph.node:
+            for index, node_output in enumerate(node.output):
+                if node_output == original_name:
+                    node.output[index] = internal_name
+        model.graph.node.append(
+            helper.make_node(
+                "Cast",
+                [internal_name],
+                [original_name],
+                name=f"{{original_name}}_CastFloat",
+                to=TensorProto.FLOAT,
+            )
+        )
+        tensor_type.elem_type = TensorProto.FLOAT
+        patched = True
+    return patched
+
+
 def _quantize_gemma4_embed_tokens_q4f16(input_path: Path, output_path: Path, block_size: int) -> dict:
     model = onnx.load(str(input_path))
     float_types = {{TensorProto.FLOAT, TensorProto.FLOAT16, TensorProto.BFLOAT16}}
+    graph_output_names = {{output.name for output in model.graph.output}}
     conversion_mode = "converted_to_fp16"
     try:
         model = onnx_float16.convert_float_to_float16(
@@ -313,11 +342,9 @@ def _quantize_gemma4_embed_tokens_q4f16(input_path: Path, output_path: Path, blo
         [initializer for initializer in initializers.values() if initializer.name not in removed_initializers]
     )
     model.graph.initializer.extend(new_initializers)
-    for output in model.graph.output:
-        if output.type.HasField("tensor_type") and output.type.tensor_type.elem_type in float_types:
-            output.type.tensor_type.elem_type = TensorProto.FLOAT16
     _ensure_ms_opset(model)
     fixed_elementwise_inputs = _harmonize_float16_elementwise_inputs(model)
+    cast_outputs_to_float = _cast_graph_outputs_to_float(model, graph_output_names)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     external_data_path = output_path.with_name(f"{{output_path.name}}_data")
@@ -336,6 +363,7 @@ def _quantize_gemma4_embed_tokens_q4f16(input_path: Path, output_path: Path, blo
 
     return {{
         "conversion_mode": f"{{conversion_mode}}+gather_block_quantized_q4",
+        "cast_outputs_to_float": cast_outputs_to_float,
         "fixed_elementwise_inputs": fixed_elementwise_inputs,
         "quantized_embeddings": quantized_embeddings,
         "output_path": str(output_path),

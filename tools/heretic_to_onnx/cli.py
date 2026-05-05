@@ -8,6 +8,7 @@ from .config import load_manifest
 from .convert import run_convert
 from .export_gemma4 import export_gemma4
 from .export_qwen3_5 import export_qwen3_5
+from .gemma4_opt_transplant import build_optimized_gemma4_text_package
 from .inspect import inspect_manifest
 from .package_repo import package_repo
 from .publish_hf import publish_hf, publish_model_card_hf, write_model_card
@@ -189,6 +190,15 @@ def _base_parser() -> argparse.ArgumentParser:
         help="Block size for MatMul int4 quantization",
     )
 
+    optimize_gemma4_parser = subparsers.add_parser(
+        "optimize-gemma4-text-package",
+        help="Replace a Gemma4 text package decoder with the reference optimized WebGPU graph",
+    )
+    optimize_gemma4_parser.add_argument("--source-dir", required=True, help="Local merged HF checkpoint directory")
+    optimize_gemma4_parser.add_argument("--template-dir", required=True, help="Reference Gemma4 ONNX package or onnx dir")
+    optimize_gemma4_parser.add_argument("--package-dir", required=True, help="Packaged repo directory to update in place")
+    optimize_gemma4_parser.add_argument("--block-size", default=32, type=int, help="MatMulNBits block size")
+
     qwen_export_parser = subparsers.add_parser("export-qwen3_5", help="Plan the Qwen3.5 ONNX export stage")
     qwen_export_parser.add_argument("--config", required=True, help="Path to manifest YAML")
     qwen_export_parser.add_argument("--work-dir", help="Optional work directory")
@@ -302,6 +312,16 @@ def main(argv: list[str] | None = None) -> int:
             source_model_id=args.source_model_id,
             base_model_id=args.base_model_id,
             target_repo_id=args.target_repo_id,
+        )
+        _dump_json(report.to_dict())
+        return 0 if report.ok else 2
+
+    if args.command == "optimize-gemma4-text-package":
+        report = build_optimized_gemma4_text_package(
+            source_dir=args.source_dir,
+            template_dir=args.template_dir,
+            package_dir=args.package_dir,
+            block_size=args.block_size,
         )
         _dump_json(report.to_dict())
         return 0 if report.ok else 2
