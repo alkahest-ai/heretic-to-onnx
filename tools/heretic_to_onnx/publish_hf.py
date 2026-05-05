@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -277,11 +276,6 @@ def publish_hf(
         report.warnings.append("package failed pre-publish validation; refusing Hugging Face upload")
         return report
 
-    if not os.environ.get("HF_TOKEN"):
-        report.ok = False
-        report.warnings.append("HF_TOKEN is not set; Hugging Face upload will fail")
-        return report
-
     run_command(create_command, cwd=manifest.manifest_dir)
     report.notes.append(f"ensured Hugging Face model repo exists: {resolved_repo_id}")
 
@@ -320,11 +314,6 @@ def publish_model_card_hf(
         output_path=str(resolved_output_path),
         command=upload_command,
     )
-
-    if not os.environ.get("HF_TOKEN"):
-        report.ok = False
-        report.warnings.append("HF_TOKEN is not set; Hugging Face upload will fail")
-        return report
 
     run_command(upload_command, cwd=manifest.manifest_dir)
     report.notes.append(f"uploaded README.md to Hugging Face repo: {resolved_repo_id}")

@@ -16,12 +16,17 @@ def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-def _manifest(root: Path, *, expected_onnx_files: list[str]) -> Manifest:
+def _manifest(
+    root: Path,
+    *,
+    expected_onnx_files: list[str],
+    target_repo_id: str = "alkahest-ai/runtime-smoke",
+) -> Manifest:
     return Manifest(
         source_model_id="example/source",
         base_model_id="example/base",
         architecture="gemma4_conditional_generation",
-        target_repo_id="alkahest-ai/runtime-smoke",
+        target_repo_id=target_repo_id,
         target_dtype="q4f16",
         target_device="webgpu",
         modalities=["text"],
@@ -88,20 +93,72 @@ class ValidateRepoGemma4WebgpuContractTests(unittest.TestCase):
         )
         onnx.save_model(model, path)
 
+    def _write_reference_decoder_model(self, path: Path, *, opset: int, custom_ops: list[str] | None = None) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        nodes = [
+            helper.make_node(op_type, ["x"], [f"{op_type}_out"], domain="com.microsoft")
+            for op_type in (custom_ops or ["MatMulNBits", "GroupQueryAttention", "RotaryEmbedding"])
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "gemma4_reference_decoder_graph",
+            [
+                helper.make_tensor_value_info("inputs_embeds", TensorProto.FLOAT, [1, 1, 1536]),
+                helper.make_tensor_value_info("attention_mask", TensorProto.INT64, [1, 2]),
+                helper.make_tensor_value_info("position_ids", TensorProto.INT64, [1, 1]),
+                helper.make_tensor_value_info("num_logits_to_keep", TensorProto.INT64, []),
+                helper.make_tensor_value_info("per_layer_inputs", TensorProto.FLOAT, [1, 1, 35, 256]),
+                helper.make_tensor_value_info("x", TensorProto.FLOAT, [1]),
+            ],
+            [helper.make_tensor_value_info("logits", TensorProto.FLOAT16, [1, 1, 262144])],
+        )
+        model = helper.make_model(
+            graph,
+            opset_imports=[
+                helper.make_opsetid("", opset),
+                helper.make_opsetid("com.microsoft", 1),
+            ],
+        )
+        onnx.save_model(model, path)
+
+    def _write_reference_embed_model(self, path: Path, *, opset: int) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        graph = helper.make_graph(
+            [helper.make_node("GatherBlockQuantized", ["x"], ["inputs_embeds"], domain="com.microsoft")],
+            "gemma4_reference_embed_graph",
+            [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])],
+            [
+                helper.make_tensor_value_info("inputs_embeds", TensorProto.FLOAT, [1, 1, 1536]),
+                helper.make_tensor_value_info("per_layer_inputs", TensorProto.FLOAT, [1, 1, 35, 256]),
+            ],
+        )
+        model = helper.make_model(
+            graph,
+            opset_imports=[
+                helper.make_opsetid("", opset),
+                helper.make_opsetid("com.microsoft", 1),
+            ],
+        )
+        onnx.save_model(model, path)
+
     def test_gemma4_q4f16_contract_accepts_reference_style_text_graphs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             package_dir = root / "package"
             self._write_gemma_package_config(package_dir)
-            self._write_custom_op_model(
+            self._write_reference_decoder_model(
                 package_dir / "onnx" / "decoder_model_merged_q4f16.onnx",
                 opset=21,
-                op_type="MatMulNBits",
             )
-            self._write_custom_op_model(
+            self._write_reference_embed_model(
                 package_dir / "onnx" / "embed_tokens_q4f16.onnx",
                 opset=21,
-                op_type="GatherBlockQuantized",
             )
 
             report = validate_package(
@@ -123,10 +180,9 @@ class ValidateRepoGemma4WebgpuContractTests(unittest.TestCase):
             root = Path(tmpdir)
             package_dir = root / "package"
             self._write_gemma_package_config(package_dir)
-            self._write_custom_op_model(
+            self._write_reference_decoder_model(
                 package_dir / "onnx" / "decoder_model_merged_q4f16.onnx",
                 opset=17,
-                op_type="MatMulNBits",
             )
 
             report = validate_package(
@@ -143,6 +199,73 @@ class ValidateRepoGemma4WebgpuContractTests(unittest.TestCase):
 
         self.assertFalse(report.ok)
         self.assertTrue(any("must use ONNX opset >= 21" in error for error in report.errors))
+
+    def test_gemma4_q4f16_contract_rejects_unoptimized_decoder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_gemma_package_config(package_dir)
+            self._write_reference_decoder_model(
+                package_dir / "onnx" / "decoder_model_merged_q4f16.onnx",
+                opset=21,
+                custom_ops=["MatMulNBits"],
+            )
+
+            report = validate_package(
+                _manifest(
+                    root,
+                    expected_onnx_files=[
+                        "onnx/embed_tokens_q4f16.onnx",
+                        "onnx/decoder_model_merged_q4f16.onnx",
+                    ],
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("GroupQueryAttention" in error for error in report.errors), report.errors)
+
+    def test_gemma4_q4f16_contract_rejects_float16_embed_outputs(self) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            package_dir = root / "package"
+            self._write_gemma_package_config(package_dir)
+            path = package_dir / "onnx" / "embed_tokens_q4f16.onnx"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            graph = helper.make_graph(
+                [helper.make_node("GatherBlockQuantized", ["x"], ["inputs_embeds"], domain="com.microsoft")],
+                "gemma4_bad_embed_graph",
+                [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])],
+                [
+                    helper.make_tensor_value_info("inputs_embeds", TensorProto.FLOAT16, [1, 1, 1536]),
+                    helper.make_tensor_value_info("per_layer_inputs", TensorProto.FLOAT16, [1, 1, 35, 256]),
+                ],
+            )
+            model = helper.make_model(
+                graph,
+                opset_imports=[
+                    helper.make_opsetid("", 21),
+                    helper.make_opsetid("com.microsoft", 1),
+                ],
+            )
+            onnx.save_model(model, path)
+
+            report = validate_package(
+                _manifest(
+                    root,
+                    expected_onnx_files=["onnx/embed_tokens_q4f16.onnx"],
+                    target_repo_id="thomasjvu/rally-2b-text",
+                ),
+                package_dir,
+                runtime_smoke=False,
+            )
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("embed outputs must be float32" in error for error in report.errors), report.errors)
 
 
 class ValidateRepoQwenWebgpuContractTests(unittest.TestCase):

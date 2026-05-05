@@ -25,18 +25,18 @@ As of 2026-05-04, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Artifact | Status | Notes |
 | --- | --- | --- |
 | Two-stage SFT | Complete | `alkahestai/rally-e2b-two-stage-sft-t4` completed Stage A and Stage B on Kaggle T4. |
-| Direct Heretic text | Needs re-export | Legacy uploaded revisions reached the browser but failed WebGPU init on the decoder. Re-export with Gemma4 opset 21 before another scorecard run. |
-| RP A100/B75 text | Needs re-export | Legacy uploaded revisions reached the browser but failed before generation for the same decoder contract issue. Re-export only; do not retrain yet. |
+| Direct Heretic text | Re-exported; failed browser smoke | Kaggle export v20 completed with upload disabled, then local HF upload published opset 21 q4f16 package at `thomasjvu/rally-2b-text`, HF commit `5ea42c682cd34c49370e8cf6a6583ae476838eb8`. Cold browser load still failed with the `MatMulNBits` provider-type error, so this revision is not promotable. |
+| RP A100/B75 text | Re-exported; upload stopped | Kaggle export v20 completed with upload disabled. Local HF upload to `thomasjvu/rally-2b-rp-text` was stopped after the direct v20 browser failure proved the package contract is still incomplete. |
 | RP A100/B75 merged checkpoint | Uploaded | `thomasjvu/rally-2b-rp-a100-b75-merged`, HF commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; `scaled_lora_merge.json` verifies `ok: true`, scale `0.75`, 148 applied LoRA targets. |
 | Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
 
-The confirmed browser failure on the pinned diagnostic scorecard was:
+The confirmed browser failure on the old pinned diagnostic scorecard was:
 
 ```text
 Provider type for MatMulNBits node with name '/language_model/per_layer_model_projection/MatMul_Q4' is not set.
 ```
 
-Local graph inspection showed the failed Rally text decoders were generated as ONNX opset 17 / IR 8, while the Lisper-trained and ONNX Community Gemma4 q4f16 reference decoders use opset 21 with `com.microsoft` custom ops. The next Kaggle pass is therefore an export compatibility pass, not a new RP training pass.
+Local graph inspection showed the failed Rally text decoders were generated as ONNX opset 17 / IR 8, while the Lisper-trained and ONNX Community Gemma4 q4f16 reference decoders use opset 21 with `com.microsoft` custom ops. Kaggle export v20 fixed the opset/import portion but still produced a generic traced decoder instead of the reference WebGPU decoder: it lacks `GroupQueryAttention` and `RotaryEmbedding`, has the wrong decoder input order, uses float16 text embeddings where the reference contract uses float32, and keeps `attention_mask` as bool instead of int64. Validation now rejects this incomplete contract before upload.
 
 ## Training Shape
 
@@ -116,8 +116,9 @@ Until then, Rally repos are URL-override diagnostics only.
 
 ## Next Recovery Pass
 
-1. Push the updated `kaggle/rally_e2b_two_stage_export` notebook.
-2. Run it with `--skip-full-packages` first so Kaggle only rebuilds `rally-2b-text` and `rally-2b-rp-text`.
-3. Confirm each package report is `ok: true` and each decoder graph is opset 21 with `com.microsoft:1`.
-4. Pin the new HF revisions in `scorecard-runner.html` and rerun the browser scorecard.
-5. Only after the text-only scorecard passes, resume full text+image package export.
+1. Replace the generic traced Gemma4 decoder path with a reference-style optimized text decoder path before another Kaggle export.
+2. Use the Lisper/reference contract as the template: decoder inputs `inputs_embeds`, `attention_mask`, `position_ids`, `num_logits_to_keep`, `per_layer_inputs`; float32 embed/per-layer tensors; int64 attention mask; `GroupQueryAttention`, `RotaryEmbedding`, and `MatMulNBits` custom ops.
+3. Re-run Kaggle export/upload disabled first and require validation to pass locally before any HF upload.
+4. Pin new direct and RP text revisions only after browser cold-load reaches first generation.
+5. Promote Rally only if RP reaches `0.70`, passes the minor-boundary gate, avoids adult false-refusal, and beats direct Rally by at least `0.05`.
+6. Only after the text-only scorecard passes, resume full text+image package export.

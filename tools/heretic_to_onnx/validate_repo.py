@@ -22,6 +22,19 @@ _GEMMA4_WEBGPU_FORBIDDEN_TEXT_ONLY_SESSION_NAMES = {
     "audio_encoder_q4f16.onnx",
     "vision_encoder_q4f16.onnx",
 }
+_GEMMA4_WEBGPU_REQUIRED_DECODER_CUSTOM_OPS = {
+    "GroupQueryAttention",
+    "MatMulNBits",
+    "RotaryEmbedding",
+}
+_GEMMA4_WEBGPU_REQUIRED_DECODER_INPUTS = [
+    "inputs_embeds",
+    "attention_mask",
+    "position_ids",
+    "num_logits_to_keep",
+    "per_layer_inputs",
+]
+_GEMMA4_WEBGPU_REQUIRED_EMBED_OUTPUTS = ["inputs_embeds", "per_layer_inputs"]
 
 
 @dataclass(slots=True)
@@ -59,6 +72,16 @@ def _find_bfloat16_paths(value: Any, prefix: str = "") -> list[str]:
     elif value == "bfloat16":
         paths.append(prefix)
     return paths
+
+
+def _onnx_session_has_custom_op(path: Path, op_type: str) -> bool:
+    try:
+        import onnx
+
+        model = onnx.load(str(path), load_external_data=False)
+    except Exception:
+        return False
+    return any(node.domain == "com.microsoft" and node.op_type == op_type for node in model.graph.node)
 
 
 def _runtime_smoke_onnx_sessions(
@@ -111,6 +134,7 @@ def _runtime_smoke_onnx_sessions(
             manifest.architecture == "gemma4_conditional_generation"
             and manifest.target_dtype == "q4f16"
             and Path(relative_path).name == "decoder_model_merged_q4f16.onnx"
+            and _onnx_session_has_custom_op(onnx_path, "MatMulNBits")
         ):
             report.warnings.append(
                 "runtime smoke skipped for optimized Gemma4 decoder: stock CPU onnxruntime does not "
@@ -303,12 +327,46 @@ def _validate_gemma4_webgpu_contract(manifest: Manifest, package_path: Path, rep
             )
 
         custom_ops = {node.op_type for node in model.graph.node if node.domain == "com.microsoft"}
-        if label == "decoder_model_merged_q4f16.onnx" and "MatMulNBits" not in custom_ops:
-            report.ok = False
-            report.errors.append("Gemma4 decoder graph is missing com.microsoft MatMulNBits custom ops")
-        if label == "embed_tokens_q4f16.onnx" and "GatherBlockQuantized" not in custom_ops:
-            report.ok = False
-            report.errors.append("Gemma4 embed graph is missing com.microsoft GatherBlockQuantized custom ops")
+        if label == "decoder_model_merged_q4f16.onnx":
+            missing_ops = sorted(_GEMMA4_WEBGPU_REQUIRED_DECODER_CUSTOM_OPS - custom_ops)
+            if missing_ops:
+                report.ok = False
+                report.errors.append(
+                    "Gemma4 decoder graph is missing required reference WebGPU custom ops: "
+                    + ", ".join(missing_ops)
+                )
+
+            input_names = [value.name for value in model.graph.input[: len(_GEMMA4_WEBGPU_REQUIRED_DECODER_INPUTS)]]
+            if input_names != _GEMMA4_WEBGPU_REQUIRED_DECODER_INPUTS:
+                report.ok = False
+                report.errors.append(
+                    "Gemma4 decoder graph does not match the reference text input order: "
+                    + ", ".join(input_names)
+                )
+
+            input_types = {value.name: value.type.tensor_type.elem_type for value in model.graph.input}
+            if input_types.get("inputs_embeds") != 1 or input_types.get("per_layer_inputs") != 1:
+                report.ok = False
+                report.errors.append("Gemma4 decoder inputs_embeds/per_layer_inputs must be float32 tensors")
+            if input_types.get("attention_mask") != 7:
+                report.ok = False
+                report.errors.append("Gemma4 decoder attention_mask must be an int64 tensor")
+
+        if label == "embed_tokens_q4f16.onnx":
+            if "GatherBlockQuantized" not in custom_ops:
+                report.ok = False
+                report.errors.append("Gemma4 embed graph is missing com.microsoft GatherBlockQuantized custom ops")
+
+            output_names = [value.name for value in model.graph.output]
+            if output_names != _GEMMA4_WEBGPU_REQUIRED_EMBED_OUTPUTS:
+                report.ok = False
+                report.errors.append(
+                    "Gemma4 embed graph does not match the reference text outputs: " + ", ".join(output_names)
+                )
+            output_types = {value.name: value.type.tensor_type.elem_type for value in model.graph.output}
+            if any(output_types.get(name) != 1 for name in _GEMMA4_WEBGPU_REQUIRED_EMBED_OUTPUTS):
+                report.ok = False
+                report.errors.append("Gemma4 embed outputs must be float32 tensors")
 
 
 def validate_package(
