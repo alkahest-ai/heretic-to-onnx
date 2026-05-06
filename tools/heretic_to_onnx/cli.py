@@ -81,6 +81,11 @@ def _base_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument("--force", action="store_true", help="Replace an existing output directory")
     convert_parser.add_argument("--strict-onnx", action="store_true", help="Require final ONNX artifacts")
     convert_parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip final package validation for an intermediate package",
+    )
+    convert_parser.add_argument(
         "--skip-runtime-smoke",
         action="store_true",
         help="Skip packaged ONNX session instantiation checks",
@@ -369,6 +374,7 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=args.output_dir,
             force=args.force,
             strict_onnx=args.strict_onnx,
+            skip_validation=args.skip_validation,
             runtime_smoke=False if args.skip_runtime_smoke else None,
             work_dir=args.work_dir,
             onnx_source_dir=args.onnx_source_dir,

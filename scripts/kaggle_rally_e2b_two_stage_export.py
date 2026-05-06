@@ -156,37 +156,45 @@ def _render_manifest(target: PackageTarget, manifest_dir: Path, base_model_id: s
     return manifest_path
 
 
-def _convert_full(target: PackageTarget, manifest_path: Path, work_dir: Path, package_dir: Path, args: argparse.Namespace) -> dict[str, Any]:
-    _run(
-        [
-            sys.executable,
-            "-m",
-            "tools.heretic_to_onnx",
-            "convert",
-            "--config",
-            str(manifest_path),
-            "--work-dir",
-            str(work_dir),
-            "--output-dir",
-            str(package_dir),
-            "--force",
-            "--strict-onnx",
-            "--skip-runtime-smoke",
-            "--export-mode",
-            "execute",
-            "--quantize-mode",
-            "execute",
-            "--python-exec",
-            sys.executable,
-            "--export-device",
-            args.export_device,
-            "--export-torch-dtype",
-            args.export_torch_dtype,
-            "--opset-version",
-            "21",
-        ],
-        cwd=ROOT_DIR,
-    )
+def _convert_full(
+    target: PackageTarget,
+    manifest_path: Path,
+    work_dir: Path,
+    package_dir: Path,
+    args: argparse.Namespace,
+    *,
+    skip_validation: bool = False,
+) -> dict[str, Any]:
+    command = [
+        sys.executable,
+        "-m",
+        "tools.heretic_to_onnx",
+        "convert",
+        "--config",
+        str(manifest_path),
+        "--work-dir",
+        str(work_dir),
+        "--output-dir",
+        str(package_dir),
+        "--force",
+        "--strict-onnx",
+        "--skip-runtime-smoke",
+        "--export-mode",
+        "execute",
+        "--quantize-mode",
+        "execute",
+        "--python-exec",
+        sys.executable,
+        "--export-device",
+        args.export_device,
+        "--export-torch-dtype",
+        args.export_torch_dtype,
+        "--opset-version",
+        "21",
+    ]
+    if skip_validation:
+        command.append("--skip-validation")
+    _run(command, cwd=ROOT_DIR)
     return {"work_dir": str(work_dir), "package_dir": str(package_dir), "quantized_dir": str(work_dir / "export/quantized")}
 
 
@@ -196,31 +204,33 @@ def _package_text_from_quantized(
     work_dir: Path,
     package_dir: Path,
     quantized_dir: Path,
+    *,
+    skip_validation: bool = False,
 ) -> dict[str, Any]:
-    _run(
-        [
-            sys.executable,
-            "-m",
-            "tools.heretic_to_onnx",
-            "convert",
-            "--config",
-            str(manifest_path),
-            "--work-dir",
-            str(work_dir),
-            "--output-dir",
-            str(package_dir),
-            "--force",
-            "--strict-onnx",
-            "--skip-runtime-smoke",
-            "--export-mode",
-            "plan",
-            "--quantize-mode",
-            "plan",
-            "--onnx-source-dir",
-            str(quantized_dir),
-        ],
-        cwd=ROOT_DIR,
-    )
+    command = [
+        sys.executable,
+        "-m",
+        "tools.heretic_to_onnx",
+        "convert",
+        "--config",
+        str(manifest_path),
+        "--work-dir",
+        str(work_dir),
+        "--output-dir",
+        str(package_dir),
+        "--force",
+        "--strict-onnx",
+        "--skip-runtime-smoke",
+        "--export-mode",
+        "plan",
+        "--quantize-mode",
+        "plan",
+        "--onnx-source-dir",
+        str(quantized_dir),
+    ]
+    if skip_validation:
+        command.append("--skip-validation")
+    _run(command, cwd=ROOT_DIR)
     return {"work_dir": str(work_dir), "package_dir": str(package_dir), "quantized_dir": str(quantized_dir)}
 
 
@@ -415,6 +425,7 @@ def _process_pair(
             scratch_work_dir / text_target.name,
             packages_dir / text_target.name,
             args,
+            skip_validation=True,
         )
         text_paths["optimized"] = _optimize_text_package(
             source_model_id=source_model_id,
@@ -444,6 +455,7 @@ def _process_pair(
         scratch_work_dir / text_target.name,
         packages_dir / text_target.name,
         Path(full_paths["quantized_dir"]),
+        skip_validation=True,
     )
     text_paths["optimized"] = _optimize_text_package(
         source_model_id=source_model_id,

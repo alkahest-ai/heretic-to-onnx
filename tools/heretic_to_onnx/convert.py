@@ -117,6 +117,7 @@ def run_convert(
     *,
     force: bool = False,
     strict_onnx: bool = False,
+    skip_validation: bool = False,
     runtime_smoke: bool | None = None,
     work_dir: str | Path | None = None,
     onnx_source_dir: str | Path | None = None,
@@ -187,20 +188,30 @@ def run_convert(
         source_spec=prepare_report.source_path,
         base_spec=prepare_report.base_path,
     )
-    validation_report = validate_package(
-        manifest,
-        package_report.output_dir,
-        strict_onnx=strict_onnx,
-        runtime_smoke=resolved_runtime_smoke,
-    )
+    if skip_validation:
+        validation_report_dict = {
+            "ok": True,
+            "skipped": True,
+            "reason": "validation skipped for intermediate package",
+        }
+        validation_ok = True
+    else:
+        validation_report = validate_package(
+            manifest,
+            package_report.output_dir,
+            strict_onnx=strict_onnx,
+            runtime_smoke=resolved_runtime_smoke,
+        )
+        validation_report_dict = validation_report.to_dict()
+        validation_ok = validation_report.ok
 
     return ConvertReport(
-        ok=export_report.ok and quantize_report.ok and package_report.ok and validation_report.ok,
+        ok=export_report.ok and quantize_report.ok and package_report.ok and validation_ok,
         output_dir=package_report.output_dir,
         inspect=inspect_report.to_dict(),
         prepare=prepare_report.to_dict(),
         export=export_report.to_dict(),
         quantize=quantize_report.to_dict(),
         package=package_report.to_dict(),
-        validate=validation_report.to_dict(),
+        validate=validation_report_dict,
     )

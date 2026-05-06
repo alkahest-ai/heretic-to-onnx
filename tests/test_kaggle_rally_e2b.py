@@ -5,7 +5,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from scripts.kaggle_rally_e2b_two_stage_export import _find_artifacts, _has_merged_checkpoint, _parser as export_parser
+from scripts.kaggle_rally_e2b_two_stage_export import (
+    PackageTarget,
+    _convert_full,
+    _find_artifacts,
+    _has_merged_checkpoint,
+    _package_text_from_quantized,
+    _parser as export_parser,
+)
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
 from scripts.train_rally_unsloth import _patch_unsloth_text_only_processor
 
@@ -80,6 +87,53 @@ class KaggleRallyE2BTests(unittest.TestCase):
             self.assertEqual(patched.count("UNSLOTH_TEXT_ONLY_PROCESSOR"), 2)
             self.assertIn("        if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") != \"1\":", patched)
             self.assertIn("            patch_saving_functions(tokenizer, vision = True)", patched)
+
+    def test_rally_text_intermediate_convert_can_skip_validation(self) -> None:
+        args = export_parser().parse_args(["--skip-full-packages"])
+        target = PackageTarget(
+            name="direct-text",
+            template="manifest.yaml",
+            source_model_id="source",
+            repo_id="repo/text",
+            full_export=False,
+        )
+
+        with patch("scripts.kaggle_rally_e2b_two_stage_export._run") as run_mock:
+            _convert_full(
+                target,
+                Path("/tmp/manifest.yaml"),
+                Path("/tmp/work"),
+                Path("/tmp/package"),
+                args,
+                skip_validation=True,
+            )
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--strict-onnx", command)
+        self.assertIn("--skip-validation", command)
+
+    def test_rally_text_repackage_can_skip_validation(self) -> None:
+        target = PackageTarget(
+            name="direct-text",
+            template="manifest.yaml",
+            source_model_id="source",
+            repo_id="repo/text",
+            full_export=False,
+        )
+
+        with patch("scripts.kaggle_rally_e2b_two_stage_export._run") as run_mock:
+            _package_text_from_quantized(
+                target,
+                Path("/tmp/manifest.yaml"),
+                Path("/tmp/work"),
+                Path("/tmp/package"),
+                Path("/tmp/quantized"),
+                skip_validation=True,
+            )
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--onnx-source-dir", command)
+        self.assertIn("--skip-validation", command)
 
 
 if __name__ == "__main__":
