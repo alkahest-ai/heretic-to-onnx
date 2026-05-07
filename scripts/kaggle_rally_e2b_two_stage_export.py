@@ -58,6 +58,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-private", dest="private", action="store_false")
     parser.add_argument("--keep-artifacts", action="store_true")
     parser.add_argument("--num-workers", type=int, default=8)
+    parser.add_argument("--report-path", default="", help="Optional path to write incremental JSON progress.")
     return parser
 
 
@@ -75,6 +76,13 @@ def _rm(path: Path) -> None:
         shutil.rmtree(path, ignore_errors=True)
     elif path.exists():
         path.unlink(missing_ok=True)
+
+
+def _write_report(report: dict[str, Any], report_path: Path | None) -> None:
+    if report_path is None:
+        return
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _has_merged_checkpoint(path: Path) -> bool:
@@ -478,6 +486,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     work_dir = Path(args.work_dir).expanduser().resolve()
     scratch_dir = Path(args.scratch_dir).expanduser().resolve() if args.scratch_dir else work_dir
+    report_path = Path(args.report_path).expanduser().resolve() if args.report_path else work_dir / "rally-e2b-browser-export-report.json"
     work_dir.mkdir(parents=True, exist_ok=True)
     scratch_dir.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
@@ -493,6 +502,7 @@ def main(argv: list[str] | None = None) -> int:
         "scratch_dir": str(scratch_dir),
         "warnings": [],
     }
+    _write_report(report, report_path)
 
     selected_merged: Path | None = None
     if not args.skip_rp:
@@ -502,8 +512,10 @@ def main(argv: list[str] | None = None) -> int:
         _merge_scaled(artifacts / "stage-a-merged", artifacts / "stage-b-adapter", selected_merged, args.stage_b_scale)
         report["selected_merged"] = str(selected_merged)
         report["disk"]["after_merge"] = _disk(work_dir)
+        _write_report(report, report_path)
     else:
         report["warnings"].append("RP merge skipped because --skip-rp was set")
+        _write_report(report, report_path)
 
     if args.score and selected_merged is not None:
         try:
@@ -512,10 +524,12 @@ def main(argv: list[str] | None = None) -> int:
             report["warnings"].append(f"scorecard failed: {type(exc).__name__}: {exc}")
             if args.require_score:
                 raise
+        _write_report(report, report_path)
 
     if selected_merged is not None:
         report["merged_upload"] = _upload_merged(selected_merged, args.rp_merged_repo, args)
         report["disk"]["after_merged_upload"] = _disk(work_dir)
+        _write_report(report, report_path)
 
     if not args.skip_direct:
         report["exports"].extend(
@@ -536,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.keep_artifacts:
             _rm(scratch_dir / "direct" / "work")
             report["disk"]["after_direct_work_cleanup"] = _disk(work_dir)
+        _write_report(report, report_path)
 
     if not args.skip_rp:
         if selected_merged is None:
@@ -560,10 +575,10 @@ def main(argv: list[str] | None = None) -> int:
             report["disk"]["after_rp_work_cleanup"] = _disk(work_dir)
             _rm(selected_merged)
             report["disk"]["after_selected_merge_cleanup"] = _disk(work_dir)
+        _write_report(report, report_path)
 
     report["ok"] = all(item.get("publish", {}).get("ok", False) for item in report["exports"]) if args.upload else True
-    report_path = work_dir / "rally-e2b-browser-export-report.json"
-    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_report(report, report_path)
     print(json.dumps(report, indent=2, sort_keys=True), flush=True)
     return 0 if report["ok"] else 1
 
