@@ -9,6 +9,7 @@ from tools.heretic_to_onnx.gemma4_opt_transplant import (
     _rewrite_embed_outputs_to_float32,
     _state_key_candidates_for_matmul,
     _state_key_candidates_for_plain_initializer,
+    _tensor_for_matmul_node,
 )
 
 
@@ -21,6 +22,13 @@ class Gemma4OptimizedTransplantMappingTests(unittest.TestCase):
         self.assertEqual(
             _state_key_candidates_for_matmul("/model/layers.7/per_layer/per_layer_projection/MatMul_Quant"),
             ["model.language_model.layers.7.per_layer_projection.weight"],
+        )
+        self.assertEqual(
+            _state_key_candidates_for_matmul("/model/per_layer_projection/MatMul_Quant"),
+            [
+                "model.language_model.per_layer_projection.weight",
+                "model.language_model.per_layer_model_projection.weight",
+            ],
         )
         self.assertEqual(
             _state_key_candidates_for_matmul("/lm_head/MatMul_Quant"),
@@ -36,6 +44,24 @@ class Gemma4OptimizedTransplantMappingTests(unittest.TestCase):
             _state_key_candidates_for_plain_initializer("model.layers.35.final_norm_layernorm.weight"),
             ["model.language_model.norm.weight"],
         )
+
+    def test_concatenates_gemma4_gate_and_up_proj_for_fused_matmul(self) -> None:
+        class FakeSafeFile:
+            def get_tensor(self, key: str):
+                lookup = {
+                    "model.language_model.layers.3.mlp.gate_proj.weight": [[1.0, 2.0]],
+                    "model.language_model.layers.3.mlp.up_proj.weight": [[3.0, 4.0]],
+                }
+                if key not in lookup:
+                    raise KeyError(key)
+                return lookup[key]
+
+        tensor, source_key = _tensor_for_matmul_node(
+            FakeSafeFile(),
+            "/model/layers.3/mlp/gate_up_proj/MatMul_Quant",
+        )
+        self.assertEqual(source_key, "model.language_model.layers.3.mlp.{gate,up}_proj.weight")
+        self.assertEqual(tensor.tolist(), [[1.0, 2.0], [3.0, 4.0]])
 
 
 @unittest.skipUnless(importlib.util.find_spec("onnx") is not None, "onnx is required")

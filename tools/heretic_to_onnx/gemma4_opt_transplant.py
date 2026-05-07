@@ -45,7 +45,10 @@ def _resolve_onnx_dir(path: Path) -> Path:
 
 def _state_key_candidates_for_matmul(node_name: str) -> list[str]:
     if node_name == "/model/per_layer_projection/MatMul_Quant":
-        return ["model.language_model.per_layer_projection.weight"]
+        return [
+            "model.language_model.per_layer_projection.weight",
+            "model.language_model.per_layer_model_projection.weight",
+        ]
     if node_name == "/lm_head/MatMul_Quant":
         return ["lm_head.weight", "model.lm_head.weight", "model.language_model.embed_tokens.weight"]
 
@@ -99,6 +102,41 @@ def _get_first_tensor(safe_file: Any, candidates: list[str]):
     raise KeyError(candidate_text) from last_error
 
 
+def _tensor_for_matmul_node(safe_file: Any, node_name: str):
+    import numpy as np
+
+    candidates = _state_key_candidates_for_matmul(node_name)
+    if node_name.endswith("/mlp/gate_up_proj/MatMul_Quant"):
+        prefix = candidates[0].removesuffix("gate_up_proj.weight")
+        gate_tensor, _ = _get_first_tensor(
+            safe_file,
+            [
+                prefix + "gate_proj.weight",
+                prefix + "gate_up_proj.weight",
+            ],
+        )
+        up_tensor, _ = _get_first_tensor(
+            safe_file,
+            [
+                prefix + "up_proj.weight",
+                prefix + "gate_up_proj.weight",
+            ],
+        )
+        if gate_tensor is up_tensor:
+            return gate_tensor, prefix + "gate_up_proj.weight"
+        return (
+            np.concatenate(
+                [
+                    _tensor_to_numpy(gate_tensor, dtype=np.float32),
+                    _tensor_to_numpy(up_tensor, dtype=np.float32),
+                ],
+                axis=0,
+            ),
+            prefix + "{gate,up}_proj.weight",
+        )
+    return _get_first_tensor(safe_file, candidates)
+
+
 def _template_initializers_by_name(model: Any) -> dict[str, Any]:
     return {initializer.name: initializer for initializer in model.graph.initializer}
 
@@ -116,7 +154,7 @@ def _replace_quantized_decoder_weights(
         if node.domain != "com.microsoft" or node.op_type != "MatMulNBits":
             continue
         try:
-            tensor, _source_key = _get_first_tensor(safe_file, _state_key_candidates_for_matmul(node.name))
+            tensor, _source_key = _tensor_for_matmul_node(safe_file, node.name)
             tensors = _quantize_matmul_weight(
                 tensor,
                 quant_name=node.input[1],
