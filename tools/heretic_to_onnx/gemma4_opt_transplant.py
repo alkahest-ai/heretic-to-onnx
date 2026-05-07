@@ -247,10 +247,11 @@ def _rewrite_embed_outputs_to_float32(path: Path) -> bool:
 
     model = onnx.load(str(path), load_external_data=False)
     patched = False
+    patchable_types = {TensorProto.FLOAT16, TensorProto.BFLOAT16}
     graph_output_names = [output.name for output in model.graph.output]
     for output in model.graph.output:
         tensor_type = output.type.tensor_type
-        if tensor_type.elem_type != TensorProto.FLOAT16:
+        if tensor_type.elem_type not in patchable_types:
             continue
         original_name = output.name
         internal_name = f"{original_name}_fp16"

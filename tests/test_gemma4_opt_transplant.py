@@ -88,6 +88,28 @@ class Gemma4OptimizedTransplantOnnxTests(unittest.TestCase):
         self.assertEqual(reloaded.graph.output[0].type.tensor_type.elem_type, TensorProto.FLOAT)
         self.assertEqual(reloaded.graph.node[-1].op_type, "Cast")
 
+    def test_rewrite_embed_outputs_to_float32_patches_bfloat16_outputs(self) -> None:
+        import onnx
+        from onnx import TensorProto, helper
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "embed_tokens_q4f16.onnx"
+            graph = helper.make_graph(
+                [helper.make_node("Identity", ["input"], ["per_layer_inputs"])],
+                "embed",
+                [helper.make_tensor_value_info("input", TensorProto.BFLOAT16, [1])],
+                [helper.make_tensor_value_info("per_layer_inputs", TensorProto.BFLOAT16, [1])],
+            )
+            model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 21)])
+            onnx.save_model(model, path)
+
+            patched = _rewrite_embed_outputs_to_float32(path)
+            reloaded = onnx.load(str(path), load_external_data=False)
+
+        self.assertTrue(patched)
+        self.assertEqual(reloaded.graph.output[0].type.tensor_type.elem_type, TensorProto.FLOAT)
+        self.assertEqual(reloaded.graph.node[-1].op_type, "Cast")
+
 
 if __name__ == "__main__":
     unittest.main()
