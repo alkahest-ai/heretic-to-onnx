@@ -75,18 +75,29 @@ Use Kaggle instead of Phala for the active lane. The workflow mirrors the Alkahe
 Kernel IDs:
 
 - `alkahestai/rally-e2b-two-stage-sft-t4`
+- `alkahestai/rally-e2b-export-prep`
 - `alkahestai/rally-e2b-browser-export`
+- `alkahestai/rally-e2b-rp-text-export`
 - `alkahestai/rally-e2b-rp-merged-upload`
 
 CLI launch:
 
 ```bash
 kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT4
-kaggle kernels push -p kaggle/rally_e2b_two_stage_export --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_export_prep
+kaggle kernels push -p kaggle/rally_e2b_two_stage_export
+kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
 ```
 
-The two-kernel workflow performs:
+Current recovery shape:
+
+1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 template into a Kaggle kernel source.
+2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
+3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs only the RP text export lane.
+4. Full text+image export remains parked until text-only browser packaging is proven inside Kaggle time limits.
+
+The legacy monolithic workflow performed:
 
 1. direct Heretic full export and upload
 2. direct Heretic text-only export and upload
