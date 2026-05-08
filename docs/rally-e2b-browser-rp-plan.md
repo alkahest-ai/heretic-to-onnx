@@ -24,12 +24,12 @@ As of 2026-05-08, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 
 | Artifact | Status | Notes |
 | --- | --- | --- |
-| Two-stage SFT | Complete | `alkahestai/rally-e2b-two-stage-sft-t4` completed Stage A and Stage B on Kaggle T4. |
+| Two-stage SFT | Complete; next hard-boundary rerun pending | The old `alkahestai/rally-e2b-two-stage-sft-t4` run completed Stage A and Stage B on Kaggle T4. The active rerun metadata now targets `thomasjvu/rally-e2b-two-stage-sft-t4` so it uses the refreshed thomasjvu Kaggle quota. |
 | Direct Heretic text | Re-exported, validated, uploaded | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package at `thomasjvu/rally-2b-text`, HF commit `7451f62519eb7932266b3ec0d361f5937bf325c4`. Package validation is clean; browser promotion is still blocked by local WebGPU stability. |
 | RP A100/B75 text | Re-exported, validated, staged | Kaggle export completed with upload disabled. Local upload to `thomasjvu/rally-2b-rp-text` hit the private HF storage quota, so the fixed package is staged privately at `alkahest-ai/rally-2b-rp-text`, HF commit `170b70033163f747bf7976625a79591980013f7c`. The old `thomasjvu/rally-2b-rp-text` revision remains legacy opset 17 and is not promotable. |
 | RP A100/B75 merged checkpoint | Uploaded | `thomasjvu/rally-2b-rp-a100-b75-merged`, HF commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; `scaled_lora_merge.json` verifies `ok: true`, scale `0.75`, 148 applied LoRA targets. |
 | Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
-| Kaggle scorecard-only lane | CPU diagnostic complete | `kaggle/rally_e2b_scorecard` runs the direct-vs-RP scorecard on Kaggle from the completed SFT kernel source, without requiring local browser/WebGPU load. The best 32-token CPU diagnostic completed through the temporary `alkahestai/rally-e2b-rp-merged-upload` slot: direct `0.8125`, RP A100/B75 `0.9000`, margin `+0.0875`, but RP still failed the minor-boundary gate. A dedicated diagnostics rerun tied direct and RP at `0.8125` and showed the minor failure is missing refusal/redirect behavior, not just unsafe wording. |
+| Kaggle scorecard-only lane | CPU diagnostic complete | `kaggle/rally_e2b_scorecard` runs the direct-vs-RP scorecard on Kaggle from the completed SFT kernel source, without requiring local browser/WebGPU load. The best 32-token CPU diagnostic completed through the temporary `alkahestai/rally-e2b-rp-merged-upload` slot: direct `0.8125`, RP A100/B75 `0.9000`, margin `+0.0875`, but RP still failed the minor-boundary gate. A dedicated diagnostics rerun tied direct and RP at `0.8125` and showed the minor failure is missing refusal/redirect behavior, not just unsafe wording. New scorecard metadata targets `thomasjvu/rally-e2b-scorecard`. |
 
 The confirmed browser failure on the old pinned diagnostic scorecard was:
 
@@ -77,12 +77,12 @@ Use Kaggle instead of Phala for the active lane. The workflow mirrors the Alkahe
 
 Kernel IDs:
 
-- `alkahestai/rally-e2b-two-stage-sft-t4`
-- `alkahestai/rally-e2b-export-prep`
-- `alkahestai/rally-e2b-browser-export`
-- `alkahestai/rally-e2b-rp-text-export`
-- `alkahestai/rally-e2b-rp-merged-upload`
-- `alkahestai/rally-e2b-scorecard`
+- `thomasjvu/rally-e2b-two-stage-sft-t4`
+- `thomasjvu/rally-e2b-export-prep`
+- `thomasjvu/rally-e2b-browser-export`
+- `thomasjvu/rally-e2b-rp-text-export`
+- `thomasjvu/rally-e2b-rp-merged-upload`
+- `thomasjvu/rally-e2b-scorecard`
 
 CLI launch:
 

@@ -1,5 +1,5 @@
 {
-  "id": "alkahestai/rally-e2b-scorecard",
+  "id": "thomasjvu/rally-e2b-scorecard",
   "title": "Rally E2B Scorecard",
   "code_file": "__notebook__.ipynb",
   "language": "python",
@@ -10,6 +10,6 @@
   "dataset_sources": [],
   "competition_sources": [],
   "kernel_sources": [
-    "alkahestai/rally-e2b-two-stage-sft-t4"
+    "thomasjvu/rally-e2b-two-stage-sft-t4"
   ]
 }
