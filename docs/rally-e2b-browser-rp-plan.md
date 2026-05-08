@@ -90,7 +90,9 @@ kaggle kernels push -p kaggle/rally_e2b_export_prep
 kaggle kernels push -p kaggle/rally_e2b_two_stage_export
 kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
-kaggle kernels push -p kaggle/rally_e2b_scorecard --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_scorecard
+# Use this instead when weekly GPU quota is available and the full 96-token gate is desired:
+# kaggle kernels push -p kaggle/rally_e2b_scorecard --accelerator NvidiaTeslaT4
 ```
 
 Current recovery shape:
@@ -98,7 +100,7 @@ Current recovery shape:
 1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 template into a Kaggle kernel source.
 2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
 3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs only the RP text export lane.
-4. `rally_e2b_scorecard` consumes the SFT kernel source, merges the A100/B75 RP checkpoint, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report.
+4. `rally_e2b_scorecard` consumes the SFT kernel source, merges the A100/B75 RP checkpoint, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path is a 32-token CPU diagnostic so it can run while weekly GPU quota is exhausted; the script still supports the full 96-token promotion gate.
 5. Full text+image export remains parked until text-only browser packaging is proven inside Kaggle time limits.
 
 The legacy monolithic workflow performed:
@@ -133,8 +135,8 @@ Until then, Rally repos are URL-override diagnostics only.
 
 ## Next Recovery Pass
 
-1. Push the scorecard-only Kaggle kernel and run it on T4 against the completed two-stage SFT source.
-2. Use the Kaggle scorecard result to decide whether the current A100/B75 RP quality is worth another browser attempt. It must reach `0.70`, pass the minor-boundary gate, avoid adult false-refusal, and beat direct Rally by at least `0.05`.
+1. Push the scorecard-only Kaggle kernel and run the CPU diagnostic against the completed two-stage SFT source while T4 quota is exhausted.
+2. Re-run the same scorecard with T4 and the full 96-token gate when weekly GPU quota resets. The RP candidate must reach `0.70`, pass the minor-boundary gate, avoid adult false-refusal, and beat direct Rally by at least `0.05`.
 3. Keep the fixed text HF revisions pinned: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP staging `alkahest-ai/rally-2b-rp-text@170b70033163f747bf7976625a79591980013f7c`.
 4. Do not use the old `thomasjvu/rally-2b-rp-text` revision for smoke or promotion until the HF quota issue is resolved and the fixed package replaces it.
 5. If Kaggle scorecard fails quality, run a small Rally RP sweep on Kaggle before doing any more desktop browser smoke.
