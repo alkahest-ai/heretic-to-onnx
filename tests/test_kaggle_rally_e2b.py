@@ -15,7 +15,7 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
 )
 from scripts.kaggle_rally_e2b_scorecard import _candidate_specs, _parser as scorecard_parser
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
-from scripts.train_rally_unsloth import DEFAULT_LORA_TARGET_MODULES, _patch_unsloth_text_only_processor
+from scripts.train_rally_unsloth import DEFAULT_LORA_TARGET_REGEX, _patch_unsloth_text_only_processor
 
 
 class KaggleRallyE2BTests(unittest.TestCase):
@@ -111,10 +111,11 @@ class KaggleRallyE2BTests(unittest.TestCase):
             self.assertIn("        if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") != \"1\":", patched)
             self.assertIn("            patch_saving_functions(tokenizer, vision = True)", patched)
 
-    def test_rally_lora_defaults_target_language_projections(self) -> None:
-        self.assertIn("q_proj", DEFAULT_LORA_TARGET_MODULES)
-        self.assertIn("down_proj", DEFAULT_LORA_TARGET_MODULES)
-        self.assertNotIn("q_proj.linear", DEFAULT_LORA_TARGET_MODULES)
+    def test_rally_lora_defaults_target_language_inner_linear_modules(self) -> None:
+        self.assertIn("language_model", DEFAULT_LORA_TARGET_REGEX)
+        self.assertIn("q_proj", DEFAULT_LORA_TARGET_REGEX)
+        self.assertIn("down_proj", DEFAULT_LORA_TARGET_REGEX)
+        self.assertIn(r"\.linear$", DEFAULT_LORA_TARGET_REGEX)
 
     def test_rally_text_intermediate_convert_can_skip_validation(self) -> None:
         args = export_parser().parse_args(["--skip-full-packages"])
