@@ -140,6 +140,26 @@ class KaggleRallyE2BTests(unittest.TestCase):
             ],
         )
 
+    def test_rally_lora_discovery_falls_back_to_nonvision_inner_linears(self) -> None:
+        class FakeModel:
+            def named_modules(self):
+                return iter(
+                    [
+                        ("model.layers.0.self_attn.q_proj.linear", object()),
+                        ("model.layers.0.mlp.up_proj.linear", object()),
+                        ("model.vision_tower.encoder.layers.0.self_attn.q_proj.linear", object()),
+                        ("model.multi_modal_projector.linear", object()),
+                    ]
+                )
+
+        self.assertEqual(
+            _discover_language_lora_target_modules(FakeModel()),
+            [
+                "model.layers.0.mlp.up_proj.linear",
+                "model.layers.0.self_attn.q_proj.linear",
+            ],
+        )
+
     def test_rally_text_intermediate_convert_can_skip_validation(self) -> None:
         args = export_parser().parse_args(["--skip-full-packages"])
         target = PackageTarget(

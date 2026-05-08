@@ -281,15 +281,21 @@ def _save_generation_config(model, output_dir: Path) -> None:
 
 
 def _discover_language_lora_target_modules(model) -> list[str]:
-    targets: list[str] = []
     suffixes = tuple(f".{projection}.linear" for projection in LANGUAGE_LORA_PROJECTIONS)
+    exclusions = ("vision_tower", "vision_model", "audio", "projector", "multi_modal")
+    preferred_targets: list[str] = []
+    fallback_targets: list[str] = []
     for name, _module in model.named_modules():
-        if "language_model" not in name or "vision_tower" in name:
+        if not name.endswith(suffixes) or any(exclusion in name for exclusion in exclusions):
             continue
-        if name.endswith(suffixes):
-            targets.append(name)
+        if "language_model" in name:
+            preferred_targets.append(name)
+        else:
+            fallback_targets.append(name)
+    targets = preferred_targets or fallback_targets
     if not targets:
-        raise ValueError("could not discover Gemma language LoRA target modules")
+        sample = [name for name, _module in list(model.named_modules())[:25]]
+        raise ValueError(f"could not discover Gemma language LoRA target modules; sample modules={sample}")
     return sorted(targets)
 
 
