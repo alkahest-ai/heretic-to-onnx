@@ -20,15 +20,16 @@ Use `HF_OWNER=thomasjvu` for private app-facing recovery work unless a later rel
 
 ## Current Kaggle Status
 
-As of 2026-05-04, the active Rally/Gemma E2B pass is staying on Kaggle instead of Phala:
+As of 2026-05-08, the active Rally/Gemma E2B pass is staying on Kaggle instead of Phala. Local browser smoke is paused because cold-loading the Rally q4f16 ONNX packages repeatedly stressed the desktop WebGPU/browser stack enough to crash the machine.
 
 | Artifact | Status | Notes |
 | --- | --- | --- |
 | Two-stage SFT | Complete | `alkahestai/rally-e2b-two-stage-sft-t4` completed Stage A and Stage B on Kaggle T4. |
-| Direct Heretic text | Re-exported; failed browser smoke | Kaggle export v20 completed with upload disabled, then local HF upload published opset 21 q4f16 package at `thomasjvu/rally-2b-text`, HF commit `5ea42c682cd34c49370e8cf6a6583ae476838eb8`. Cold browser load still failed with the `MatMulNBits` provider-type error, so this revision is not promotable. |
-| RP A100/B75 text | Re-exported; upload stopped | Kaggle export v20 completed with upload disabled. Local HF upload to `thomasjvu/rally-2b-rp-text` was stopped after the direct v20 browser failure proved the package contract is still incomplete. |
+| Direct Heretic text | Re-exported, validated, uploaded | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package at `thomasjvu/rally-2b-text`, HF commit `7451f62519eb7932266b3ec0d361f5937bf325c4`. Package validation is clean; browser promotion is still blocked by local WebGPU stability. |
+| RP A100/B75 text | Re-exported, validated, staged | Kaggle export completed with upload disabled. Local upload to `thomasjvu/rally-2b-rp-text` hit the private HF storage quota, so the fixed package is staged privately at `alkahest-ai/rally-2b-rp-text`, HF commit `170b70033163f747bf7976625a79591980013f7c`. The old `thomasjvu/rally-2b-rp-text` revision remains legacy opset 17 and is not promotable. |
 | RP A100/B75 merged checkpoint | Uploaded | `thomasjvu/rally-2b-rp-a100-b75-merged`, HF commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; `scaled_lora_merge.json` verifies `ok: true`, scale `0.75`, 148 applied LoRA targets. |
 | Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
+| Kaggle scorecard-only lane | Added | `kaggle/rally_e2b_scorecard` runs the direct-vs-RP scorecard on Kaggle from the completed SFT kernel source, without requiring local browser/WebGPU load. This is the next validation step before another desktop browser attempt. |
 
 The confirmed browser failure on the old pinned diagnostic scorecard was:
 
@@ -36,7 +37,7 @@ The confirmed browser failure on the old pinned diagnostic scorecard was:
 Provider type for MatMulNBits node with name '/language_model/per_layer_model_projection/MatMul_Q4' is not set.
 ```
 
-Local graph inspection showed the failed Rally text decoders were generated as ONNX opset 17 / IR 8, while the Lisper-trained and ONNX Community Gemma4 q4f16 reference decoders use opset 21 with `com.microsoft` custom ops. Kaggle export v20 fixed the opset/import portion but still produced a generic traced decoder instead of the reference WebGPU decoder: it lacks `GroupQueryAttention` and `RotaryEmbedding`, has the wrong decoder input order, uses float16 text embeddings where the reference contract uses float32, and keeps `attention_mask` as bool instead of int64. Validation now rejects this incomplete contract before upload.
+Local graph inspection showed the failed Rally text decoders were generated as ONNX opset 17 / IR 8, while the Lisper-trained and ONNX Community Gemma4 q4f16 reference decoders use opset 21 with `com.microsoft` custom ops. The current fixed text packages transplant the optimized reference-style decoder, preserve the `com.microsoft` custom ops, and pass strict package validation. Browser scorecard promotion is still pending because the desktop crashed during local WebGPU session initialization after the direct package completed download.
 
 ## Training Shape
 
@@ -79,6 +80,7 @@ Kernel IDs:
 - `alkahestai/rally-e2b-browser-export`
 - `alkahestai/rally-e2b-rp-text-export`
 - `alkahestai/rally-e2b-rp-merged-upload`
+- `alkahestai/rally-e2b-scorecard`
 
 CLI launch:
 
@@ -88,6 +90,7 @@ kaggle kernels push -p kaggle/rally_e2b_export_prep
 kaggle kernels push -p kaggle/rally_e2b_two_stage_export
 kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
+kaggle kernels push -p kaggle/rally_e2b_scorecard --accelerator NvidiaTeslaT4
 ```
 
 Current recovery shape:
@@ -95,7 +98,8 @@ Current recovery shape:
 1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 template into a Kaggle kernel source.
 2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
 3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs only the RP text export lane.
-4. Full text+image export remains parked until text-only browser packaging is proven inside Kaggle time limits.
+4. `rally_e2b_scorecard` consumes the SFT kernel source, merges the A100/B75 RP checkpoint, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report.
+5. Full text+image export remains parked until text-only browser packaging is proven inside Kaggle time limits.
 
 The legacy monolithic workflow performed:
 
@@ -129,9 +133,10 @@ Until then, Rally repos are URL-override diagnostics only.
 
 ## Next Recovery Pass
 
-1. Replace the generic traced Gemma4 decoder path with a reference-style optimized text decoder path before another Kaggle export.
-2. Use the Lisper/reference contract as the template: decoder inputs `inputs_embeds`, `attention_mask`, `position_ids`, `num_logits_to_keep`, `per_layer_inputs`; float32 embed/per-layer tensors; int64 attention mask; `GroupQueryAttention`, `RotaryEmbedding`, and `MatMulNBits` custom ops.
-3. Re-run Kaggle export/upload disabled first and require `optimize-gemma4-text-package` plus package validation to pass before any HF upload.
-4. Pin new direct and RP text revisions only after browser cold-load reaches first generation.
-5. Promote Rally only if RP reaches `0.70`, passes the minor-boundary gate, avoids adult false-refusal, and beats direct Rally by at least `0.05`.
-6. Only after the text-only scorecard passes, resume full text+image package export.
+1. Push the scorecard-only Kaggle kernel and run it on T4 against the completed two-stage SFT source.
+2. Use the Kaggle scorecard result to decide whether the current A100/B75 RP quality is worth another browser attempt. It must reach `0.70`, pass the minor-boundary gate, avoid adult false-refusal, and beat direct Rally by at least `0.05`.
+3. Keep the fixed text HF revisions pinned: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP staging `alkahest-ai/rally-2b-rp-text@170b70033163f747bf7976625a79591980013f7c`.
+4. Do not use the old `thomasjvu/rally-2b-rp-text` revision for smoke or promotion until the HF quota issue is resolved and the fixed package replaces it.
+5. If Kaggle scorecard fails quality, run a small Rally RP sweep on Kaggle before doing any more desktop browser smoke.
+6. If Kaggle scorecard passes, retry browser smoke in a clean isolated browser profile, one model at a time, with the worker-backed scorecard runner.
+7. Only after the text-only scorecard passes, resume full text+image package export.

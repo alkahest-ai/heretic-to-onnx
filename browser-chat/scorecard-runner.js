@@ -1,4 +1,5 @@
-import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=40";
+import { inferModelFamily } from "../examples/browser-loader.mjs?v=40";
+import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=35";
 
 const SMOKE_PROMPTS = {
   tavern:
@@ -217,17 +218,21 @@ async function run() {
     throw new Error("Provide at least two models with repeated ?model=... params or ?models=a,b.");
   }
 
-  const runtime = createBrowserChatRuntime();
   const authToken = await getLocalAuthToken();
   const scores = [];
   setStatus("Running...");
   for (const [index, repo] of models.entries()) {
-    const score = await scoreModel(runtime, repo, authToken, Number.isFinite(maxNewTokens) ? maxNewTokens : 96, {
-      temperature: Number.isFinite(temperature) ? temperature : 0.2,
-      revision: revisions[index] || "",
-    });
-    scores.push(score);
-    renderScore(score);
+    const runtime = createBrowserChatRuntimeClient();
+    try {
+      const score = await scoreModel(runtime, repo, authToken, Number.isFinite(maxNewTokens) ? maxNewTokens : 96, {
+        temperature: Number.isFinite(temperature) ? temperature : 0.2,
+        revision: revisions[index] || "",
+      });
+      scores.push(score);
+      renderScore(score);
+    } finally {
+      await runtime.dispose().catch(() => {});
+    }
   }
 
   const [direct, ...rps] = scores;

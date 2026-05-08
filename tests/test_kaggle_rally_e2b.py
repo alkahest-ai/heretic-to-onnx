@@ -13,6 +13,7 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
     _package_text_from_quantized,
     _parser as export_parser,
 )
+from scripts.kaggle_rally_e2b_scorecard import _parser as scorecard_parser
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
 from scripts.train_rally_unsloth import _patch_unsloth_text_only_processor
 
@@ -42,6 +43,15 @@ class KaggleRallyE2BTests(unittest.TestCase):
         args = export_parser().parse_args(["--skip-full-packages"])
 
         self.assertTrue(args.skip_full_packages)
+
+    def test_scorecard_defaults_match_rally_candidate(self) -> None:
+        args = scorecard_parser().parse_args([])
+
+        self.assertEqual(args.candidate_name, "a100-b75")
+        self.assertEqual(args.stage_b_scale, 0.75)
+        self.assertEqual(args.temperature, 0.2)
+        self.assertEqual(args.min_total, 0.70)
+        self.assertEqual(args.min_margin, 0.05)
 
     def test_stage_b_command_can_skip_full_merge(self) -> None:
         args = sft_parser().parse_args([])
