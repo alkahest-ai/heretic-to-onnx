@@ -52,6 +52,7 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertEqual(args.temperature, 0.2)
         self.assertEqual(args.min_total, 0.70)
         self.assertEqual(args.min_margin, 0.05)
+        self.assertFalse(args.require_promotion)
 
     def test_stage_b_command_can_skip_full_merge(self) -> None:
         args = sft_parser().parse_args([])

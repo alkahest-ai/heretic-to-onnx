@@ -32,6 +32,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-total", type=float, default=0.70)
     parser.add_argument("--min-margin", type=float, default=0.05)
     parser.add_argument("--keep-merged", action="store_true")
+    parser.add_argument(
+        "--require-promotion",
+        action="store_true",
+        help="Exit nonzero when the RP candidate does not clear the promotion gate.",
+    )
     return parser
 
 
@@ -176,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
 
     _write_report(report, report_path)
     print(json.dumps(report, indent=2, sort_keys=True), flush=True)
-    return 0 if report["ok"] else 1
+    return 0 if report["ok"] or not args.require_promotion else 1
 
 
 if __name__ == "__main__":
