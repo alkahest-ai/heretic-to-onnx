@@ -218,9 +218,14 @@ except Exception:
     pass
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_LORA_TARGET_REGEX = (
-    r".*language_model.*\."
-    r"(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)\.linear$"
+LANGUAGE_LORA_PROJECTIONS = (
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
 )
 
 
@@ -275,6 +280,19 @@ def _save_generation_config(model, output_dir: Path) -> None:
     generation_config.save_pretrained(str(output_dir))
 
 
+def _discover_language_lora_target_modules(model) -> list[str]:
+    targets: list[str] = []
+    suffixes = tuple(f".{projection}.linear" for projection in LANGUAGE_LORA_PROJECTIONS)
+    for name, _module in model.named_modules():
+        if "language_model" not in name or "vision_tower" in name:
+            continue
+        if name.endswith(suffixes):
+            targets.append(name)
+    if not targets:
+        raise ValueError("could not discover Gemma language LoRA target modules")
+    return sorted(targets)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-name", default="p-e-w/gemma-4-E2B-it-heretic-ara")
@@ -298,7 +316,7 @@ def main() -> int:
         "--lora-target-module",
         action="append",
         default=None,
-        help="LoRA target module suffix. May be repeated. Overrides the default Gemma language projection regex.",
+        help="LoRA target module suffix/name. May be repeated. Overrides automatic Gemma language target discovery.",
     )
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--enable-thinking", action="store_true")
@@ -335,10 +353,19 @@ def main() -> int:
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    lora_target_modules = args.lora_target_module or _discover_language_lora_target_modules(model)
+    print(
+        "[lora-targets]",
+        f"count={len(lora_target_modules)}",
+        f"first={lora_target_modules[0]}",
+        f"last={lora_target_modules[-1]}",
+        flush=True,
+    )
+
     model = FastLanguageModel.get_peft_model(
         model,
         r=args.lora_rank,
-        target_modules=args.lora_target_module or DEFAULT_LORA_TARGET_REGEX,
+        target_modules=lora_target_modules,
         lora_alpha=args.lora_rank,
         lora_dropout=0,
         bias="none",
@@ -411,7 +438,7 @@ def main() -> int:
         "max_seq_length": args.max_seq_length,
         "load_in_4bit": args.load_in_4bit,
         "enable_thinking": args.enable_thinking,
-        "lora_target_modules": args.lora_target_module or DEFAULT_LORA_TARGET_REGEX,
+        "lora_target_modules": lora_target_modules,
     }
     (output_dir / "training-run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(metadata, indent=2))

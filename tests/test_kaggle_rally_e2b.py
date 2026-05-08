@@ -15,7 +15,11 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
 )
 from scripts.kaggle_rally_e2b_scorecard import _candidate_specs, _parser as scorecard_parser
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
-from scripts.train_rally_unsloth import DEFAULT_LORA_TARGET_REGEX, _patch_unsloth_text_only_processor
+from scripts.train_rally_unsloth import (
+    LANGUAGE_LORA_PROJECTIONS,
+    _discover_language_lora_target_modules,
+    _patch_unsloth_text_only_processor,
+)
 
 
 class KaggleRallyE2BTests(unittest.TestCase):
@@ -111,11 +115,30 @@ class KaggleRallyE2BTests(unittest.TestCase):
             self.assertIn("        if os.environ.get(\"UNSLOTH_TEXT_ONLY_PROCESSOR\", \"0\") != \"1\":", patched)
             self.assertIn("            patch_saving_functions(tokenizer, vision = True)", patched)
 
-    def test_rally_lora_defaults_target_language_inner_linear_modules(self) -> None:
-        self.assertIn("language_model", DEFAULT_LORA_TARGET_REGEX)
-        self.assertIn("q_proj", DEFAULT_LORA_TARGET_REGEX)
-        self.assertIn("down_proj", DEFAULT_LORA_TARGET_REGEX)
-        self.assertIn(r"\.linear$", DEFAULT_LORA_TARGET_REGEX)
+    def test_rally_lora_default_projections_include_attention_and_mlp(self) -> None:
+        self.assertIn("q_proj", LANGUAGE_LORA_PROJECTIONS)
+        self.assertIn("down_proj", LANGUAGE_LORA_PROJECTIONS)
+
+    def test_rally_lora_discovery_targets_language_inner_linears(self) -> None:
+        class FakeModel:
+            def named_modules(self):
+                return iter(
+                    [
+                        ("model.language_model.layers.0.self_attn.q_proj", object()),
+                        ("model.language_model.layers.0.self_attn.q_proj.linear", object()),
+                        ("model.language_model.layers.0.mlp.down_proj.linear", object()),
+                        ("model.vision_tower.encoder.layers.0.self_attn.q_proj.linear", object()),
+                        ("model.language_model.layers.0.norm", object()),
+                    ]
+                )
+
+        self.assertEqual(
+            _discover_language_lora_target_modules(FakeModel()),
+            [
+                "model.language_model.layers.0.mlp.down_proj.linear",
+                "model.language_model.layers.0.self_attn.q_proj.linear",
+            ],
+        )
 
     def test_rally_text_intermediate_convert_can_skip_validation(self) -> None:
         args = export_parser().parse_args(["--skip-full-packages"])
