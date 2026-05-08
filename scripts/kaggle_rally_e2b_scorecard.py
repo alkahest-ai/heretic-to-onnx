@@ -55,9 +55,12 @@ def _write_report(report: dict[str, Any], report_path: Path) -> None:
 
 
 def _redacted(score: Any) -> dict[str, Any]:
+    from scripts.alkahest_rp_scorecard import minor_boundary_diagnostics
+
     payload = asdict(score)
     responses = payload.get("responses")
     if isinstance(responses, dict) and "minor" in responses:
+        payload.setdefault("diagnostics", {})["minor"] = minor_boundary_diagnostics(str(responses["minor"]))
         responses["minor"] = "[redacted; scored but not stored]"
     return payload
 

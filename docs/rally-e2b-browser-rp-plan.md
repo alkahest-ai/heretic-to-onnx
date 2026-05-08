@@ -29,7 +29,7 @@ As of 2026-05-08, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | RP A100/B75 text | Re-exported, validated, staged | Kaggle export completed with upload disabled. Local upload to `thomasjvu/rally-2b-rp-text` hit the private HF storage quota, so the fixed package is staged privately at `alkahest-ai/rally-2b-rp-text`, HF commit `170b70033163f747bf7976625a79591980013f7c`. The old `thomasjvu/rally-2b-rp-text` revision remains legacy opset 17 and is not promotable. |
 | RP A100/B75 merged checkpoint | Uploaded | `thomasjvu/rally-2b-rp-a100-b75-merged`, HF commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168`; `scaled_lora_merge.json` verifies `ok: true`, scale `0.75`, 148 applied LoRA targets. |
 | Full text+image browser packages | Blocked on Kaggle resources | T4 export OOMed during Gemma4 vision export; CPU export avoided VRAM but raw full ONNX intermediates exceeded the persistent Kaggle disk budget. Text-only packages are the current browser-ready artifacts. |
-| Kaggle scorecard-only lane | CPU diagnostic complete | `kaggle/rally_e2b_scorecard` runs the direct-vs-RP scorecard on Kaggle from the completed SFT kernel source, without requiring local browser/WebGPU load. The 32-token CPU diagnostic completed through the temporary `alkahestai/rally-e2b-rp-merged-upload` slot: direct `0.8125`, RP A100/B75 `0.8125`, margin `0.0000`, both failed the minor-boundary gate. |
+| Kaggle scorecard-only lane | CPU diagnostic complete | `kaggle/rally_e2b_scorecard` runs the direct-vs-RP scorecard on Kaggle from the completed SFT kernel source, without requiring local browser/WebGPU load. The 32-token CPU diagnostic completed through the temporary `alkahestai/rally-e2b-rp-merged-upload` slot: direct `0.8125`, RP A100/B75 `0.9000`, margin `+0.0875`, but RP still failed the minor-boundary gate. |
 
 The confirmed browser failure on the old pinned diagnostic scorecard was:
 
@@ -135,18 +135,19 @@ Until then, Rally repos are URL-override diagnostics only.
 
 ## Scorecard Result
 
-The 2026-05-08 Kaggle CPU diagnostic is not a promotion pass. It proves that the current A100/B75 Rally RP merge can run the scorecard off-desktop, but it does not improve over direct Rally:
+The 2026-05-08 Kaggle CPU diagnostic is not a promotion pass. It proves that the current A100/B75 Rally RP merge can run the scorecard off-desktop and improves the adult RP score, but it still does not pass the boundary gate:
 
 | Model | Total | Minor | Decision |
 | --- | ---: | ---: | --- |
 | Direct Rally E2B | `0.8125` | `0.0000` | Fails minor-boundary gate. |
-| Rally E2B RP A100/B75 | `0.8125` | `0.0000` | Fails minor-boundary gate and ties direct, margin `0.0000`. |
+| Rally E2B RP A100/B75 | `0.9000` | `0.0000` | Improves adult RP, margin `+0.0875`, but fails the minor-boundary gate. |
+| Rally E2B RP A100/B100 | `0.8125` | `0.0000` | Worse than direct in the CPU diagnostic, margin `-0.0875`, and still fails the minor-boundary gate. |
 
-The next Rally RP work should be another Kaggle RP sweep with stronger boundary anchors before spending more local browser/WebGPU time.
+The A100/B100 test shows that simply increasing Stage B scale is not enough. The next Rally RP work needs Gemma-specific boundary rows or a retraining pass, and the scorecard report now records non-text minor-gate diagnostics while keeping the raw minor response redacted.
 
 ## Next Recovery Pass
 
-1. Run a new Rally RP sweep on Kaggle; the current A100/B75 candidate ties direct and fails the minor-boundary gate on the CPU diagnostic.
+1. Run a new Rally RP sweep on Kaggle; the current A100/B75 candidate improves adult RP but fails the minor-boundary gate on the CPU diagnostic.
 2. Re-run the same scorecard with T4 and the full 96-token gate when weekly GPU quota resets. Any RP candidate must reach `0.70`, pass the minor-boundary gate, avoid adult false-refusal, and beat direct Rally by at least `0.05`.
 3. Keep the fixed text HF revisions pinned: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP staging `alkahest-ai/rally-2b-rp-text@170b70033163f747bf7976625a79591980013f7c`.
 4. Do not use the old `thomasjvu/rally-2b-rp-text` revision for smoke or promotion until the HF quota issue is resolved and the fixed package replaces it.
