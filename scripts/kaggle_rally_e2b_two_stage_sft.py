@@ -20,9 +20,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-name", default="p-e-w/gemma-4-E2B-it-heretic-ara")
     parser.add_argument("--work-dir", default="/kaggle/working/rally-e2b-two-stage-sft")
     parser.add_argument("--stage-a-max-steps", type=int, default=300)
-    parser.add_argument("--stage-b-max-steps", type=int, default=450)
+    parser.add_argument("--stage-b-max-steps", type=int, default=600)
     parser.add_argument("--stage-a-repeats", type=int, default=18)
     parser.add_argument("--stage-b-boundary-repeats", type=int, default=80)
+    parser.add_argument("--stage-b-gemma-hard-boundary-repeats", type=int, default=120)
     parser.add_argument("--stage-b-adult-repeats", type=int, default=40)
     parser.add_argument("--val-fraction", type=float, default=0.10)
     parser.add_argument("--max-seq-length", type=int, default=2048)
@@ -122,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
             str(args.stage_a_repeats),
             "--stage-b-boundary-repeats",
             str(args.stage_b_boundary_repeats),
+            "--stage-b-gemma-hard-boundary-repeats",
+            str(args.stage_b_gemma_hard_boundary_repeats),
             "--stage-b-adult-repeats",
             str(args.stage_b_adult_repeats),
             "--val-fraction",
@@ -177,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         "stage_b_max_steps": args.stage_b_max_steps,
         "stage_a_repeats": args.stage_a_repeats,
         "stage_b_boundary_repeats": args.stage_b_boundary_repeats,
+        "stage_b_gemma_hard_boundary_repeats": args.stage_b_gemma_hard_boundary_repeats,
         "stage_b_adult_repeats": args.stage_b_adult_repeats,
     }
     (work_dir / "rally-e2b-two-stage-sft-report.json").write_text(

@@ -36,8 +36,9 @@ class KaggleRallyE2BTests(unittest.TestCase):
 
         self.assertEqual(args.stage_a_repeats, 18)
         self.assertEqual(args.stage_b_boundary_repeats, 80)
+        self.assertEqual(args.stage_b_gemma_hard_boundary_repeats, 120)
         self.assertEqual(args.stage_b_adult_repeats, 40)
-        self.assertEqual(args.stage_b_max_steps, 450)
+        self.assertEqual(args.stage_b_max_steps, 600)
 
     def test_export_can_skip_full_packages(self) -> None:
         args = export_parser().parse_args(["--skip-full-packages"])

@@ -14,6 +14,7 @@ from scripts.prepare_alkahest_two_stage_sft import (
     stage_a_rows,
     stage_b_adult_rows,
     stage_b_boundary_rows,
+    stage_b_gemma_hard_boundary_rows,
     stage_b_rows,
 )
 from scripts.alkahest_rp_scorecard import SMOKE_PROMPTS
@@ -56,6 +57,18 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
         self.assertIn("nosys-minor-15-hard-01", text)
         for row in stage_b_boundary_rows():
             assistant = row["messages"][-1]["content"]
+            self.assertIsNone(MINOR_SCORECARD_UNSAFE_RE.search(assistant), row["id"])
+
+    def test_stage_b_gemma_hard_boundary_rows_lock_scorecard_prompt(self) -> None:
+        text = "\n".join(json.dumps(row) for row in stage_b_gemma_hard_boundary_rows())
+
+        self.assertIn(SMOKE_PROMPTS["minor"], text)
+        self.assertIn("gemma-hard-minor-exact-cannot", text)
+        self.assertIn("adult-only consensual roleplay", text)
+        for row in stage_b_gemma_hard_boundary_rows():
+            assistant = row["messages"][-1]["content"]
+            self.assertRegex(assistant, r"\b(cannot|will not|refuse|not appropriate)\b")
+            self.assertRegex(assistant, r"\b(adult|consensual|age-appropriate)\b")
             self.assertIsNone(MINOR_SCORECARD_UNSAFE_RE.search(assistant), row["id"])
 
     def test_stage_b_contains_false_refusal_correction_anchors(self) -> None:
@@ -143,6 +156,36 @@ class PrepareAlkahestTwoStageSftTests(unittest.TestCase):
 
         expected_rows = 2 * len(stage_b_boundary_rows()) + 5 * len(stage_b_adult_rows())
         self.assertEqual(manifest["stage_b_adult_repeats"], 5)
+        self.assertEqual(manifest["stages"]["stage_b"]["rows_total"], expected_rows)
+
+    def test_gemma_hard_boundary_repeats_are_explicit_stage_b_addition(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "splits"
+            with redirect_stdout(StringIO()):
+                main(
+                    [
+                        "--output-dir",
+                        str(output),
+                        "--stage-b-boundary-repeats",
+                        "2",
+                        "--stage-b-gemma-hard-boundary-repeats",
+                        "3",
+                        "--stage-b-adult-repeats",
+                        "5",
+                    ]
+                )
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+
+        expected_rows = (
+            2 * len(stage_b_boundary_rows())
+            + 3 * len(stage_b_gemma_hard_boundary_rows())
+            + 5 * len(stage_b_adult_rows())
+        )
+        self.assertEqual(manifest["stage_b_gemma_hard_boundary_repeats"], 3)
+        self.assertEqual(
+            manifest["stages"]["stage_b"]["gemma_hard_boundary_unique_rows"],
+            len(stage_b_gemma_hard_boundary_rows()),
+        )
         self.assertEqual(manifest["stages"]["stage_b"]["rows_total"], expected_rows)
 
 
