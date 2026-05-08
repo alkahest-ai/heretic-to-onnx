@@ -218,6 +218,15 @@ except Exception:
     pass
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_LORA_TARGET_MODULES = [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+]
 
 
 def _patch_sft_trainer_constant_length_dataset() -> None:
@@ -290,6 +299,12 @@ def main() -> int:
     parser.add_argument("--warmup-steps", type=int, default=10)
     parser.add_argument("--max-steps", type=int, default=300)
     parser.add_argument("--lora-rank", type=int, default=16)
+    parser.add_argument(
+        "--lora-target-module",
+        action="append",
+        default=None,
+        help="LoRA target module suffix. May be repeated. Defaults to Gemma language projections.",
+    )
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--enable-thinking", action="store_true")
     parser.add_argument("--save-merged", action="store_true")
@@ -328,15 +343,7 @@ def main() -> int:
     model = FastLanguageModel.get_peft_model(
         model,
         r=args.lora_rank,
-        target_modules=[
-            "q_proj.linear",
-            "k_proj.linear",
-            "v_proj.linear",
-            "o_proj.linear",
-            "gate_proj.linear",
-            "up_proj.linear",
-            "down_proj.linear",
-        ],
+        target_modules=args.lora_target_module or DEFAULT_LORA_TARGET_MODULES,
         lora_alpha=args.lora_rank,
         lora_dropout=0,
         bias="none",
@@ -409,6 +416,7 @@ def main() -> int:
         "max_seq_length": args.max_seq_length,
         "load_in_4bit": args.load_in_4bit,
         "enable_thinking": args.enable_thinking,
+        "lora_target_modules": args.lora_target_module or DEFAULT_LORA_TARGET_MODULES,
     }
     (output_dir / "training-run.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(metadata, indent=2))
