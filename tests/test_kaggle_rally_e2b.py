@@ -13,7 +13,7 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
     _package_text_from_quantized,
     _parser as export_parser,
 )
-from scripts.kaggle_rally_e2b_scorecard import _parser as scorecard_parser
+from scripts.kaggle_rally_e2b_scorecard import _candidate_specs, _parser as scorecard_parser
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
 from scripts.train_rally_unsloth import _patch_unsloth_text_only_processor
 
@@ -54,6 +54,17 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertEqual(args.min_total, 0.70)
         self.assertEqual(args.min_margin, 0.05)
         self.assertFalse(args.require_promotion)
+        self.assertEqual(_candidate_specs(args), [("a100-b75", 0.75)])
+
+    def test_scorecard_can_parse_rally_candidate_sweep(self) -> None:
+        args = scorecard_parser().parse_args(
+            ["--sweep-candidates", "a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0"]
+        )
+
+        self.assertEqual(
+            _candidate_specs(args),
+            [("a25-b100", 0.25), ("a50-b100", 0.5), ("a100-b75", 0.75), ("a100-b100", 1.0)],
+        )
 
     def test_stage_b_command_can_skip_full_merge(self) -> None:
         args = sft_parser().parse_args([])
