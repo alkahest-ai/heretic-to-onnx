@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,7 +8,9 @@ from unittest.mock import patch
 
 from scripts.kaggle_rally_e2b_two_stage_export import (
     PackageTarget,
+    _compose_full_from_text_package,
     _convert_full,
+    _copy_template_vision_files,
     _find_artifacts,
     _has_merged_checkpoint,
     _package_text_from_quantized,
@@ -49,6 +52,11 @@ class KaggleRallyE2BTests(unittest.TestCase):
         args = export_parser().parse_args(["--skip-full-packages"])
 
         self.assertTrue(args.skip_full_packages)
+
+    def test_export_can_compose_full_packages_from_template(self) -> None:
+        args = export_parser().parse_args(["--full-package-mode", "template"])
+
+        self.assertEqual(args.full_package_mode, "template")
 
     def test_scorecard_defaults_match_rally_candidate(self) -> None:
         args = scorecard_parser().parse_args([])
@@ -238,6 +246,83 @@ class KaggleRallyE2BTests(unittest.TestCase):
         command = run_mock.call_args.args[0]
         self.assertIn("--onnx-source-dir", command)
         self.assertIn("--skip-validation", command)
+
+    def test_template_vision_copy_adds_q4f16_vision_artifacts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template_onnx = root / "template" / "onnx"
+            package = root / "package"
+            template_onnx.mkdir(parents=True)
+            (template_onnx / "vision_encoder_q4f16.onnx").write_bytes(b"onnx")
+            (template_onnx / "vision_encoder_q4f16.onnx_data").write_bytes(b"data")
+            (package / "onnx").mkdir(parents=True)
+            (package / "onnx" / "MISSING_ONNX_ARTIFACTS.txt").write_text("missing\n", encoding="utf-8")
+            (package / "package-report.json").write_text(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "warnings": [
+                            "some ONNX artifacts were not found in the provided source directory: vision_encoder_q4f16.onnx",
+                            "onnx artifacts are not complete yet; wrote placeholder note instead",
+                        ],
+                        "notes": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            report = _copy_template_vision_files(root / "template", package)
+            package_report = json.loads((package / "package-report.json").read_text(encoding="utf-8"))
+
+            self.assertTrue(report["ok"])
+            self.assertTrue((package / "onnx" / "vision_encoder_q4f16.onnx").exists())
+            self.assertTrue((package / "onnx" / "vision_encoder_q4f16.onnx_data").exists())
+            self.assertFalse((package / "onnx" / "MISSING_ONNX_ARTIFACTS.txt").exists())
+            self.assertEqual(package_report["warnings"], [])
+            self.assertIn("copied reference Gemma4 q4f16 vision artifacts into full package", package_report["notes"])
+
+    def test_compose_full_from_text_package_uses_plan_then_validates(self) -> None:
+        args = export_parser().parse_args(["--full-package-mode", "template"])
+        target = PackageTarget(
+            name="direct-full",
+            template="manifest.yaml",
+            source_model_id="source",
+            repo_id="repo/full",
+            full_export=True,
+        )
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template_onnx = root / "template" / "onnx"
+            template_onnx.mkdir(parents=True)
+            (template_onnx / "vision_encoder_q4f16.onnx").write_bytes(b"onnx")
+            (template_onnx / "vision_encoder_q4f16.onnx_data").write_bytes(b"data")
+            (root / "text-package" / "onnx").mkdir(parents=True)
+
+            def fake_run(command, *, cwd):
+                if "--output-dir" in command:
+                    package_dir = Path(command[command.index("--output-dir") + 1])
+                    (package_dir / "onnx").mkdir(parents=True, exist_ok=True)
+
+            with patch("scripts.kaggle_rally_e2b_two_stage_export._run", side_effect=fake_run) as run_mock, patch(
+                "scripts.kaggle_rally_e2b_two_stage_export._resolve_optimized_template",
+                return_value=root / "template",
+            ):
+                report = _compose_full_from_text_package(
+                    target,
+                    Path("/tmp/manifest.yaml"),
+                    root / "text-package",
+                    root / "work",
+                    root / "full-package",
+                    args,
+                )
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["mode"], "template")
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertIn("--skip-validation", run_mock.call_args_list[0].args[0])
+        self.assertIn("validate", run_mock.call_args_list[1].args[0])
 
 
 if __name__ == "__main__":

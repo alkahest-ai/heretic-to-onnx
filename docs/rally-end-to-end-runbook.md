@@ -149,10 +149,21 @@ After the Alkahest 0.8B/2B closeout, use the E2B-only Kaggle lane before touchin
 
 ```bash
 kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_export_prep
 kaggle kernels push -p kaggle/rally_e2b_two_stage_export --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e2b_rp_text_export
+kaggle kernels push -p kaggle/rally_e2b_scorecard
 ```
 
-That path publishes the direct Heretic full package, direct Heretic text-only package, A100/B75 RP merged checkpoint, A100/B75 RP full package, and A100/B75 RP text-only package. Keep the resulting Rally presets hidden until browser smoke and the RP scorecard beat the direct Rally E2B baseline.
+That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4` and RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate.
+
+For full text+image packages, prefer the template-composed mode instead of raw Gemma4 vision export:
+
+```bash
+RALLY_FULL_EXPORT=1 RALLY_FULL_PACKAGE_MODE=template kaggle kernels push -p kaggle/rally_e2b_rp_text_export
+```
+
+This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. Keep Rally presets hidden until browser smoke passes.
 
 ## 11. Legacy One-Click H200 Path
 

@@ -46,6 +46,15 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-direct", action="store_true")
     parser.add_argument("--skip-rp", action="store_true")
     parser.add_argument("--skip-full-packages", action="store_true")
+    parser.add_argument(
+        "--full-package-mode",
+        choices=["export", "template"],
+        default="export",
+        help=(
+            "How to build full text+image packages. 'export' runs the native full Gemma4 export; "
+            "'template' composes a full package from the optimized text package plus reference q4f16 vision files."
+        ),
+    )
     parser.add_argument("--optimized-template-dir", default="", help="Local reference Gemma4 ONNX package/template dir.")
     parser.add_argument("--optimized-template-model-id", default="onnx-community/gemma-4-E2B-it-ONNX")
     parser.add_argument("--optimized-template-revision", default="")
@@ -273,12 +282,52 @@ def _resolve_optimized_template(work_dir: Path, args: argparse.Namespace) -> Pat
     kwargs: dict[str, Any] = {
         "repo_id": args.optimized_template_model_id,
         "local_dir": str(target_dir),
-        "allow_patterns": ["onnx/decoder_model_merged_q4f16.onnx"],
+        "allow_patterns": [
+            "onnx/decoder_model_merged_q4f16.onnx",
+            "onnx/vision_encoder_q4f16.onnx",
+            "onnx/vision_encoder_q4f16.onnx_data",
+        ],
     }
     if args.optimized_template_revision:
         kwargs["revision"] = args.optimized_template_revision
     snapshot_download(**kwargs)
     return target_dir
+
+
+def _copy_template_vision_files(template_dir: Path, package_dir: Path) -> dict[str, Any]:
+    template_onnx_dir = template_dir / "onnx" if (template_dir / "onnx").is_dir() else template_dir
+    package_onnx_dir = package_dir / "onnx"
+    package_onnx_dir.mkdir(parents=True, exist_ok=True)
+    copied: list[str] = []
+    missing: list[str] = []
+    for filename in ("vision_encoder_q4f16.onnx", "vision_encoder_q4f16.onnx_data"):
+        source_path = template_onnx_dir / filename
+        if source_path.exists():
+            shutil.copyfile(source_path, package_onnx_dir / filename)
+            copied.append(f"onnx/{filename}")
+        else:
+            missing.append(f"onnx/{filename}")
+    missing_note = package_onnx_dir / "MISSING_ONNX_ARTIFACTS.txt"
+    if missing_note.exists() and not missing:
+        missing_note.unlink()
+    package_report = package_dir / "package-report.json"
+    if package_report.exists() and not missing:
+        data = json.loads(package_report.read_text(encoding="utf-8"))
+        data["warnings"] = [
+            warning
+            for warning in data.get("warnings", [])
+            if "ONNX artifacts" not in warning and "onnx artifacts" not in warning
+        ]
+        notes = data.setdefault("notes", [])
+        notes.append("copied reference Gemma4 q4f16 vision artifacts into full package")
+        package_report.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {
+        "ok": not missing,
+        "template_dir": str(template_dir),
+        "package_dir": str(package_dir),
+        "copied": copied,
+        "missing": missing,
+    }
 
 
 def _source_dir_for_optimize(source_model_id: str, convert_work_dir: Path) -> Path:
@@ -329,6 +378,71 @@ def _optimize_text_package(
         cwd=ROOT_DIR,
     )
     return {"source_dir": str(source_dir), "template_dir": str(template_dir), "package_dir": str(package_dir)}
+
+
+def _compose_full_from_text_package(
+    target: PackageTarget,
+    manifest_path: Path,
+    text_package_dir: Path,
+    work_dir: Path,
+    package_dir: Path,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    command = [
+        sys.executable,
+        "-m",
+        "tools.heretic_to_onnx",
+        "convert",
+        "--config",
+        str(manifest_path),
+        "--work-dir",
+        str(work_dir),
+        "--output-dir",
+        str(package_dir),
+        "--force",
+        "--strict-onnx",
+        "--skip-runtime-smoke",
+        "--skip-validation",
+        "--export-mode",
+        "plan",
+        "--quantize-mode",
+        "plan",
+        "--onnx-source-dir",
+        str(text_package_dir / "onnx"),
+    ]
+    _run(command, cwd=ROOT_DIR)
+    template_dir = _resolve_optimized_template(work_dir, args)
+    vision_copy = _copy_template_vision_files(template_dir, package_dir)
+    if not vision_copy["ok"]:
+        raise FileNotFoundError("missing Gemma4 template vision files: " + ", ".join(vision_copy["missing"]))
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "tools.heretic_to_onnx",
+            "validate",
+            "--config",
+            str(manifest_path),
+            "--package-dir",
+            str(package_dir),
+            "--strict-onnx",
+            "--skip-runtime-smoke",
+        ],
+        cwd=ROOT_DIR,
+    )
+    report = {
+        "ok": True,
+        "mode": "template",
+        "work_dir": str(work_dir),
+        "package_dir": str(package_dir),
+        "text_package_dir": str(text_package_dir),
+        "vision_copy": vision_copy,
+    }
+    (package_dir / "gemma4-full-template-package-report.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return report
 
 
 def _upload_merged(merged_dir: Path, repo_id: str, args: argparse.Namespace) -> dict[str, Any]:
@@ -444,6 +558,43 @@ def _process_pair(
         )
         text_publish = _publish(text_manifest, Path(text_paths["package_dir"]), args)
         results.append({"target": asdict(text_target), "paths": text_paths, "publish": text_publish})
+        return results
+
+    if args.full_package_mode == "template":
+        text_manifest = _render_manifest(text_target, manifests_dir, base_model_id)
+        text_paths = _convert_full(
+            text_target,
+            text_manifest,
+            scratch_work_dir / text_target.name,
+            packages_dir / text_target.name,
+            args,
+            skip_validation=True,
+        )
+        text_paths["optimized"] = _optimize_text_package(
+            source_model_id=source_model_id,
+            manifest_path=text_manifest,
+            convert_work_dir=scratch_work_dir / text_target.name,
+            package_dir=packages_dir / text_target.name,
+            args=args,
+        )
+
+        full_manifest = _render_manifest(full_target, manifests_dir, base_model_id)
+        full_paths = _compose_full_from_text_package(
+            full_target,
+            full_manifest,
+            packages_dir / text_target.name,
+            scratch_work_dir / full_target.name,
+            packages_dir / full_target.name,
+            args,
+        )
+        full_publish = _publish(full_manifest, Path(full_paths["package_dir"]), args)
+        text_publish = _publish(text_manifest, Path(text_paths["package_dir"]), args)
+        results.extend(
+            [
+                {"target": asdict(full_target), "paths": full_paths, "publish": full_publish},
+                {"target": asdict(text_target), "paths": text_paths, "publish": text_publish},
+            ]
+        )
         return results
 
     full_manifest = _render_manifest(full_target, manifests_dir, base_model_id)
