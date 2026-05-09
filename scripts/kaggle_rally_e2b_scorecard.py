@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import gc
 import json
+import os
 import shutil
 import sys
 from dataclasses import asdict
@@ -16,6 +17,11 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+# Kaggle T4 notebooks can expose two GPUs. The scorecard loads one model at a
+# time, so keep generation on one visible device and avoid cross-device tensor
+# placement during `generate`.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -103,7 +109,7 @@ def _generate(model_spec: str | Path, *, max_new_tokens: int, temperature: float
         "trust_remote_code": True,
     }
     if torch.cuda.is_available():
-        model_kwargs["device_map"] = "auto"
+        model_kwargs["device_map"] = {"": 0}
         model_kwargs["torch_dtype"] = torch.float16
     else:
         model_kwargs["torch_dtype"] = torch.float32
