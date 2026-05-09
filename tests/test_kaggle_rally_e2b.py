@@ -18,6 +18,7 @@ from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train
 from scripts.train_rally_unsloth import (
     LANGUAGE_LORA_PROJECTIONS,
     _discover_language_lora_target_modules,
+    _model_has_vision_tower,
     _patch_unsloth_text_only_processor,
 )
 
@@ -159,6 +160,37 @@ class KaggleRallyE2BTests(unittest.TestCase):
                 "model.layers.0.self_attn.q_proj.linear",
             ],
         )
+
+    def test_rally_lora_discovery_falls_back_to_nonvision_wrappers(self) -> None:
+        class FakeModel:
+            def named_modules(self):
+                return iter(
+                    [
+                        ("model.layers.0.self_attn.q_proj", object()),
+                        ("model.layers.0.mlp.down_proj", object()),
+                        ("model.vision_tower.encoder.layers.0.self_attn.q_proj", object()),
+                    ]
+                )
+
+        self.assertEqual(
+            _discover_language_lora_target_modules(FakeModel()),
+            [
+                "model.layers.0.mlp.down_proj",
+                "model.layers.0.self_attn.q_proj",
+            ],
+        )
+
+    def test_rally_detects_vision_tower_for_fast_vision_peft(self) -> None:
+        class FakeModel:
+            def named_modules(self):
+                return iter(
+                    [
+                        ("model", object()),
+                        ("model.vision_tower", object()),
+                    ]
+                )
+
+        self.assertTrue(_model_has_vision_tower(FakeModel()))
 
     def test_rally_text_intermediate_convert_can_skip_validation(self) -> None:
         args = export_parser().parse_args(["--skip-full-packages"])

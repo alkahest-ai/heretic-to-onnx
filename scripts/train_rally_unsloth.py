@@ -280,19 +280,38 @@ def _save_generation_config(model, output_dir: Path) -> None:
     generation_config.save_pretrained(str(output_dir))
 
 
+def _model_has_vision_tower(model) -> bool:
+    return any(name == "model.vision_tower" or ".vision_tower" in name for name, _module in model.named_modules())
+
+
 def _discover_language_lora_target_modules(model) -> list[str]:
-    suffixes = tuple(f".{projection}.linear" for projection in LANGUAGE_LORA_PROJECTIONS)
+    linear_suffixes = tuple(f".{projection}.linear" for projection in LANGUAGE_LORA_PROJECTIONS)
+    wrapper_suffixes = tuple(f".{projection}" for projection in LANGUAGE_LORA_PROJECTIONS)
     exclusions = ("vision_tower", "vision_model", "audio", "projector", "multi_modal")
-    preferred_targets: list[str] = []
-    fallback_targets: list[str] = []
+    preferred_linear_targets: list[str] = []
+    fallback_linear_targets: list[str] = []
+    preferred_wrapper_targets: list[str] = []
+    fallback_wrapper_targets: list[str] = []
     for name, _module in model.named_modules():
-        if not name.endswith(suffixes) or any(exclusion in name for exclusion in exclusions):
+        if any(exclusion in name for exclusion in exclusions):
             continue
-        if "language_model" in name:
-            preferred_targets.append(name)
-        else:
-            fallback_targets.append(name)
-    targets = preferred_targets or fallback_targets
+        if name.endswith(linear_suffixes):
+            if "language_model" in name:
+                preferred_linear_targets.append(name)
+            else:
+                fallback_linear_targets.append(name)
+            continue
+        if name.endswith(wrapper_suffixes):
+            if "language_model" in name:
+                preferred_wrapper_targets.append(name)
+            else:
+                fallback_wrapper_targets.append(name)
+    targets = (
+        preferred_linear_targets
+        or fallback_linear_targets
+        or preferred_wrapper_targets
+        or fallback_wrapper_targets
+    )
     if not targets:
         sample = [name for name, _module in list(model.named_modules())[:25]]
         raise ValueError(f"could not discover Gemma language LoRA target modules; sample modules={sample}")
@@ -337,7 +356,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    from unsloth import FastLanguageModel
+    from unsloth import FastLanguageModel, FastVisionModel
     from datasets import DatasetDict, load_dataset
     from trl import SFTConfig, SFTTrainer
 
@@ -359,26 +378,54 @@ def main() -> int:
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    lora_target_modules = args.lora_target_module or _discover_language_lora_target_modules(model)
-    print(
-        "[lora-targets]",
-        f"count={len(lora_target_modules)}",
-        f"first={lora_target_modules[0]}",
-        f"last={lora_target_modules[-1]}",
-        flush=True,
+    use_vision_peft = _model_has_vision_tower(model) and not args.lora_target_module
+    lora_target_modules: list[str] | str = "all-linear" if use_vision_peft else (
+        args.lora_target_module or _discover_language_lora_target_modules(model)
     )
+    if isinstance(lora_target_modules, str):
+        print(
+            "[lora-targets]",
+            "mode=fast-vision-language-only",
+            "count=auto",
+            f"target_modules={lora_target_modules}",
+            flush=True,
+        )
+    else:
+        print(
+            "[lora-targets]",
+            "mode=explicit",
+            f"count={len(lora_target_modules)}",
+            f"first={lora_target_modules[0]}",
+            f"last={lora_target_modules[-1]}",
+            flush=True,
+        )
 
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=args.lora_rank,
-        target_modules=lora_target_modules,
-        lora_alpha=args.lora_rank,
-        lora_dropout=0,
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=args.seed,
-        max_seq_length=args.max_seq_length,
-    )
+    if use_vision_peft:
+        model = FastVisionModel.get_peft_model(
+            model,
+            finetune_vision_layers=False,
+            finetune_language_layers=True,
+            finetune_attention_modules=True,
+            finetune_mlp_modules=True,
+            r=args.lora_rank,
+            target_modules=lora_target_modules,
+            lora_alpha=args.lora_rank,
+            lora_dropout=0,
+            bias="none",
+            random_state=args.seed,
+        )
+    else:
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=args.lora_rank,
+            target_modules=lora_target_modules,
+            lora_alpha=args.lora_rank,
+            lora_dropout=0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=args.seed,
+            max_seq_length=args.max_seq_length,
+        )
 
     train_dataset = dataset["train"].map(
         lambda row: _format_row(row, tokenizer, enable_thinking=args.enable_thinking),
