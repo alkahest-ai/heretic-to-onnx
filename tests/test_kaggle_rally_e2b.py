@@ -322,7 +322,9 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertEqual(report["mode"], "template")
         self.assertEqual(run_mock.call_count, 2)
         self.assertIn("--skip-validation", run_mock.call_args_list[0].args[0])
+        self.assertNotIn("--strict-onnx", run_mock.call_args_list[0].args[0])
         self.assertIn("validate", run_mock.call_args_list[1].args[0])
+        self.assertIn("--strict-onnx", run_mock.call_args_list[1].args[0])
 
 
 if __name__ == "__main__":

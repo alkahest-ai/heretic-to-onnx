@@ -400,7 +400,6 @@ def _compose_full_from_text_package(
         "--output-dir",
         str(package_dir),
         "--force",
-        "--strict-onnx",
         "--skip-runtime-smoke",
         "--skip-validation",
         "--export-mode",
