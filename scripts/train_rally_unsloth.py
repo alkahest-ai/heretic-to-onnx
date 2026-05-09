@@ -379,26 +379,15 @@ def main() -> int:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     use_vision_peft = _model_has_vision_tower(model) and not args.lora_target_module
-    lora_target_modules: list[str] | str = "all-linear" if use_vision_peft else (
-        args.lora_target_module or _discover_language_lora_target_modules(model)
+    lora_target_modules = args.lora_target_module or _discover_language_lora_target_modules(model)
+    print(
+        "[lora-targets]",
+        "mode=fast-vision-language-explicit" if use_vision_peft else "mode=explicit",
+        f"count={len(lora_target_modules)}",
+        f"first={lora_target_modules[0]}",
+        f"last={lora_target_modules[-1]}",
+        flush=True,
     )
-    if isinstance(lora_target_modules, str):
-        print(
-            "[lora-targets]",
-            "mode=fast-vision-language-only",
-            "count=auto",
-            f"target_modules={lora_target_modules}",
-            flush=True,
-        )
-    else:
-        print(
-            "[lora-targets]",
-            "mode=explicit",
-            f"count={len(lora_target_modules)}",
-            f"first={lora_target_modules[0]}",
-            f"last={lora_target_modules[-1]}",
-            flush=True,
-        )
 
     if use_vision_peft:
         model = FastVisionModel.get_peft_model(
