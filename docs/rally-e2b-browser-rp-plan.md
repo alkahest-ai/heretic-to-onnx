@@ -81,6 +81,7 @@ Kernel IDs:
 - `thomasjvu/rally-e2b-export-prep`
 - `thomasjvu/rally-e2b-browser-export`
 - `thomasjvu/rally-e2b-rp-text-export`
+- `thomasjvu/rally-e2b-rp-full-compose`
 - `thomasjvu/rally-e2b-rp-merged-upload`
 - `thomasjvu/rally-e2b-scorecard`
 
@@ -91,6 +92,7 @@ kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT
 kaggle kernels push -p kaggle/rally_e2b_export_prep
 kaggle kernels push -p kaggle/rally_e2b_two_stage_export
 kaggle kernels push -p kaggle/rally_e2b_rp_text_export
+kaggle kernels push -p kaggle/rally_e2b_rp_full_compose
 kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
 kaggle kernels push -p kaggle/rally_e2b_scorecard
 # Use this instead when weekly GPU quota is available and the full 96-token gate is desired:
@@ -102,8 +104,9 @@ Current recovery shape:
 1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 decoder and vision template files into a Kaggle kernel source.
 2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
 3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs the RP text export lane. With `RALLY_FULL_EXPORT=1`, it also uses `--full-package-mode template` to compose the RP full text+image package from the optimized text package plus reference q4f16 vision files.
-4. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path scores the primary A100/B75 candidate first so failures surface quickly; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
-5. Full text+image raw export remains parked; full package composition should use the template mode first.
+4. `rally_e2b_rp_full_compose` is the dedicated safe-default full compose kernel for the RP package. It forces `--full-package-mode template`, skips direct export, and leaves HF upload disabled unless the Kaggle `HF_TOKEN` secret is available.
+5. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path scores the primary A100/B75 candidate first so failures surface quickly; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
+6. Full text+image raw export remains parked; full package composition should use the template mode first.
 
 The legacy monolithic workflow performed:
 
@@ -151,7 +154,7 @@ The failed attempts before this pass are still useful history: the first thomasj
 ## Next Recovery Pass
 
 1. Push and run `rally_e2b_export_prep` again so the Kaggle source includes the reference q4f16 vision files and the `--full-package-mode template` code.
-2. Run `rally_e2b_rp_text_export` with `RALLY_FULL_EXPORT=1` to compose `thomasjvu/rally-2b-rp` without raw Gemma4 vision export.
+2. Run `rally_e2b_rp_full_compose` to compose `thomasjvu/rally-2b-rp` without raw Gemma4 vision export.
 3. Run the direct lane with `RALLY_FULL_EXPORT=1` if the base full package still needs replacement, producing `thomasjvu/rally-2b`.
 4. Upload or recover the current hard-boundary v8 merged checkpoint to `thomasjvu/rally-2b-rp-a100-b75-merged` for provenance.
 5. Keep the fixed text HF revisions pinned: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
