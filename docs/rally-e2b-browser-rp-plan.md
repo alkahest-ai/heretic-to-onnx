@@ -102,7 +102,7 @@ Current recovery shape:
 1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 template into a Kaggle kernel source.
 2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
 3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs only the RP text export lane.
-4. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path is a 32-token CPU diagnostic so it can run while weekly GPU quota is exhausted; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
+4. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path scores the primary A100/B75 candidate first so failures surface quickly; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
 5. Full text+image export remains parked until text-only browser packaging is proven inside Kaggle time limits.
 
 The legacy monolithic workflow performed:
