@@ -155,7 +155,7 @@ kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_scorecard
 ```
 
-That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4` and RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate.
+That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4` and RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate. The current RP full text+image package is `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
 
 For full text+image packages, prefer the template-composed mode instead of raw Gemma4 vision export:
 
@@ -163,7 +163,7 @@ For full text+image packages, prefer the template-composed mode instead of raw G
 kaggle kernels push -p kaggle/rally_e2b_rp_full_compose
 ```
 
-This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. Keep Rally presets hidden until browser smoke passes.
+This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. The RP full compose path completed on Kaggle as version 2 and was uploaded to the private HF repo above. Keep Rally presets hidden until browser smoke passes.
 
 ## 11. Legacy One-Click H200 Path
 

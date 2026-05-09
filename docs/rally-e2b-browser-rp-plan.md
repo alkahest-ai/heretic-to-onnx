@@ -28,7 +28,8 @@ As of 2026-05-09, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Direct Heretic text | Re-exported, validated, uploaded | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package at `thomasjvu/rally-2b-text`, HF commit `7451f62519eb7932266b3ec0d361f5937bf325c4`. Package validation is clean; browser promotion is still blocked by local WebGPU stability. |
 | RP A100/B75 text | Re-exported, validated, uploaded | Kaggle export completed with upload disabled, then local HF upload replaced the legacy repo after clearing the old LFS-history storage issue. Current private repo is `thomasjvu/rally-2b-rp-text`, HF commit `a4065c02e9228d41cd19e527e5f66f969177b29a`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. |
 | RP A100/B75 merged checkpoint | Legacy upload exists; current hard-boundary upload pending | The older `thomasjvu/rally-2b-rp-a100-b75-merged` commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168` is not the final hard-boundary v8 provenance target. The v8 export generated and cleaned `/kaggle/working/rally-e2b-rp-text-export/a100-b75-merged`; upload still needs a Kaggle-side HF token or a dedicated merge/upload rerun. |
-| Full text+image browser packages | New template-compose path ready; rerun pending | The old T4 full export OOMed during Gemma4 vision export, and CPU raw intermediates exceeded Kaggle disk. The current code adds `--full-package-mode template`, which builds text sessions as before and composes the full package by copying the reference Gemma4 `vision_encoder_q4f16.*` files. This avoids the failing raw vision export step but still needs a Kaggle package rerun and HF upload. |
+| Direct Heretic full | Existing legacy full package; replacement pending | `thomasjvu/rally-2b` still points at the older full text+image package, HF commit `51cb78d3ac4a95d9999d28f1ff72e0240730793a`. Attempting to flip it private hit the HF private-storage quota, so keep it diagnostic-only until the direct full package is re-exported or a storage decision is made. |
+| RP A100/B75 full | Template-composed, validated, uploaded | `rally_e2b_export_prep` version 4 and `rally_e2b_rp_full_compose` version 2 completed the safe full-package path. The package report is clean with no warnings, and the current private repo is `thomasjvu/rally-2b-rp`, HF commit `d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`, used storage `3.41 GB`, containing q4f16 text + image sessions only. |
 | Kaggle scorecard-only lane | Passed primary promotion gate | `thomasjvu/rally-e2b-scorecard` version 5 scored direct Rally against the hard-boundary A100/B75 candidate on Kaggle without local WebGPU. Direct total was `0.9000`; RP total was `1.0000`; margin was `+0.1000`; minor-boundary diagnostics passed with `safety_refusal=true`, `adult_redirect=true`, and `unsafe_continuation=false`. |
 
 The confirmed browser failure on the old pinned diagnostic scorecard was:
@@ -104,7 +105,7 @@ Current recovery shape:
 1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 decoder and vision template files into a Kaggle kernel source.
 2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
 3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs the RP text export lane. With `RALLY_FULL_EXPORT=1`, it also uses `--full-package-mode template` to compose the RP full text+image package from the optimized text package plus reference q4f16 vision files.
-4. `rally_e2b_rp_full_compose` is the dedicated safe-default full compose kernel for the RP package. It forces `--full-package-mode template`, skips direct export, and leaves HF upload disabled unless the Kaggle `HF_TOKEN` secret is available.
+4. `rally_e2b_rp_full_compose` is the dedicated safe-default full compose kernel for the RP package. Version 2 completed with `--full-package-mode template`, skipped direct export, copied the reference q4f16 vision files, and validated the full RP package before local HF upload to `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
 5. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path scores the primary A100/B75 candidate first so failures surface quickly; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
 6. Full text+image raw export remains parked; full package composition should use the template mode first.
 
@@ -119,11 +120,11 @@ The legacy monolithic workflow performed:
 7. RP full export and upload
 8. RP text-only export and upload
 
-For the immediate recovery pass, do not expose Rally in the picker yet. The A100/B75 RP text package is the current scorecard winner, but it still needs browser smoke in a clean isolated profile and full-package recovery before app-default consideration.
+For the immediate recovery pass, do not expose Rally in the picker yet. The A100/B75 RP text package is the current scorecard winner and the RP full package is uploaded, but Rally still needs browser smoke in a clean isolated profile before app-default consideration.
 
 The equivalent Phala command remains available as a fallback, but it is not the active path for this lane.
 
-The upload-only merged checkpoint kernel is retained for future Kaggle-side recovery, but version 2 could not read the `HF_TOKEN` Kaggle secret in this session. The completed checkpoint was therefore recovered by streaming the Kaggle output to local disk with resumable download support, uploading it to Hugging Face, and deleting the local staging copy afterward.
+The upload-only merged checkpoint kernel is retained for future Kaggle-side recovery, but version 2 could not read the `HF_TOKEN` Kaggle secret in this session. The browser package outputs were recovered by streaming Kaggle output to local disk with resumable download support, uploading them to Hugging Face, and deleting the large local staging copies afterward.
 
 ## Promotion Gate
 
@@ -153,10 +154,9 @@ The failed attempts before this pass are still useful history: the first thomasj
 
 ## Next Recovery Pass
 
-1. Push and run `rally_e2b_export_prep` again so the Kaggle source includes the reference q4f16 vision files and the `--full-package-mode template` code.
-2. Run `rally_e2b_rp_full_compose` to compose `thomasjvu/rally-2b-rp` without raw Gemma4 vision export.
-3. Run the direct lane with `RALLY_FULL_EXPORT=1` if the base full package still needs replacement, producing `thomasjvu/rally-2b`.
-4. Upload or recover the current hard-boundary v8 merged checkpoint to `thomasjvu/rally-2b-rp-a100-b75-merged` for provenance.
-5. Keep the fixed text HF revisions pinned: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
-6. Retry browser smoke in a clean isolated browser profile, one model at a time, with the worker-backed runner. Use text-only first; full image smoke comes after the composed full packages upload.
-7. Add Rally presets to the picker only after browser smoke passes. Until then, keep Rally URL-override only even though the Kaggle scorecard has passed.
+1. Treat `rally_e2b_export_prep` v4 and `rally_e2b_rp_full_compose` v2 as the source of record for the current RP full package.
+2. Run the direct lane with `RALLY_FULL_EXPORT=1` only if the base full package needs replacement, producing a new `thomasjvu/rally-2b` revision after the HF storage/private-state decision is clear.
+3. Upload or recover the current hard-boundary v8 merged checkpoint to `thomasjvu/rally-2b-rp-a100-b75-merged` for provenance.
+4. Keep the fixed HF revisions pinned: direct text `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP text `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; RP full `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
+5. Retry browser smoke off the main desktop or in a clean isolated browser profile, one model at a time, with the worker-backed runner. Use text-only first, then RP full image smoke.
+6. Add Rally presets to the picker only after browser smoke passes. Until then, keep Rally URL-override only even though the Kaggle scorecard has passed.

@@ -168,5 +168,6 @@ Current execution status on 2026-05-09:
 - Text-only ONNX packages are uploaded for direct Heretic and RP Heretic: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`, RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
 - The Kaggle scorecard now promotes the RP text candidate over direct Rally: RP `1.0000`, direct `0.9000`, margin `+0.1000`, minor-boundary gate passed.
 - The older RP merged HF checkpoint remains at `thomasjvu/rally-2b-rp-a100-b75-merged@3f2f180e1abea16d236e43e79b1e8454a1a5f168`; the current hard-boundary v8 merged checkpoint still needs a provenance upload.
-- Full text+image ONNX packages are not complete on Kaggle yet. The next path is template composition, not raw Gemma4 vision export: build text sessions, then copy reference `vision_encoder_q4f16.*` into the full package.
+- The RP full text+image ONNX package is now complete from the template-compose Kaggle path and uploaded privately at `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`. It contains q4f16 text + image sessions only and validates cleanly.
+- The direct full package remains the older `thomasjvu/rally-2b@51cb78d3ac4a95d9999d28f1ff72e0240730793a`; making it private hit the HF private-storage quota, so keep it diagnostic-only until a replacement/storage decision is made.
 - E4B remains out of scope for this pass.
