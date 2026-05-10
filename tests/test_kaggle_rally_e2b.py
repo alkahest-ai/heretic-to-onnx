@@ -326,6 +326,19 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertIn("validate", run_mock.call_args_list[1].args[0])
         self.assertIn("--strict-onnx", run_mock.call_args_list[1].args[0])
 
+    def test_merged_upload_notebook_reports_without_hf_token(self) -> None:
+        notebook = json.loads(Path("kaggle/rally_e2b_rp_merged_upload/__notebook__.ipynb").read_text(encoding="utf-8"))
+        metadata = json.loads(Path("kaggle/rally_e2b_rp_merged_upload/kernel-metadata.json").read_text(encoding="utf-8"))
+        source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+
+        self.assertIn("thomasjvu/rally-e2b-two-stage-sft-t4", metadata["kernel_sources"])
+        self.assertNotIn("raise RuntimeError('HF_TOKEN Kaggle secret is required", source)
+        self.assertIn("'reason': 'HF_TOKEN is not set'", source)
+        self.assertIn("scripts/merge_lora_scaled.py", source)
+        self.assertIn("'RALLY_STAGE_B_SCALE', '0.75'", source)
+        self.assertIn("sorted(merged_dir.iterdir(), key=lambda item: item.name)", source)
+        self.assertNotIn("files = sorted(\\n    {", source)
+
 
 if __name__ == "__main__":
     unittest.main()

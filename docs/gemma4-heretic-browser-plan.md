@@ -167,7 +167,7 @@ Current execution status on 2026-05-09:
 - Kaggle two-stage SFT is complete for Rally/Gemma E2B A100/B75 using the hard-boundary Stage B mix and language-only FastVision LoRA target discovery.
 - Text-only ONNX packages are uploaded for direct Heretic and RP Heretic: direct `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`, RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
 - The Kaggle scorecard now promotes the RP text candidate over direct Rally: RP `1.0000`, direct `0.9000`, margin `+0.1000`, minor-boundary gate passed.
-- The older RP merged HF checkpoint remains at `thomasjvu/rally-2b-rp-a100-b75-merged@3f2f180e1abea16d236e43e79b1e8454a1a5f168`; the current hard-boundary v8 merged checkpoint still needs a provenance upload.
+- The older RP merged HF checkpoint remains at `thomasjvu/rally-2b-rp-a100-b75-merged@3f2f180e1abea16d236e43e79b1e8454a1a5f168`; the current hard-boundary v8 checkpoint was recreated and validated on Kaggle by `rally_e2b_rp_merged_upload` version 3, but HF upload is still pending because the Kaggle `HF_TOKEN` secret was unavailable.
 - The RP full text+image ONNX package is now complete from the template-compose Kaggle path and uploaded privately at `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`. It contains q4f16 text + image sessions only and validates cleanly.
 - The direct full package remains the older `thomasjvu/rally-2b@51cb78d3ac4a95d9999d28f1ff72e0240730793a`; making it private hit the HF private-storage quota, so keep it diagnostic-only until a replacement/storage decision is made.
 - E4B remains out of scope for this pass.

@@ -10,6 +10,6 @@
   "dataset_sources": [],
   "competition_sources": [],
   "kernel_sources": [
-    "thomasjvu/rally-e2b-browser-export"
+    "thomasjvu/rally-e2b-two-stage-sft-t4"
   ]
 }

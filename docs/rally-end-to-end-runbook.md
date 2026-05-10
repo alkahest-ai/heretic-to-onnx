@@ -165,6 +165,14 @@ kaggle kernels push -p kaggle/rally_e2b_rp_full_compose
 
 This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. The RP full compose path completed on Kaggle as version 2 and was uploaded to the private HF repo above. Keep Rally presets hidden until browser smoke passes.
 
+For merged-checkpoint provenance, run:
+
+```bash
+kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
+```
+
+That notebook now re-creates the A100/B75 merge from the two-stage SFT output, writes a file manifest/report, and only uploads to HF when the Kaggle `HF_TOKEN` secret is reachable. Version 3 validated the current v8 checkpoint on Kaggle but skipped HF upload because the secret was unavailable.
+
 ## 11. Legacy One-Click H200 Path
 
 If you want the whole Gemma loop in one terminal command on Phala GPU TEE, use:
