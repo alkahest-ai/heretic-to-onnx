@@ -339,6 +339,17 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertIn("sorted(merged_dir.iterdir(), key=lambda item: item.name)", source)
         self.assertNotIn("files = sorted(\\n    {", source)
 
+    def test_direct_full_compose_notebook_is_direct_only_by_default(self) -> None:
+        notebook = json.loads(Path("kaggle/rally_e2b_direct_full_compose/__notebook__.ipynb").read_text(encoding="utf-8"))
+        metadata = json.loads(Path("kaggle/rally_e2b_direct_full_compose/kernel-metadata.json").read_text(encoding="utf-8"))
+        source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+
+        self.assertEqual(metadata["kernel_sources"], ["thomasjvu/rally-e2b-export-prep"])
+        self.assertIn("'--full-package-mode', 'template'", source)
+        self.assertIn("'--skip-rp'", source)
+        self.assertIn("cmd.append('--no-upload')", source)
+        self.assertNotIn("'--skip-direct'", source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,15 @@
+{
+  "id": "thomasjvu/rally-e2b-direct-full-compose",
+  "title": "Rally E2B Direct Full Compose",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "kernel_sources": [
+    "thomasjvu/rally-e2b-export-prep"
+  ],
+  "competition_sources": []
+}

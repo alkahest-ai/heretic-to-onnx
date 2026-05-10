@@ -160,10 +160,11 @@ That path now uses Kaggle first and local HF upload only when Kaggle has no HF s
 For full text+image packages, prefer the template-composed mode instead of raw Gemma4 vision export:
 
 ```bash
+kaggle kernels push -p kaggle/rally_e2b_direct_full_compose
 kaggle kernels push -p kaggle/rally_e2b_rp_full_compose
 ```
 
-This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. The RP full compose path completed on Kaggle as version 2 and was uploaded to the private HF repo above. Keep Rally presets hidden until browser smoke passes.
+This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. The RP full compose path completed on Kaggle as version 2 and was uploaded to the private HF repo above. The direct full compose path is upload-disabled by default until the `thomasjvu/rally-2b` storage/private-state decision is clear. Keep Rally presets hidden until browser smoke passes.
 
 For merged-checkpoint provenance, run:
 

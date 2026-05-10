@@ -28,7 +28,7 @@ As of 2026-05-09, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Direct Heretic text | Re-exported, validated, uploaded | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package at `thomasjvu/rally-2b-text`, HF commit `7451f62519eb7932266b3ec0d361f5937bf325c4`. Package validation is clean; browser promotion is still blocked by local WebGPU stability. |
 | RP A100/B75 text | Re-exported, validated, uploaded | Kaggle export completed with upload disabled, then local HF upload replaced the legacy repo after clearing the old LFS-history storage issue. Current private repo is `thomasjvu/rally-2b-rp-text`, HF commit `a4065c02e9228d41cd19e527e5f66f969177b29a`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. |
 | RP A100/B75 merged checkpoint | Recreated and validated on Kaggle; HF upload pending | The older `thomasjvu/rally-2b-rp-a100-b75-merged` commit `3f2f180e1abea16d236e43e79b1e8454a1a5f168` is not the final hard-boundary v8 provenance target. `rally_e2b_rp_merged_upload` version 3 now consumes the two-stage SFT output, re-merges A100/B75 on Kaggle, applies 205 LoRA targets at scale `0.75`, and writes a clean report with `checkpoint_ok=true` and `required_ok=true`. HF upload still skipped because the Kaggle `HF_TOKEN` secret is not reachable in this environment. |
-| Direct Heretic full | Existing legacy full package; replacement pending | `thomasjvu/rally-2b` still points at the older full text+image package, HF commit `51cb78d3ac4a95d9999d28f1ff72e0240730793a`. Attempting to flip it private hit the HF private-storage quota, so keep it diagnostic-only until the direct full package is re-exported or a storage decision is made. |
+| Direct Heretic full | Template-composed and validated on Kaggle; HF replacement pending | `thomasjvu/rally-2b` still points at the older full text+image package, HF commit `51cb78d3ac4a95d9999d28f1ff72e0240730793a`. `rally_e2b_direct_full_compose` version 1 produced clean direct full/text packages from the optimized template path with upload disabled; full package report is `ok=true`, warnings are empty, and q4f16 vision artifacts were copied. Attempting to flip the existing HF repo private hit the HF private-storage quota, so keep the repo diagnostic-only until the replacement/storage decision is clear. |
 | RP A100/B75 full | Template-composed, validated, uploaded | `rally_e2b_export_prep` version 4 and `rally_e2b_rp_full_compose` version 2 completed the safe full-package path. The package report is clean with no warnings, and the current private repo is `thomasjvu/rally-2b-rp`, HF commit `d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`, used storage `3.41 GB`, containing q4f16 text + image sessions only. |
 | Kaggle scorecard-only lane | Passed primary promotion gate | `thomasjvu/rally-e2b-scorecard` version 5 scored direct Rally against the hard-boundary A100/B75 candidate on Kaggle without local WebGPU. Direct total was `0.9000`; RP total was `1.0000`; margin was `+0.1000`; minor-boundary diagnostics passed with `safety_refusal=true`, `adult_redirect=true`, and `unsafe_continuation=false`. |
 
@@ -81,6 +81,7 @@ Kernel IDs:
 - `thomasjvu/rally-e2b-two-stage-sft-t4`
 - `thomasjvu/rally-e2b-export-prep`
 - `thomasjvu/rally-e2b-browser-export`
+- `thomasjvu/rally-e2b-direct-full-compose`
 - `thomasjvu/rally-e2b-rp-text-export`
 - `thomasjvu/rally-e2b-rp-full-compose`
 - `thomasjvu/rally-e2b-rp-merged-upload`
@@ -92,6 +93,7 @@ CLI launch:
 kaggle kernels push -p kaggle/rally_e2b_two_stage_sft --accelerator NvidiaTeslaT4
 kaggle kernels push -p kaggle/rally_e2b_export_prep
 kaggle kernels push -p kaggle/rally_e2b_two_stage_export
+kaggle kernels push -p kaggle/rally_e2b_direct_full_compose
 kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_rp_full_compose
 kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
@@ -104,10 +106,11 @@ Current recovery shape:
 
 1. `rally_e2b_export_prep` stages the exact `heretic-to-onnx` branch checkout plus the optimized Gemma4 q4f16 decoder and vision template files into a Kaggle kernel source.
 2. `rally_e2b_two_stage_export` consumes the prep source plus the SFT kernel source and runs only the direct text export lane.
-3. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs the RP text export lane. With `RALLY_FULL_EXPORT=1`, it also uses `--full-package-mode template` to compose the RP full text+image package from the optimized text package plus reference q4f16 vision files.
-4. `rally_e2b_rp_full_compose` is the dedicated safe-default full compose kernel for the RP package. Version 2 completed with `--full-package-mode template`, skipped direct export, copied the reference q4f16 vision files, and validated the full RP package before local HF upload to `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
-5. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path scores the primary A100/B75 candidate first so failures surface quickly; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
-6. Full text+image raw export remains parked; full package composition should use the template mode first.
+3. `rally_e2b_direct_full_compose` is the safe-default direct full compose kernel. It consumes only the prep source, forces `--full-package-mode template`, skips RP, and leaves upload disabled until the direct full repo storage/private-state decision is clear.
+4. `rally_e2b_rp_text_export` consumes the same prep source plus the SFT kernel source and runs the RP text export lane. With `RALLY_FULL_EXPORT=1`, it also uses `--full-package-mode template` to compose the RP full text+image package from the optimized text package plus reference q4f16 vision files.
+5. `rally_e2b_rp_full_compose` is the dedicated safe-default full compose kernel for the RP package. Version 2 completed with `--full-package-mode template`, skipped direct export, copied the reference q4f16 vision files, and validated the full RP package before local HF upload to `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
+6. `rally_e2b_scorecard` consumes the SFT kernel source, merges one or more scaled RP candidates, scores direct versus RP on Kaggle, and redacts the raw minor-boundary response from the report. The default notebook path scores the primary A100/B75 candidate first so failures surface quickly; the script still supports the full 96-token promotion gate. Set `RALLY_SCORECARD_SWEEP=a25-b100:0.25,a50-b100:0.5,a100-b75:0.75,a100-b100:1.0` to score the first post-hard-boundary sweep in one remote run.
+7. Full text+image raw export remains parked; full package composition should use the template mode first.
 
 The legacy monolithic workflow performed:
 
@@ -155,7 +158,7 @@ The failed attempts before this pass are still useful history: the first thomasj
 ## Next Recovery Pass
 
 1. Treat `rally_e2b_export_prep` v4 and `rally_e2b_rp_full_compose` v2 as the source of record for the current RP full package.
-2. Run the direct lane with `RALLY_FULL_EXPORT=1` only if the base full package needs replacement, producing a new `thomasjvu/rally-2b` revision after the HF storage/private-state decision is clear.
+2. Use `rally_e2b_direct_full_compose` v1 output as the validated direct full replacement candidate, producing a new `thomasjvu/rally-2b` revision only after the HF storage/private-state decision is clear.
 3. Upload the current hard-boundary v8 merged checkpoint from the completed `rally_e2b_rp_merged_upload` v3 Kaggle output to `thomasjvu/rally-2b-rp-a100-b75-merged` once the Kaggle HF secret works, or use another remote upload path with enough disk.
 4. Keep the fixed HF revisions pinned: direct text `thomasjvu/rally-2b-text@7451f62519eb7932266b3ec0d361f5937bf325c4`; RP text `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; RP full `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
 5. Retry browser smoke off the main desktop or in a clean isolated browser profile, one model at a time, with the worker-backed runner. Use text-only first, then RP full image smoke.
