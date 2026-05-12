@@ -10,7 +10,7 @@ This is the actual browser chat integration for running a public ONNX LLM entire
 
 Current default model:
 
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
+- `thomasjvu/alkahest-0.8b-q4-onnx`
 
 The browser app lives in:
 
@@ -78,18 +78,16 @@ Then open:
 
 You can override the model from the URL:
 
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-text`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx-text`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-text-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-rp-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-text-q4-onnx`
+- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-rp-q4-onnx`
 
 Diagnostic-only URL overrides:
 
 - `http://localhost:4173/browser-chat/?model=onnx-community/Qwen3.5-0.8B-ONNX-OPT`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx-rp`
-- `http://localhost:4173/browser-chat/?model=thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text`
 
 ## Recommended Deployment Shape
 
@@ -97,26 +95,24 @@ For the first real deployment:
 
 1. ship the static app
 2. point the default at the best validated public Alkahest q4 ONNX repo
-3. keep the 0.8B Heretic repo as the stable fallback while SFT quality is still moving
-4. expose the direct 2B Heretic q4 repos as desktop-class targets after cold browser load and first-generation smoke pass
+3. keep the 0.8B direct repo as the stable fallback while SFT quality is still moving
+4. expose the direct 2B q4 repos as desktop-class targets after cold browser load and first-generation smoke pass
 5. move the owner namespace constant when repo ownership moves from the personal account to the org
 
 For the current default picker, keep only:
 
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx`
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text`
-- `thomasjvu/alkahest-2b-heretic-q4-onnx`
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-text`
+- `thomasjvu/alkahest-0.8b-q4-onnx`
+- `thomasjvu/alkahest-0.8b-text-q4-onnx`
+- `thomasjvu/alkahest-0.8b-rp-q4-onnx`
+- `thomasjvu/alkahest-2b-q4-onnx`
+- `thomasjvu/alkahest-2b-text-q4-onnx`
+- `thomasjvu/alkahest-2b-rp-q4-onnx`
 
-Keep these as diagnostic URL-only targets until they pass the RP scorecard:
+Keep this as a diagnostic URL-only target:
 
 - `onnx-community/Qwen3.5-0.8B-ONNX-OPT`
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp`
-- `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text`
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp`
-- `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text`
 
-The 2026-05-01 RP scorecard did not promote any RP target. Both RP variants failed the minor-boundary gate and did not beat the same-size direct model, so direct Heretic remains the app default lane.
+The older training-knob RP repos were deleted or left as private provenance because the promoted RP packages above replace them.
 
 Older q4f16 exports, rejected SFT experiments, upstream controls, and RP candidates are intentionally hidden from the picker to avoid confusing smoke results.
 

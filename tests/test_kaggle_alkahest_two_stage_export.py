@@ -72,8 +72,8 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
 
     def test_text_only_export_manifest_omits_vision_contract(self) -> None:
         manifest = _manifest(
-            "thomasjvu/alkahest-2b-heretic-q4-onnx-text",
-            "thomasjvu/alkahest-2b-heretic-merged",
+            "thomasjvu/alkahest-2b-text-q4-onnx",
+            "thomasjvu/alkahest-2b-source-merged",
             "Qwen/Qwen3.5-2B",
             Path("/tmp/package"),
             include_vision=False,
@@ -85,8 +85,8 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
 
     def test_full_export_manifest_includes_vision_contract(self) -> None:
         manifest = _manifest(
-            "thomasjvu/alkahest-2b-heretic-q4-onnx-rp",
-            "thomasjvu/alkahest-2b-heretic-rp-merged",
+            "thomasjvu/alkahest-2b-rp-q4-onnx",
+            "thomasjvu/alkahest-2b-rp-source-merged",
             "Qwen/Qwen3.5-2B",
             Path("/tmp/package"),
             include_vision=True,
@@ -100,8 +100,8 @@ class KaggleAlkahestTwoStageExportTests(unittest.TestCase):
 
     def test_q4_vision_export_manifest_includes_q4_vision_contract(self) -> None:
         manifest = _manifest(
-            "thomasjvu/alkahest-2b-heretic-q4-onnx-q4vision",
-            "thomasjvu/alkahest-2b-heretic-merged",
+            "thomasjvu/alkahest-2b-q4vision-q4-onnx",
+            "thomasjvu/alkahest-2b-source-merged",
             "Qwen/Qwen3.5-2B",
             Path("/tmp/package"),
             include_vision=True,

@@ -64,10 +64,10 @@ class TextExportReport:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-repo-id", default="thomasjvu/alkahest-2b-heretic-merged")
+    parser.add_argument("--source-repo-id", default="thomasjvu/alkahest-2b-source-merged")
     parser.add_argument("--template-model-id", default="onnx-community/Qwen3.5-2B-ONNX-OPT")
     parser.add_argument("--base-model-id", default="Qwen/Qwen3.5-2B")
-    parser.add_argument("--target-repo-id", default="thomasjvu/alkahest-2b-heretic-q4-onnx-text")
+    parser.add_argument("--target-repo-id", default="thomasjvu/alkahest-2b-text-q4-onnx")
     parser.add_argument("--work-dir", default="/kaggle/working/alkahest-qwen-text-export")
     parser.add_argument("--package-dir", default="")
     parser.add_argument("--block-size", type=int, default=32)

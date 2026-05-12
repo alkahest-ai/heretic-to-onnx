@@ -79,33 +79,33 @@ const GEMMA4_WEBGPU_TEXT_DTYPE = Object.freeze({
   decoder_model_merged: "q4f16",
 });
 
-export const DEFAULT_MODEL_ID = ownedModel("alkahest-0.8b-heretic-q4-onnx");
+export const DEFAULT_MODEL_ID = ownedModel("alkahest-0.8b-q4-onnx");
 
 const GEMMA4_FLOAT16_BRIDGE_FLAG = "__hereticGemma4Float16FeedBridge";
 const gemma4Float16BridgeState = new WeakMap();
 
 export const DEFAULT_MODEL_PRESETS = [
   {
-    label: "Alkahest 0.8B Heretic Q4 (stable)",
-    modelId: ownedModel("alkahest-0.8b-heretic-q4-onnx"),
+    label: "Alkahest 0.8B Q4",
+    modelId: ownedModel("alkahest-0.8b-q4-onnx"),
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~850 MB",
     dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Stable Heretic-only 0.8B q4 browser package. Use this as the baseline for SFT comparisons.",
+    note: "Stable direct 0.8B q4 browser package. Use this as the baseline for RP comparisons.",
   },
   {
-    label: "Alkahest 0.8B Heretic Q4 Text",
-    modelId: ownedModel("alkahest-0.8b-heretic-q4-onnx-text"),
+    label: "Alkahest 0.8B Text Q4",
+    modelId: ownedModel("alkahest-0.8b-text-q4-onnx"),
     family: "qwen3_5",
     modalities: "text",
     approxDownload: "~620 MB",
     dtype: QWEN35_WEBGPU_TEXT_DTYPE,
-    note: "Text-only 0.8B Heretic q4 package for the lightest Alkahest browser smoke target.",
+    note: "Text-only 0.8B q4 package for the lightest Alkahest browser smoke target.",
   },
   {
-    label: "Alkahest 0.8B Heretic RP v8 A50/B100 Q4",
-    modelId: ownedModel("alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx"),
+    label: "Alkahest 0.8B RP Q4",
+    modelId: ownedModel("alkahest-0.8b-rp-q4-onnx"),
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~850 MB",
@@ -113,35 +113,26 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Promoted 0.8B RP candidate. Browser scorecard total 0.8500 with a +0.3225 margin over direct.",
   },
   {
-    label: "Alkahest 0.8B Heretic RP v8 A25/B100 Q4",
-    modelId: ownedModel("alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx"),
-    family: "qwen3_5",
-    modalities: "text + image",
-    approxDownload: "~850 MB",
-    dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Softer promoted 0.8B RP candidate. Browser scorecard total 0.7625 with a +0.2350 margin over direct.",
-  },
-  {
-    label: "Alkahest 2B Heretic Q4",
-    modelId: ownedModel("alkahest-2b-heretic-q4-onnx"),
+    label: "Alkahest 2B Q4",
+    modelId: ownedModel("alkahest-2b-q4-onnx"),
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~2.1 GB",
     dtype: QWEN35_WEBGPU_DTYPE,
-    note: "Full multimodal 2B Heretic q4 package. Larger than the text-only build because it keeps the fp16 vision encoder.",
+    note: "Full multimodal 2B q4 package. Larger than the text-only build because it keeps the fp16 vision encoder.",
   },
   {
-    label: "Alkahest 2B Heretic Q4 Text",
-    modelId: ownedModel("alkahest-2b-heretic-q4-onnx-text"),
+    label: "Alkahest 2B Text Q4",
+    modelId: ownedModel("alkahest-2b-text-q4-onnx"),
     family: "qwen3_5",
     modalities: "text",
     approxDownload: "~1.45 GB",
     dtype: QWEN35_WEBGPU_TEXT_DTYPE,
-    note: "Text-only 2B Heretic q4 package. This avoids loading the vision encoder for browser chat.",
+    note: "Text-only 2B q4 package. This avoids loading the vision encoder for browser chat.",
   },
   {
-    label: "Alkahest 2B Heretic RP v8 A100/B75 Q4",
-    modelId: ownedModel("alkahest-2b-heretic-rp-sft-two-stage-a100-b75-q4-onnx"),
+    label: "Alkahest 2B RP Q4",
+    modelId: ownedModel("alkahest-2b-rp-q4-onnx"),
     family: "qwen3_5",
     modalities: "text + image",
     approxDownload: "~2.1 GB",
@@ -149,7 +140,7 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Promoted 2B RP candidate. Browser scorecard total 0.8025 with a +0.2350 margin over direct.",
   },
   {
-    label: "Rally 2B Heretic Full Q4F16",
+    label: "Rally 2B Full Q4F16",
     modelId: ownedModel("rally-2b"),
     family: "gemma4",
     modalities: "text + image + audio",
@@ -158,7 +149,7 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Browser-smoked Gemma4 E2B direct full package with q4f16 text, image, and audio sessions.",
   },
   {
-    label: "Rally 2B Heretic Text Q4F16",
+    label: "Rally 2B Text Q4F16",
     modelId: ownedModel("rally-2b-text"),
     family: "gemma4",
     modalities: "text",
@@ -167,7 +158,7 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Browser-smoked Gemma4 E2B direct text package. Use Chrome 148+ with Metal/WebGPU on macOS.",
   },
   {
-    label: "Rally 2B Heretic RP Full Q4F16",
+    label: "Rally 2B RP Full Q4F16",
     modelId: ownedModel("rally-2b-rp"),
     family: "gemma4",
     modalities: "text + image + audio",
@@ -176,7 +167,7 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Browser-smoked A100/B75 RP full package with q4f16 text, image, and audio sessions.",
   },
   {
-    label: "Rally 2B Heretic RP Text Q4F16",
+    label: "Rally 2B RP Text Q4F16",
     modelId: ownedModel("rally-2b-rp-text"),
     family: "gemma4",
     modalities: "text",

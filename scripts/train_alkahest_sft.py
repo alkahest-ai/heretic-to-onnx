@@ -165,7 +165,7 @@ def _upload_folder(repo_id: str, folder: Path, *, private: bool, message: str) -
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="QLoRA SFT runner for Alkahest Qwen Heretic checkpoints.")
-    parser.add_argument("--model-name", default="thomasjvu/alkahest-0.8b-heretic-merged")
+    parser.add_argument("--model-name", default="thomasjvu/alkahest-0.8b-source-merged")
     parser.add_argument("--train-file", required=True)
     parser.add_argument("--val-file", required=True)
     parser.add_argument("--output-dir", required=True, help="Adapter/trainer output directory")

@@ -32,7 +32,7 @@ from scripts.alkahest_rp_scorecard import (
 )
 
 
-BASE_MODEL_ID = "thomasjvu/alkahest-0.8b-heretic-merged"
+BASE_MODEL_ID = "thomasjvu/alkahest-0.8b-source-merged"
 TEMPLATE_MODEL_ID = "onnx-community/Qwen3.5-0.8B-ONNX-OPT"
 QWEN_BASE_MODEL_ID = "Qwen/Qwen3.5-0.8B"
 EXPECTED_ONNX_FILES = [
@@ -67,7 +67,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--artifact-dir", default="", help="Directory containing the completed two-stage SFT output.")
     parser.add_argument("--artifact-name", default="alkahest-08b-two-stage-sft")
     parser.add_argument("--work-dir", default="/kaggle/working/alkahest-08b-two-stage-export")
-    parser.add_argument("--repo-prefix", default="thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage")
+    parser.add_argument("--repo-prefix", default="thomasjvu/alkahest-0.8b-rp")
     parser.add_argument("--source-model-id", default=BASE_MODEL_ID)
     parser.add_argument("--template-model-id", default=TEMPLATE_MODEL_ID)
     parser.add_argument("--qwen-base-model-id", default=QWEN_BASE_MODEL_ID)

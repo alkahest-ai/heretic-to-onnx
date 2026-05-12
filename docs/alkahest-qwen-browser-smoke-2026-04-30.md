@@ -2,6 +2,8 @@
 
 Update: 2026-05-04 2B RP v8 promotion pass.
 
+Naming cleanup: on 2026-05-12, promoted repos were renamed to the shorter app-facing IDs documented in `docs/alkahest-definitive-model-list.md`. Older long IDs in this smoke note are historical references to the repos before that rename.
+
 ## Artifact Reconciliation
 
 All recovered Kaggle reports and current 0.8B/2B Hub inventories were checked before promotion. The active pass is 0.8B/2B only; 4B remains documented as a recovered but unpromoted stress lane.

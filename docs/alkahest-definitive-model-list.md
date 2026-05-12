@@ -8,32 +8,28 @@ Closeout checkpoint: `docs/alkahest-closeout-2026-05-04.md`.
 
 ## Active Scope
 
-This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gemma is parked, and 4B remains a desktop stress lane until 0.8B/2B are stable.
+This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gemma is documented separately, and 4B remains parked.
 
 ## Definitive App Targets
 
 | Slot | Repo | Package inventory | Picker status |
 | --- | --- | --- | --- |
-| 0.8B Heretic full | `thomasjvu/alkahest-0.8b-heretic-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible; current-runtime text smoke passed. Stable fallback. |
-| 0.8B Heretic text | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Visible; current-runtime text smoke and RP scorecard capture passed technically. |
-| 0.8B Heretic RP full | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden diagnostic; load initially stalled at 100% decoder shard, retry passed, scorecard gate failed through RP text. |
-| 0.8B Heretic RP text | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-rp-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Hidden diagnostic; current-runtime technical smoke passed, scorecard failed. |
-| 0.8B Heretic RP v8 A50/B100 full | `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible promoted RP target; Kaggle scorecard passed with `1.0000` and `+0.2750` over direct. Browser text-session, image smoke, and browser RP scorecard passed on runtime `v38`. Recommended 0.8B RP app target. |
-| 0.8B Heretic RP v8 A25/B100 full | `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible promoted RP target; Kaggle scorecard passed with `1.0000` and `+0.2750` over direct. Browser text-session, image smoke, and browser RP scorecard passed on runtime `v38`. Softer fallback to A50/B100. |
-| 2B Heretic full | `thomasjvu/alkahest-2b-heretic-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible desktop-class direct target; current-runtime text smoke passed, slow generation. |
-| 2B Heretic text | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Visible desktop-class text target; current-runtime text smoke and RP scorecard capture passed technically. |
-| 2B Heretic RP full | `thomasjvu/alkahest-2b-heretic-q4-onnx-rp` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden diagnostic; current-runtime text load passed, 96-token generation stalled, 32-token retry passed, scorecard gate failed through RP text. |
-| 2B Heretic RP text | `thomasjvu/alkahest-2b-heretic-q4-onnx-rp-text` | tokenizer/config, q4 embed, q4 decoder, no vision | Hidden diagnostic; current-runtime technical smoke passed, scorecard failed. |
-| 2B Heretic RP v8 A100/B75 full | `thomasjvu/alkahest-2b-heretic-rp-sft-two-stage-a100-b75-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible promoted 2B RP target; browser image smoke passed, warm cache image smoke passed, browser scorecard passed with `0.8025` and `+0.2350` over direct. Recommended 2B RP app target. |
-| 2B Heretic RP v8 A100/B50 full | `thomasjvu/alkahest-2b-heretic-rp-sft-two-stage-a100-b50-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Hidden diagnostic; browser image smoke passed, but scorecard failed with `0.5800`, minor-boundary failure, and only `+0.0125` over direct. |
+| 0.8B full | `thomasjvu/alkahest-0.8b-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible stable fallback. |
+| 0.8B text | `thomasjvu/alkahest-0.8b-text-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, no vision | Visible lightweight text target. |
+| 0.8B RP full | `thomasjvu/alkahest-0.8b-rp-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible recommended 0.8B RP target. |
+| 2B full | `thomasjvu/alkahest-2b-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible desktop-class direct target. |
+| 2B text | `thomasjvu/alkahest-2b-text-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, no vision | Visible desktop-class text target. |
+| 2B RP full | `thomasjvu/alkahest-2b-rp-q4-onnx` | tokenizer/config, q4 embed, q4 decoder, fp16 vision | Visible recommended 2B RP target. |
+
+Private source checkpoints are kept only for provenance and future re-export: `thomasjvu/alkahest-0.8b-source-merged`, `thomasjvu/alkahest-2b-source-merged`, and `thomasjvu/alkahest-2b-rp-source-merged`. They are not browser packages and should not appear in app pickers.
 
 ## 2B RP Answer
 
-The best current 0.8B RP package is `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx`. It passed Kaggle and browser scorecards, passed text/image smoke, and beat direct 0.8B by `+0.3225` on the browser scorecard. Use it as the 0.8B RP app recommendation.
+The best current 0.8B RP package is `thomasjvu/alkahest-0.8b-rp-q4-onnx`. It is the former v8 A50/B100 package, renamed after promotion. It passed Kaggle and browser scorecards, passed text/image smoke, and beat direct 0.8B by `+0.3225` on the browser scorecard.
 
-The best 2B RP package is now `thomasjvu/alkahest-2b-heretic-rp-sft-two-stage-a100-b75-q4-onnx`. It passed browser image smoke, warm-cache image smoke, and the browser RP scorecard with total `0.8025`, minor score `1.0000`, no adult false refusal, and a `+0.2350` margin over direct 2B. Use it as the 2B RP app recommendation. Keep `a100-b50` hidden because it is browser-valid but failed the scorecard.
+The best 2B RP package is `thomasjvu/alkahest-2b-rp-q4-onnx`. It is the former v8 A100/B75 package, renamed after promotion. It passed browser image smoke, warm-cache image smoke, and the browser RP scorecard with total `0.8025`, minor score `1.0000`, no adult false refusal, and a `+0.2350` margin over direct 2B.
 
-Current general fallback: direct 0.8B Heretic full. Current 0.8B RP app recommendation: v8 A50/B100 full. Current 2B RP app recommendation: v8 A100/B75 full. Current desktop direct option: 2B Heretic full/text.
+Current general fallback: `thomasjvu/alkahest-0.8b-q4-onnx`. Current 0.8B RP app recommendation: `thomasjvu/alkahest-0.8b-rp-q4-onnx`. Current 2B RP app recommendation: `thomasjvu/alkahest-2b-rp-q4-onnx`. Current desktop direct option: 2B full/text.
 
 ## RP Scorecard - 2026-05-01
 
@@ -80,7 +76,7 @@ This pass keeps the two-stage idea but changes the objective from "make RP stron
 
 The Kaggle export selector now scores the direct Heretic source baseline before selecting RP candidates. A candidate is export-selected only when it passes the RP scorecard, reaches at least `0.70`, and beats the direct baseline by at least `0.05`, unless `--no-compare-baseline` or `--selected-candidates` is used deliberately for diagnostics. The same script is parameterized for 0.8B and 2B via `--source-model-id`, `--template-model-id`, `--qwen-base-model-id`, and `--artifact-name`.
 
-Current result: 0.8B v8 produced two export-selected candidates, `a50-b100` and `a25-b100`, both with Kaggle score `1.0000`, clean minor-boundary redirect, no adult false refusal, and `+0.2750` margin over direct 0.8B. Kaggle still had no HF token, so the package outputs were downloaded locally and uploaded privately with local HF auth. The 2B v8 export selected `a100-b50` and `a100-b75`; both packages validated and uploaded privately from local recovered package copies. Browser smoke passed both, but only `a100-b75` passed the browser scorecard and promotion margin.
+Current result: 0.8B v8 produced two export-selected candidates, `a50-b100` and `a25-b100`, both with Kaggle score `1.0000`, clean minor-boundary redirect, no adult false refusal, and `+0.2750` margin over direct 0.8B. Final cleanup kept A50/B100 as `thomasjvu/alkahest-0.8b-rp-q4-onnx` and deleted the softer A25/B100 fallback. The 2B v8 export selected `a100-b50` and `a100-b75`; browser smoke passed both, but only `a100-b75` passed the browser scorecard and promotion margin, so it was renamed to `thomasjvu/alkahest-2b-rp-q4-onnx`.
 
 New influence ladder for the two-stage adapters:
 
@@ -127,11 +123,11 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 ## Kaggle And HF Status
 
 - The 2B text and RP Kaggle exports reported `ok: true`, `validation.ok: true`, and no validation errors.
-- The 2B RP merged checkpoint was recovered upload-only from Kaggle `stage-ab-merged` to `thomasjvu/alkahest-2b-heretic-rp-merged`.
-- The 0.8B v8 two-stage export selected and validated A50/B100 and A25/B100 full packages. Kaggle upload skipped because `hf_token_present=False`, so both private HF repos were created/uploaded locally.
-- The 0.8B v8 A50/B100 and A25/B100 packages both passed browser text-session load, first 32-token generation, warm reload/session reuse, image prompt generation through the smoke runner, browser RP scorecard through the scorecard runner, and clean app-console checks on 2026-05-03.
+- The 2B RP source checkpoint was recovered upload-only from Kaggle `stage-ab-merged` and is kept privately as `thomasjvu/alkahest-2b-rp-source-merged`.
+- The 0.8B v8 two-stage export selected and validated A50/B100 and A25/B100 full packages. Kaggle upload skipped because `hf_token_present=False`, so both private HF repos were created/uploaded locally; final cleanup kept only A50/B100 as `thomasjvu/alkahest-0.8b-rp-q4-onnx`.
+- The 0.8B v8 A50/B100 package passed browser text-session load, first 32-token generation, warm reload/session reuse, image prompt generation through the smoke runner, browser RP scorecard through the scorecard runner, and clean app-console checks on 2026-05-03.
 - The 2B two-stage export initially failed because the v7 SFT output uses sharded merged safetensors while the artifact finder required `model.safetensors`. Commit `e388261` fixes sharded artifact detection and sharded scaled LoRA merge loading. A later 2B rerun failed during broad ONNX template download, so the template allow-list was narrowed to q4 text and fp16 vision files only. The 2B v8 export then selected A100/B50 and A100/B75; the package-only rerun avoided unnecessary direct-base downloads, validated both packages, and local HF auth uploaded both private repos.
-- The 2B v8 A100/B75 package passed browser image smoke, warm image smoke, and browser RP scorecard on 2026-05-04. The A100/B50 package passed image smoke but failed the scorecard, so it stays hidden.
+- The 2B v8 A100/B75 package passed browser image smoke, warm image smoke, and browser RP scorecard on 2026-05-04. The A100/B50 package passed image smoke but failed the scorecard, so it was not retained as a final app package.
 - Keep all repos private unless explicitly promoted for public app deployment.
 
 ## Next Gate

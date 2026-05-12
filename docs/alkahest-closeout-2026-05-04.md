@@ -14,13 +14,12 @@ Current checkpoint:
 
 | Slot | Repo | Status |
 | --- | --- | --- |
-| 0.8B direct full | `thomasjvu/alkahest-0.8b-heretic-q4-onnx` | Visible stable fallback. |
-| 0.8B direct text | `thomasjvu/alkahest-0.8b-heretic-q4-onnx-text` | Visible lightweight text target. |
-| 0.8B RP | `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a50-b100-q4-onnx` | Visible recommended 0.8B RP target. |
-| 0.8B RP softer fallback | `thomasjvu/alkahest-0.8b-heretic-rp-sft-two-stage-a25-b100-q4-onnx` | Visible softer RP fallback. |
-| 2B direct full | `thomasjvu/alkahest-2b-heretic-q4-onnx` | Visible desktop-class direct target. |
-| 2B direct text | `thomasjvu/alkahest-2b-heretic-q4-onnx-text` | Visible desktop-class text target. |
-| 2B RP | `thomasjvu/alkahest-2b-heretic-rp-sft-two-stage-a100-b75-q4-onnx` | Visible recommended 2B RP target. |
+| 0.8B direct full | `thomasjvu/alkahest-0.8b-q4-onnx` | Visible stable fallback. |
+| 0.8B direct text | `thomasjvu/alkahest-0.8b-text-q4-onnx` | Visible lightweight text target. |
+| 0.8B RP | `thomasjvu/alkahest-0.8b-rp-q4-onnx` | Visible recommended 0.8B RP target. |
+| 2B direct full | `thomasjvu/alkahest-2b-q4-onnx` | Visible desktop-class direct target. |
+| 2B direct text | `thomasjvu/alkahest-2b-text-q4-onnx` | Visible desktop-class text target. |
+| 2B RP | `thomasjvu/alkahest-2b-rp-q4-onnx` | Visible recommended 2B RP target. |
 
 ## 2B RP Decision
 

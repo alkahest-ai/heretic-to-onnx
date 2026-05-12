@@ -36,7 +36,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-model-id", default="google/gemma-4-E2B-it")
     parser.add_argument("--direct-full-repo", default="thomasjvu/rally-2b")
     parser.add_argument("--direct-text-repo", default="thomasjvu/rally-2b-text")
-    parser.add_argument("--rp-merged-repo", default="thomasjvu/rally-2b-rp-a100-b75-merged")
+    parser.add_argument("--rp-merged-repo", default="thomasjvu/rally-2b-rp-source-merged")
     parser.add_argument("--rp-full-repo", default="thomasjvu/rally-2b-rp")
     parser.add_argument("--rp-text-repo", default="thomasjvu/rally-2b-rp-text")
     parser.add_argument("--candidate-name", default="a100-b75")

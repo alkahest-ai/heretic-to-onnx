@@ -2,7 +2,22 @@
 
 Date: 2026-04-30
 
-Deletion status: paused. Do not delete or archive any Hugging Face repos until the definitive 0.8B/2B Heretic and RP targets are published, browser-smoked, and explicitly approved again at action time.
+Status: superseded by the 2026-05-12 cleanup. The old long `heretic` and training-knob package names below are historical references only.
+
+Current kept app-facing repos:
+
+- `thomasjvu/alkahest-0.8b-q4-onnx`
+- `thomasjvu/alkahest-0.8b-text-q4-onnx`
+- `thomasjvu/alkahest-0.8b-rp-q4-onnx`
+- `thomasjvu/alkahest-2b-q4-onnx`
+- `thomasjvu/alkahest-2b-text-q4-onnx`
+- `thomasjvu/alkahest-2b-rp-q4-onnx`
+
+Private source/provenance repos:
+
+- `thomasjvu/alkahest-0.8b-source-merged`
+- `thomasjvu/alkahest-2b-source-merged`
+- `thomasjvu/alkahest-2b-rp-source-merged`
 
 ## Default Browser Picker Targets
 

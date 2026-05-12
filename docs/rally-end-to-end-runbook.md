@@ -172,7 +172,7 @@ For merged-checkpoint provenance, run:
 kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
 ```
 
-That notebook now re-creates the A100/B75 merge from the two-stage SFT output, writes a file manifest/report, and only uploads to HF when the Kaggle `HF_TOKEN` secret is reachable. Version 3 validated the current v8 checkpoint on Kaggle but skipped HF upload because the secret was unavailable. The existing HF repo `thomasjvu/rally-2b-rp-a100-b75-merged@3f2f180e1abea16d236e43e79b1e8454a1a5f168` is still the older `applied: 148` checkpoint; the validated v8 merge is `applied: 205` and must be uploaded from Kaggle or another remote host with at least 12 GB free.
+That notebook now re-creates the A100/B75 merge from the two-stage SFT output, writes a file manifest/report, and only uploads to HF when the Kaggle `HF_TOKEN` secret is reachable. The validated v8 source checkpoint is kept privately at `thomasjvu/rally-2b-rp-source-merged`; `scaled_lora_merge.json` verifies `applied: 205` and `scale: 0.75`.
 
 ## 11. Legacy One-Click H200 Path
 
