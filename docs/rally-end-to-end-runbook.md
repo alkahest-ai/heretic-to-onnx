@@ -155,7 +155,7 @@ kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_scorecard
 ```
 
-That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b` and RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate. Direct text was deleted/recreated and reuploaded on 2026-05-11 to clear bloated LFS history. The current full text+image packages are direct `thomasjvu/rally-2b@6131f825540facbc8efaa98b837db79850bfcc4f` and RP `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
+That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b` and RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate. Direct text was deleted/recreated and reuploaded on 2026-05-11 to clear bloated LFS history. The full text+image+audio repos `thomasjvu/rally-2b` and `thomasjvu/rally-2b-rp` exist privately as experimental package artifacts, but they are not app-promoted because no retained passing browser smoke exists.
 
 For full text+image packages, prefer the template-composed mode instead of raw Gemma4 vision export:
 
@@ -164,7 +164,7 @@ kaggle kernels push -p kaggle/rally_e2b_direct_full_compose
 kaggle kernels push -p kaggle/rally_e2b_rp_full_compose
 ```
 
-This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. The RP full compose path completed on Kaggle as version 2 and was uploaded to the private HF repo above. The direct full compose path is upload-disabled by default until the `thomasjvu/rally-2b` storage/private-state decision is clear. Keep Rally presets hidden until browser smoke passes.
+This builds the text package, copies the reference `vision_encoder_q4f16.*` files, and validates the full package without rerunning the old vision export path that OOMed on T4 and overran CPU disk. The direct and RP full compose paths completed and were uploaded privately, but keep Rally full presets hidden until a fresh browser smoke passes for both direct and RP full packages.
 
 For merged-checkpoint provenance, run:
 

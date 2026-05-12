@@ -12,10 +12,10 @@ Use `HF_OWNER=thomasjvu` for private app-facing recovery work unless a later rel
 
 | Target | Default repo variable | Purpose |
 | --- | --- | --- |
-| Direct Heretic full | `RALLY2_DIRECT_REPO=thomasjvu/rally-2b` | Deleted from HF on 2026-05-12 to reclaim storage after full image generation failed. Recreate only after the Gemma4 full runtime issue is fixed. |
+| Direct Heretic full | `RALLY2_DIRECT_REPO=thomasjvu/rally-2b` | Private experimental full text+image+audio package. Package validation/upload completed, but no retained passing browser smoke exists; keep hidden from the app picker. |
 | Direct Heretic text | `RALLY2_DIRECT_TEXT_REPO=thomasjvu/rally-2b-text` | Text-only browser package with Gemma4 q4f16 embed + decoder sessions only. |
 | RP source checkpoint | `RALLY2_MERGED_REPO=thomasjvu/rally-2b-rp-source-merged` | Full merged PyTorch/HF checkpoint for provenance and re-export. |
-| RP full browser package | `RALLY2_TUNED_REPO=thomasjvu/rally-2b-rp` | Deleted from HF on 2026-05-12 to reclaim storage after direct full image generation failed. Recreate only after the Gemma4 full runtime issue is fixed. |
+| RP full browser package | `RALLY2_TUNED_REPO=thomasjvu/rally-2b-rp` | Private experimental full text+image+audio package. Package validation/upload completed, but no retained passing browser smoke exists; keep hidden from the app picker. |
 | RP text browser package | `RALLY2_TUNED_TEXT_REPO=thomasjvu/rally-2b-rp-text` | A100/B75 text-only browser package. |
 
 ## Current Kaggle Status
@@ -28,8 +28,8 @@ As of 2026-05-12, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Direct Heretic text | Re-exported, validated, cleaned, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package. On 2026-05-11, the bloated private `thomasjvu/rally-2b-text` repo was deleted/recreated and the validated direct-text package from `rally_e2b_direct_full_compose` v1 was uploaded with `hf upload-large-folder`. Current private repo is `thomasjvu/rally-2b-text`, HF commit `48bc24a9f76ef215637c78ca33c18308cde4962b`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; first cold pass took `572s` and generated `The quiet tavern offered a warm, comforting`. |
 | RP A100/B75 text | Re-exported, validated, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload replaced the legacy repo after clearing the old LFS-history storage issue. Current private repo is `thomasjvu/rally-2b-rp-text`, HF commit `a4065c02e9228d41cd19e527e5f66f969177b29a`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; cold pass took `454s` and generated `The tavern offered warm firelight and the`. |
 | RP source checkpoint | Uploaded and verified | `thomasjvu/rally-e2b-rp-merged-upload` completed on 2026-05-12 after the `HF_TOKEN` Kaggle secret was added. The private HF repo `thomasjvu/rally-2b-rp-source-merged` contains the intended hard-boundary v8 checkpoint; `scaled_lora_merge.json` verifies `applied: 205` and `scale: 0.75`. |
-| Direct Heretic full | Deleted after failed image smoke | `thomasjvu/rally-2b` was patched with the required Lisper q4f16 audio wrapper and external-data config, then browser image smoke reached generation and failed with `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)`. The repo was deleted from HF on 2026-05-12 to reclaim storage. |
-| RP A100/B75 full | Deleted until full runtime is fixed | `thomasjvu/rally-2b-rp` was patched with the same q4f16 audio wrapper and external-data config, but full RP image smoke was held behind the direct full generation failure. The repo was deleted from HF on 2026-05-12 to reclaim storage. |
+| Direct Heretic full | Private experimental, not app-promoted | `thomasjvu/rally-2b` was patched with the required Lisper q4f16 audio wrapper and external-data config, but retained browser smoke artifacts still show full multimodal generation failures, including `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)`. |
+| RP A100/B75 full | Private experimental, not app-promoted | `thomasjvu/rally-2b-rp` was built from the same template-composed full path. Keep hidden until direct and RP full browser smoke both pass in a fresh isolated run. |
 | Kaggle scorecard-only lane | Passed primary promotion gate | `thomasjvu/rally-e2b-scorecard` version 5 scored direct Rally against the hard-boundary A100/B75 candidate on Kaggle without local WebGPU. Direct total was `0.9000`; RP total was `1.0000`; margin was `+0.1000`; minor-boundary diagnostics passed with `safety_refusal=true`, `adult_redirect=true`, and `unsafe_continuation=false`. |
 
 The confirmed browser failure on the old pinned diagnostic scorecard was:
@@ -123,7 +123,7 @@ The legacy monolithic workflow performed:
 7. RP full export and upload
 8. RP text-only export and upload
 
-For the immediate recovery pass, do not expose Rally full packages in the picker yet. The A100/B75 RP text package is the current scorecard winner and the text packages pass browser smoke in Chrome 148 with Metal WebGPU; full packages still need the Gemma4 image-generation runtime failure resolved before app-default consideration.
+For the immediate recovery pass, do not expose Rally full packages in the picker. The A100/B75 RP text package is the current scorecard winner and the text packages pass browser smoke in Chrome 148 with Metal WebGPU; full packages still need a retained passing browser smoke before app-default consideration.
 
 The equivalent Phala command remains available as a fallback, but it is not the active path for this lane.
 
@@ -139,7 +139,7 @@ Only expose the Rally text-only presets in the default app picker. Do not expose
 - RP total is at least `0.70`
 - RP beats direct Rally E2B by at least `0.05`
 
-Until then, Rally full repos should not exist as app-facing HF packages. The text-only direct and RP repos are app-visible because both passed Chrome 148 Metal/WebGPU browser smoke.
+Until then, Rally full repos may exist privately for debugging, but they should not be app-facing HF packages. The text-only direct and RP repos are app-visible because both passed Chrome 148 Metal/WebGPU browser smoke.
 
 ## Scorecard Result
 

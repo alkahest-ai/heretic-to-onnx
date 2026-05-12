@@ -21,7 +21,7 @@ The browser app lives in:
 
 Current scope:
 
-- the sample browser picker includes promoted Alkahest Qwen 3.5 0.8B/2B targets plus browser-smoked Rally/Gemma E2B text and full packages
+- the sample browser picker includes promoted Alkahest Qwen 3.5 0.8B/2B targets plus browser-smoked Rally/Gemma E2B text-only packages
 - the browser UI supports text chat, image input, and audio input for presets whose package ships those sessions
 - video input remains in the UI for future multimodal lanes
 - RP and upstream diagnostic repos can still be loaded by URL override for smoke/scorecard work, but they stay hidden from the default picker until promoted
@@ -107,12 +107,15 @@ For the current default picker, keep only:
 - `thomasjvu/alkahest-2b-q4-onnx`
 - `thomasjvu/alkahest-2b-text-q4-onnx`
 - `thomasjvu/alkahest-2b-rp-q4-onnx`
+- `thomasjvu/rally-2b-text`
+- `thomasjvu/rally-2b-rp-text`
 
 Keep this as a diagnostic URL-only target:
 
 - `onnx-community/Qwen3.5-0.8B-ONNX-OPT`
 
 The older training-knob RP repos were deleted or left as private provenance because the promoted RP packages above replace them.
+The Rally full text+image+audio repos remain private experimental Hub artifacts, but they are not picker-visible because the retained local smoke artifacts do not prove a passing browser run.
 
 Older q4f16 exports, rejected SFT experiments, upstream controls, and RP candidates are intentionally hidden from the picker to avoid confusing smoke results.
 

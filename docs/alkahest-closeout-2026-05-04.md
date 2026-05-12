@@ -1,5 +1,7 @@
 # Alkahest 0.8B/2B Closeout - 2026-05-04
 
+Superseded by the final naming and browser-picker closeout in `docs/browser-model-closeout-2026-05-12.md`.
+
 ## Summary
 
 The Alkahest Qwen 0.8B/2B browser lane is complete for this pass. The app picker exposes the direct 0.8B/2B browser packages, the promoted 0.8B RP v8 packages, and the promoted 2B RP v8 A100/B75 package. Older RP repos, the weaker 2B A100/B50 candidate, Rally/Gemma, and 4B remain hidden from the default picker.

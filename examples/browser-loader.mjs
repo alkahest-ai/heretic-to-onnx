@@ -140,15 +140,6 @@ export const DEFAULT_MODEL_PRESETS = [
     note: "Promoted 2B RP candidate. Browser scorecard total 0.8025 with a +0.2350 margin over direct.",
   },
   {
-    label: "Rally 2B Full Q4F16",
-    modelId: ownedModel("rally-2b"),
-    family: "gemma4",
-    modalities: "text + image + audio",
-    approxDownload: "~3.6 GB",
-    dtype: GEMMA4_WEBGPU_DTYPE,
-    note: "Browser-smoked Gemma4 E2B direct full package with q4f16 text, image, and audio sessions.",
-  },
-  {
     label: "Rally 2B Text Q4F16",
     modelId: ownedModel("rally-2b-text"),
     family: "gemma4",
@@ -156,15 +147,6 @@ export const DEFAULT_MODEL_PRESETS = [
     approxDownload: "~3.3 GB",
     dtype: GEMMA4_WEBGPU_TEXT_DTYPE,
     note: "Browser-smoked Gemma4 E2B direct text package. Use Chrome 148+ with Metal/WebGPU on macOS.",
-  },
-  {
-    label: "Rally 2B RP Full Q4F16",
-    modelId: ownedModel("rally-2b-rp"),
-    family: "gemma4",
-    modalities: "text + image + audio",
-    approxDownload: "~3.6 GB",
-    dtype: GEMMA4_WEBGPU_DTYPE,
-    note: "Browser-smoked A100/B75 RP full package with q4f16 text, image, and audio sessions.",
   },
   {
     label: "Rally 2B RP Text Q4F16",
