@@ -1,4 +1,4 @@
-import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=42";
+import { clearBrowserModelCache, createBrowserChatRuntime } from "../examples/browser-loader.mjs?v=43";
 
 const runtime = createBrowserChatRuntime();
 

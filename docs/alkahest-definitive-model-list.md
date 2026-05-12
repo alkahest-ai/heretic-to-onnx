@@ -122,7 +122,7 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 ## Parked Lanes
 
 - 4B text/full/RP artifacts exist from the prior recovery pass, but they are out of scope here. Direct 4B text downloaded locally but failed to initialize WebGPU sessions after more than 10 minutes and logged `RangeError: Array buffer allocation failed`.
-- Rally/Gemma E2B is parked until the Alkahest 0.8B/2B lane is fully promoted. Do not expose Rally presets in the browser app during this pass.
+- Rally/Gemma E2B text-only has moved to the next lane. Only the browser-smoked Rally text presets should be exposed; Rally full packages remain parked until their Gemma4 image-generation runtime failure is fixed.
 
 ## Kaggle And HF Status
 
@@ -138,4 +138,4 @@ The old 0.8B influence ladder is historical audit data only. Do not rebuild it u
 
 1. Run final static checks and targeted tests for the browser preset/docs pass.
 2. Commit and push the B75 promotion checkpoint.
-3. Keep Gemma/Rally parked until Alkahest 0.8B/2B promotion docs and picker gating are committed.
+3. Keep Rally full packages parked until the Gemma4 full-package runtime issue is fixed; Rally text-only is handled in the Rally E2B plan.

@@ -12,10 +12,10 @@ Use `HF_OWNER=thomasjvu` for private app-facing recovery work unless a later rel
 
 | Target | Default repo variable | Purpose |
 | --- | --- | --- |
-| Direct Heretic full | `RALLY2_DIRECT_REPO=thomasjvu/rally-2b` | Base Heretic full Gemma4 browser package with text, image, and required audio sessions. |
+| Direct Heretic full | `RALLY2_DIRECT_REPO=thomasjvu/rally-2b` | Deleted from HF on 2026-05-12 to reclaim storage after full image generation failed. Recreate only after the Gemma4 full runtime issue is fixed. |
 | Direct Heretic text | `RALLY2_DIRECT_TEXT_REPO=thomasjvu/rally-2b-text` | Text-only browser package with Gemma4 q4f16 embed + decoder sessions only. |
 | RP merged HF checkpoint | `RALLY2_MERGED_REPO=thomasjvu/rally-2b-rp-a100-b75-merged` | Full merged PyTorch/HF checkpoint for provenance and re-export. |
-| RP full browser package | `RALLY2_TUNED_REPO=thomasjvu/rally-2b-rp` | A100/B75 full Gemma4 browser package with text, image, and required audio sessions. |
+| RP full browser package | `RALLY2_TUNED_REPO=thomasjvu/rally-2b-rp` | Deleted from HF on 2026-05-12 to reclaim storage after direct full image generation failed. Recreate only after the Gemma4 full runtime issue is fixed. |
 | RP text browser package | `RALLY2_TUNED_TEXT_REPO=thomasjvu/rally-2b-rp-text` | A100/B75 text-only browser package. |
 
 ## Current Kaggle Status
@@ -28,8 +28,8 @@ As of 2026-05-12, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Direct Heretic text | Re-exported, validated, cleaned, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package. On 2026-05-11, the bloated private `thomasjvu/rally-2b-text` repo was deleted/recreated and the validated direct-text package from `rally_e2b_direct_full_compose` v1 was uploaded with `hf upload-large-folder`. Current private repo is `thomasjvu/rally-2b-text`, HF commit `48bc24a9f76ef215637c78ca33c18308cde4962b`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; first cold pass took `572s` and generated `The quiet tavern offered a warm, comforting`. |
 | RP A100/B75 text | Re-exported, validated, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload replaced the legacy repo after clearing the old LFS-history storage issue. Current private repo is `thomasjvu/rally-2b-rp-text`, HF commit `a4065c02e9228d41cd19e527e5f66f969177b29a`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; cold pass took `454s` and generated `The tavern offered warm firelight and the`. |
 | RP A100/B75 merged checkpoint | Validated on Kaggle; HF repo still old | The current `thomasjvu/rally-2b-rp-a100-b75-merged@3f2f180e1abea16d236e43e79b1e8454a1a5f168` repo is private and structurally valid, but its `scaled_lora_merge.json` shows `applied: 148`, so it is the older provenance checkpoint. The validated hard-boundary v8 checkpoint from `rally_e2b_rp_merged_upload` version 3 applies `205` LoRA targets at scale `0.75`, has `checkpoint_ok=true` and `required_ok=true`, and produces `model.safetensors` size `10246620806`. HF upload still skipped because the Kaggle `HF_TOKEN` secret is not reachable in this environment, and local disk is too low to download the 10.25 GB checkpoint safely. |
-| Direct Heretic full | Template-composed, validated, uploaded, browser blocked | `thomasjvu/rally-2b` was deleted/recreated private to clear the older full package history and stale README, then uploaded from `alkahestai/rally-e2b-direct-full-compose` version 3. The repo was patched with the required Lisper q4f16 audio wrapper and external-data config because Transformers.js `Gemma4ForConditionalGeneration` requires audio sessions even for image-only prompts. Current private repo is `thomasjvu/rally-2b`, HF commit `a943c0b0fcef50f404659111a02518ca93de6460`. Browser image smoke now loads sessions but fails during generation with `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)`. |
-| RP A100/B75 full | Template-composed, validated, uploaded, pending full-smoke fix | `rally_e2b_export_prep` version 4 and `rally_e2b_rp_full_compose` version 2 completed the safe full-package path. The repo was patched with the same q4f16 audio wrapper and external-data config. Current private repo is `thomasjvu/rally-2b-rp`, HF commit `3689081cbc44ecf8490b1cb438ef472c5d95f130`, containing q4f16 text, vision, and audio sessions. Full RP image smoke is held behind the direct full `GatherBlockQuantized` generation failure. |
+| Direct Heretic full | Deleted after failed image smoke | `thomasjvu/rally-2b` was patched with the required Lisper q4f16 audio wrapper and external-data config, then browser image smoke reached generation and failed with `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)`. The repo was deleted from HF on 2026-05-12 to reclaim storage. |
+| RP A100/B75 full | Deleted until full runtime is fixed | `thomasjvu/rally-2b-rp` was patched with the same q4f16 audio wrapper and external-data config, but full RP image smoke was held behind the direct full generation failure. The repo was deleted from HF on 2026-05-12 to reclaim storage. |
 | Kaggle scorecard-only lane | Passed primary promotion gate | `thomasjvu/rally-e2b-scorecard` version 5 scored direct Rally against the hard-boundary A100/B75 candidate on Kaggle without local WebGPU. Direct total was `0.9000`; RP total was `1.0000`; margin was `+0.1000`; minor-boundary diagnostics passed with `safety_refusal=true`, `adult_redirect=true`, and `unsafe_continuation=false`. |
 
 The confirmed browser failure on the old pinned diagnostic scorecard was:
@@ -131,16 +131,15 @@ The merged checkpoint kernel is retained for Kaggle-side recovery. Version 3 rec
 
 ## Promotion Gate
 
-Do not add Rally presets to the default app picker until all of these are true:
+Only expose the Rally text-only presets in the default app picker. Do not expose Rally full packages until all of these are true:
 
-- direct full and direct text browser smoke pass
-- RP full and RP text browser smoke pass
+- direct full browser image smoke passes
+- RP full browser image smoke passes
 - RP scorecard passes the minor-boundary gate
 - RP total is at least `0.70`
 - RP beats direct Rally E2B by at least `0.05`
-- image smoke passes for the full packages
 
-Until then, Rally repos are URL-override diagnostics only.
+Until then, Rally full repos should not exist as app-facing HF packages. The text-only direct and RP repos are app-visible because both passed Chrome 148 Metal/WebGPU browser smoke.
 
 ## Scorecard Result
 
@@ -157,9 +156,8 @@ The failed attempts before this pass are still useful history: the first thomasj
 
 ## Next Recovery Pass
 
-1. Treat `rally_e2b_export_prep` v4 and `rally_e2b_rp_full_compose` v2 as the source of record for the current RP full package.
-2. Treat `rally_e2b_direct_full_compose` version 3 as the source of record for the current direct full package, uploaded at `thomasjvu/rally-2b@6131f825540facbc8efaa98b837db79850bfcc4f`.
+1. Treat `rally_e2b_export_prep` v4 plus the current local exporter patch as the source of record for future full-package compose runs; the compose path must include q4f16 audio wrapper files and external-data metadata.
+2. Treat the current direct and RP text repos as the app-visible Rally lane: `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b` and `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
 3. Upload the current hard-boundary v8 merged checkpoint from the completed `rally_e2b_rp_merged_upload` v3 Kaggle output to `thomasjvu/rally-2b-rp-a100-b75-merged` once the Kaggle HF secret works, or use another remote upload path with enough disk. The existing HF repo is older (`applied: 148`), while the validated v8 merge is `applied: 205`.
-4. Keep the fixed HF revisions pinned: direct text `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b`; direct full `thomasjvu/rally-2b@6131f825540facbc8efaa98b837db79850bfcc4f`; RP text `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; RP full `thomasjvu/rally-2b-rp@d77b5c09ea6796dbd5c175ac4ac7ea756b70af01`.
-5. Retry browser smoke off the main desktop or in a clean isolated browser profile, one model at a time, with the worker-backed runner. Use text-only first, then RP full image smoke.
-6. Add Rally presets to the picker only after browser smoke passes. Until then, keep Rally URL-override only even though the Kaggle scorecard has passed.
+4. Recreate full Rally packages only after the `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)` image-generation failure is fixed.
+5. Retry full browser smoke off the main desktop or in a clean isolated browser profile, one model at a time, with the worker-backed runner.
