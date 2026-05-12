@@ -81,6 +81,10 @@ const GEMMA4_WEBGPU_TEXT_DTYPE = Object.freeze({
 
 export const DEFAULT_MODEL_ID = ownedModel("alkahest-0.8b-heretic-q4-onnx");
 
+const GEMMA4_FLOAT16_BRIDGE_FLAG = "__hereticGemma4Float16FeedBridge";
+const GEMMA4_DECODER_FLOAT16_INPUTS = new Set(["inputs_embeds", "per_layer_inputs"]);
+const gemma4Float16BridgeState = new WeakMap();
+
 export const DEFAULT_MODEL_PRESETS = [
   {
     label: "Alkahest 0.8B Heretic Q4 (stable)",
@@ -271,6 +275,83 @@ function dtypeIncludesSession(dtype, sessionName) {
   return Boolean(dtype && typeof dtype === "object" && Object.hasOwn(dtype, sessionName));
 }
 
+function isTensorLike(value) {
+  return Boolean(value && typeof value === "object" && typeof value.type === "string" && Array.isArray(value.dims));
+}
+
+function getExpectedInputType(session, name) {
+  const metadata = session?.inputMetadata;
+  if (!metadata) {
+    return null;
+  }
+  if (Array.isArray(metadata)) {
+    const match = metadata.find((entry) => entry?.name === name);
+    return match?.type ?? match?.dataType ?? match?.tensorType ?? null;
+  }
+  const match = metadata[name];
+  return match?.type ?? match?.dataType ?? match?.tensorType ?? null;
+}
+
+function sessionExpectsFloat16(session, name) {
+  const expected = getExpectedInputType(session, name);
+  if (typeof expected === "string" && expected.toLowerCase().includes("float16")) {
+    return true;
+  }
+  return Boolean(session?.inputNames?.includes?.(name) && GEMMA4_DECODER_FLOAT16_INPUTS.has(name));
+}
+
+function castFeedToFloat16(value) {
+  if (!isTensorLike(value) || value.type !== "float32" || typeof Transformers.Tensor !== "function") {
+    return value;
+  }
+  const tensor = value.ort_tensor ? value : new Transformers.Tensor(value);
+  return tensor.to("float16").ort_tensor;
+}
+
+function patchSessionFloat16Feeds(session) {
+  if (!session || session[GEMMA4_FLOAT16_BRIDGE_FLAG] || typeof session.run !== "function") {
+    return;
+  }
+
+  const state = { castCount: 0, lastCasts: [] };
+  const originalRun = session.run.bind(session);
+  session.run = async (feeds, ...rest) => {
+    if (!feeds || typeof feeds !== "object") {
+      return originalRun(feeds, ...rest);
+    }
+
+    let changed = false;
+    const nextFeeds = { ...feeds };
+    const castNames = [];
+    for (const [name, value] of Object.entries(feeds)) {
+      if (!sessionExpectsFloat16(session, name) || !isTensorLike(value) || value.type !== "float32") {
+        continue;
+      }
+      nextFeeds[name] = castFeedToFloat16(value);
+      changed = changed || nextFeeds[name] !== value;
+      state.castCount += 1;
+      castNames.push(name);
+    }
+    if (castNames.length) {
+      state.lastCasts = castNames;
+    }
+    return originalRun(changed ? nextFeeds : feeds, ...rest);
+  };
+
+  session[GEMMA4_FLOAT16_BRIDGE_FLAG] = true;
+  gemma4Float16BridgeState.set(session, state);
+}
+
+function patchGemma4Float16Feeds(model) {
+  const sessions = model?.sessions;
+  if (!sessions || typeof sessions !== "object") {
+    return;
+  }
+  for (const session of Object.values(sessions)) {
+    patchSessionFloat16Feeds(session);
+  }
+}
+
 function sanitizeBrowserConfig(config, dtype) {
   if (!config || typeof config !== "object") {
     return config;
@@ -385,7 +466,26 @@ async function buildProcessorInputs(processor, family, prompt, imageArg, audioAr
     return false;
   };
 
+  const validateGemma4Inputs = (inputs) => {
+    const inputIds = inputs?.input_ids;
+    const dims = Array.isArray(inputIds?.dims) ? inputIds.dims : [];
+    const tokenCount = Number(dims.at(-1));
+    if (!Number.isFinite(tokenCount) || tokenCount <= 0) {
+      throw new Error(`Gemma4 processor output omitted usable input_ids. dims=${JSON.stringify(dims)}`);
+    }
+    if (imageArg && !hasTensorValues(inputs?.pixel_values)) {
+      throw new Error("Gemma4 processor output omitted pixel_values for image input.");
+    }
+    if (audioArg && !hasTensorValues(inputs?.input_features)) {
+      throw new Error("Gemma4 processor output omitted input_features for audio input.");
+    }
+    return inputs;
+  };
+
   const validateMultimodalInputs = (inputs) => {
+    if (family === "gemma4") {
+      return validateGemma4Inputs(inputs);
+    }
     if (family !== "qwen3_5") {
       return inputs;
     }
@@ -426,9 +526,9 @@ async function buildProcessorInputs(processor, family, prompt, imageArg, audioAr
   ];
 
   if (family === "gemma4") {
-    attempts.push(() => processor(prompt, imageArg, audioArg, videoArg, options));
-    attempts.push(() => processor(prompt, imageArg, audioArg, { videos: videoArg, ...options }));
-    attempts.push(() => processor(prompt, imageArg, audioArg, options));
+    attempts.unshift(() => processor(prompt, imageArg ?? null, audioArg ?? null, options));
+    attempts.push(() => processor(prompt, imageArg ?? null, audioArg ?? null, videoArg, options));
+    attempts.push(() => processor(prompt, imageArg ?? null, audioArg ?? null, { videos: videoArg, ...options }));
   } else {
     attempts.push(() => processor(prompt, imageArg, videoArg, options));
     attempts.push(() => processor(prompt, imageArg, { videos: videoArg, ...options }));
@@ -498,6 +598,9 @@ export function inferModelFamily(modelId) {
   if (value.includes("rally")) {
     return "gemma4";
   }
+  if (value.includes("lisper")) {
+    return "gemma4";
+  }
   return null;
 }
 
@@ -521,7 +624,7 @@ export function inferCustomModelDtype(modelId, family) {
     if (value.endsWith("-text") || value.includes("-text/") || value.includes("-text")) {
       return GEMMA4_WEBGPU_TEXT_DTYPE;
     }
-    if (value.includes("q4f16") || value.includes("rally-2b")) {
+    if (value.includes("q4f16") || value.includes("rally-2b") || value.includes("lisper")) {
       return GEMMA4_WEBGPU_DTYPE;
     }
   }
@@ -660,7 +763,7 @@ export function createBrowserChatRuntime({
     modelPromise ||= (async () => {
       const config = await configPromise;
       onProgress?.({ status: "loading_model_sessions" }, "Loading ONNX sessions...");
-      return ModelClass.from_pretrained(modelId, {
+      const model = await ModelClass.from_pretrained(modelId, {
         ...hubOptions,
         config,
         device,
@@ -669,6 +772,10 @@ export function createBrowserChatRuntime({
           onProgress?.(info, makeProgressMessage(info));
         },
       });
+      if (family === "gemma4") {
+        patchGemma4Float16Feeds(model);
+      }
+      return model;
     })();
 
     const [processor, model] = await Promise.all([processorPromise, modelPromise]);
@@ -730,12 +837,14 @@ export function createBrowserChatRuntime({
     onProgress?.({ status: "loading_media" }, "Preparing inputs...");
     const images =
       imageSources.length > 0 ? await Promise.all(imageSources.map((source) => load_image(source))) : [];
+    const audioSampleRate = Number(processor?.feature_extractor?.config?.sampling_rate ?? 16000);
     const audios =
-      audioSources.length > 0 ? await Promise.all(audioSources.map((source) => read_audio(source))) : [];
+      audioSources.length > 0
+        ? await Promise.all(audioSources.map((source) => read_audio(source, audioSampleRate)))
+        : [];
     const videos = videoSources.length > 0 ? [...videoSources] : [];
 
-    const imageArg =
-      images.length === 0 ? undefined : family === "qwen3_5" ? images : images.length === 1 ? images[0] : images;
+    const imageArg = images.length === 0 ? undefined : images;
     const audioArg = audios.length <= 1 ? audios[0] : audios;
     const videoArg =
       videos.length === 0 ? undefined : family === "qwen3_5" ? videos : videos.length === 1 ? videos[0] : videos;
