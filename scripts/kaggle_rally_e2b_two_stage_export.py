@@ -284,6 +284,8 @@ def _resolve_optimized_template(work_dir: Path, args: argparse.Namespace) -> Pat
         "local_dir": str(target_dir),
         "allow_patterns": [
             "onnx/decoder_model_merged_q4f16.onnx",
+            "onnx/audio_encoder_q4f16.onnx",
+            "onnx/audio_encoder_q4f16.onnx_data",
             "onnx/vision_encoder_q4f16.onnx",
             "onnx/vision_encoder_q4f16.onnx_data",
         ],
@@ -294,13 +296,18 @@ def _resolve_optimized_template(work_dir: Path, args: argparse.Namespace) -> Pat
     return target_dir
 
 
-def _copy_template_vision_files(template_dir: Path, package_dir: Path) -> dict[str, Any]:
+def _copy_template_multimodal_files(template_dir: Path, package_dir: Path) -> dict[str, Any]:
     template_onnx_dir = template_dir / "onnx" if (template_dir / "onnx").is_dir() else template_dir
     package_onnx_dir = package_dir / "onnx"
     package_onnx_dir.mkdir(parents=True, exist_ok=True)
     copied: list[str] = []
     missing: list[str] = []
-    for filename in ("vision_encoder_q4f16.onnx", "vision_encoder_q4f16.onnx_data"):
+    for filename in (
+        "audio_encoder_q4f16.onnx",
+        "audio_encoder_q4f16.onnx_data",
+        "vision_encoder_q4f16.onnx",
+        "vision_encoder_q4f16.onnx_data",
+    ):
         source_path = template_onnx_dir / filename
         if source_path.exists():
             shutil.copyfile(source_path, package_onnx_dir / filename)
@@ -319,7 +326,7 @@ def _copy_template_vision_files(template_dir: Path, package_dir: Path) -> dict[s
             if "ONNX artifacts" not in warning and "onnx artifacts" not in warning
         ]
         notes = data.setdefault("notes", [])
-        notes.append("copied reference Gemma4 q4f16 vision artifacts into full package")
+        notes.append("copied reference Gemma4 q4f16 multimodal artifacts into full package")
         package_report.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {
         "ok": not missing,
@@ -411,9 +418,11 @@ def _compose_full_from_text_package(
     ]
     _run(command, cwd=ROOT_DIR)
     template_dir = _resolve_optimized_template(work_dir, args)
-    vision_copy = _copy_template_vision_files(template_dir, package_dir)
-    if not vision_copy["ok"]:
-        raise FileNotFoundError("missing Gemma4 template vision files: " + ", ".join(vision_copy["missing"]))
+    multimodal_copy = _copy_template_multimodal_files(template_dir, package_dir)
+    if not multimodal_copy["ok"]:
+        raise FileNotFoundError(
+            "missing Gemma4 template multimodal files: " + ", ".join(multimodal_copy["missing"])
+        )
     _run(
         [
             sys.executable,
@@ -435,7 +444,7 @@ def _compose_full_from_text_package(
         "work_dir": str(work_dir),
         "package_dir": str(package_dir),
         "text_package_dir": str(text_package_dir),
-        "vision_copy": vision_copy,
+        "multimodal_copy": multimodal_copy,
     }
     (package_dir / "gemma4-full-template-package-report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",

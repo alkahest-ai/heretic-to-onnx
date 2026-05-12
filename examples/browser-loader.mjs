@@ -68,6 +68,7 @@ const QWEN35_WEBGPU_Q8_DTYPE = Object.freeze({
 });
 
 const GEMMA4_WEBGPU_DTYPE = Object.freeze({
+  audio_encoder: "q4f16",
   embed_tokens: "q4f16",
   decoder_model_merged: "q4f16",
   vision_encoder: "q4f16",
@@ -245,6 +246,13 @@ function dtypeUsesBrowserFloat16Metadata(dtype) {
   return false;
 }
 
+function dtypeIncludesSession(dtype, sessionName) {
+  if (typeof dtype === "string") {
+    return true;
+  }
+  return Boolean(dtype && typeof dtype === "object" && Object.hasOwn(dtype, sessionName));
+}
+
 function sanitizeBrowserConfig(config, dtype) {
   if (!config || typeof config !== "object") {
     return config;
@@ -272,7 +280,14 @@ function sanitizeBrowserConfig(config, dtype) {
     return node;
   };
 
-  return replaceNode(config);
+  const sanitized = replaceNode(config);
+  if (!dtypeIncludesSession(dtype, "audio_encoder")) {
+    delete sanitized.audio_config;
+    delete sanitized.audio_token_id;
+    delete sanitized.boa_token_id;
+    delete sanitized.eoa_token_id;
+  }
+  return sanitized;
 }
 
 function resolveModelClass(family, { textOnly = false } = {}) {
@@ -324,7 +339,13 @@ function resolveProcessorClass(family) {
 async function buildProcessorInputs(processor, family, prompt, imageArg, audioArg, videoArg) {
   const options = { add_special_tokens: false };
   if (!imageArg && !audioArg && !videoArg) {
-    return family === "qwen3_5" ? processor(prompt) : processor(prompt, options);
+    if (family === "qwen3_5") {
+      return processor(prompt);
+    }
+    if (family === "gemma4" && typeof processor?.tokenizer === "function") {
+      return processor.tokenizer(prompt, options);
+    }
+    return processor(prompt, options);
   }
 
   const hasTensorValues = (value) => {

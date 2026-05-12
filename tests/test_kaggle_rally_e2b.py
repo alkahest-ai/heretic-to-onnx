@@ -10,7 +10,7 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
     PackageTarget,
     _compose_full_from_text_package,
     _convert_full,
-    _copy_template_vision_files,
+    _copy_template_multimodal_files,
     _find_artifacts,
     _has_merged_checkpoint,
     _package_text_from_quantized,
@@ -247,12 +247,14 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertIn("--onnx-source-dir", command)
         self.assertIn("--skip-validation", command)
 
-    def test_template_vision_copy_adds_q4f16_vision_artifacts(self) -> None:
+    def test_template_multimodal_copy_adds_q4f16_artifacts(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             template_onnx = root / "template" / "onnx"
             package = root / "package"
             template_onnx.mkdir(parents=True)
+            (template_onnx / "audio_encoder_q4f16.onnx").write_bytes(b"audio")
+            (template_onnx / "audio_encoder_q4f16.onnx_data").write_bytes(b"audio-data")
             (template_onnx / "vision_encoder_q4f16.onnx").write_bytes(b"onnx")
             (template_onnx / "vision_encoder_q4f16.onnx_data").write_bytes(b"data")
             (package / "onnx").mkdir(parents=True)
@@ -272,15 +274,17 @@ class KaggleRallyE2BTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            report = _copy_template_vision_files(root / "template", package)
+            report = _copy_template_multimodal_files(root / "template", package)
             package_report = json.loads((package / "package-report.json").read_text(encoding="utf-8"))
 
             self.assertTrue(report["ok"])
+            self.assertTrue((package / "onnx" / "audio_encoder_q4f16.onnx").exists())
+            self.assertTrue((package / "onnx" / "audio_encoder_q4f16.onnx_data").exists())
             self.assertTrue((package / "onnx" / "vision_encoder_q4f16.onnx").exists())
             self.assertTrue((package / "onnx" / "vision_encoder_q4f16.onnx_data").exists())
             self.assertFalse((package / "onnx" / "MISSING_ONNX_ARTIFACTS.txt").exists())
             self.assertEqual(package_report["warnings"], [])
-            self.assertIn("copied reference Gemma4 q4f16 vision artifacts into full package", package_report["notes"])
+            self.assertIn("copied reference Gemma4 q4f16 multimodal artifacts into full package", package_report["notes"])
 
     def test_compose_full_from_text_package_uses_plan_then_validates(self) -> None:
         args = export_parser().parse_args(["--full-package-mode", "template"])
@@ -296,6 +300,8 @@ class KaggleRallyE2BTests(unittest.TestCase):
             root = Path(tmp)
             template_onnx = root / "template" / "onnx"
             template_onnx.mkdir(parents=True)
+            (template_onnx / "audio_encoder_q4f16.onnx").write_bytes(b"audio")
+            (template_onnx / "audio_encoder_q4f16.onnx_data").write_bytes(b"audio-data")
             (template_onnx / "vision_encoder_q4f16.onnx").write_bytes(b"onnx")
             (template_onnx / "vision_encoder_q4f16.onnx_data").write_bytes(b"data")
             (root / "text-package" / "onnx").mkdir(parents=True)

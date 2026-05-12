@@ -1,4 +1,4 @@
-import { inferModelFamily } from "../examples/browser-loader.mjs?v=40";
+import { inferModelFamily } from "../examples/browser-loader.mjs?v=42";
 import { createBrowserChatRuntimeClient } from "./runtime-client.js?v=35";
 
 const SMOKE_PROMPTS = {

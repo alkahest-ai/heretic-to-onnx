@@ -7,6 +7,7 @@ target_device: webgpu
 modalities:
   - text
   - image
+  - audio
 inherit_assets:
   from_source:
     - config.json
@@ -21,6 +22,8 @@ expected_architecture: Gemma4ForConditionalGeneration
 expected_onnx_files:
   - onnx/vision_encoder_q4f16.onnx
   - onnx/vision_encoder_q4f16.onnx_data
+  - onnx/audio_encoder_q4f16.onnx
+  - onnx/audio_encoder_q4f16.onnx_data
   - onnx/embed_tokens_q4f16.onnx
   - onnx/embed_tokens_q4f16.onnx_data
   - onnx/decoder_model_merged_q4f16.onnx

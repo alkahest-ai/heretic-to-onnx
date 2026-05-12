@@ -1,4 +1,4 @@
-import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=40";
+import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=42";
 
 const elements = {
   status: document.querySelector("#smoke-status"),
@@ -48,7 +48,7 @@ async function run() {
   const revision = url.searchParams.get("revision")?.trim() || "";
   const prompt =
     url.searchParams.get("prompt")?.trim() ||
-    "Describe the attached image in one short sentence.";
+    (imageUrl ? "Describe the attached image in one short sentence." : "Write one short sentence about a quiet tavern.");
   const maxNewTokens = Number.parseInt(url.searchParams.get("maxTokens") || "32", 10);
 
   setText("model", modelId || "(missing)");
@@ -57,13 +57,9 @@ async function run() {
   if (!modelId) {
     throw new Error("Missing ?model=...");
   }
-  if (!imageUrl) {
-    throw new Error("Missing ?image=...");
-  }
-
   const runtime = createBrowserChatRuntime();
   const authToken = await getLocalAuthToken();
-  setStatus("Running multimodal smoke...");
+  setStatus(imageUrl ? "Running multimodal smoke..." : "Running text smoke...");
 
   const output = await runtime.generate({
     modelId,
@@ -72,10 +68,12 @@ async function run() {
     messages: [
       {
         role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image", url: imageUrl },
-        ],
+        content: imageUrl
+          ? [
+              { type: "text", text: prompt },
+              { type: "image", url: imageUrl },
+            ]
+          : prompt,
       },
     ],
     maxNewTokens: Number.isFinite(maxNewTokens) ? maxNewTokens : 32,
