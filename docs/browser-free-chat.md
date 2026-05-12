@@ -21,10 +21,10 @@ The browser app lives in:
 
 Current scope:
 
-- the sample browser picker is limited to promoted direct Alkahest Qwen 3.5 0.8B/2B targets
-- the browser UI now supports text chat plus a single image input for all shipped presets
-- audio and video inputs remain in the UI for future multimodal lanes, but Rally/Gemma presets stay hidden until the Rally browser-smoke gate passes
-- RP and upstream diagnostic repos can still be loaded by URL override for smoke/scorecard work, but they are hidden from the default picker until promoted
+- the sample browser picker includes promoted Alkahest Qwen 3.5 0.8B/2B targets plus browser-smoked Rally/Gemma E2B text and full packages
+- the browser UI supports text chat, image input, and audio input for presets whose package ships those sessions
+- video input remains in the UI for future multimodal lanes
+- RP and upstream diagnostic repos can still be loaded by URL override for smoke/scorecard work, but they stay hidden from the default picker until promoted
 
 ## Release Gate
 

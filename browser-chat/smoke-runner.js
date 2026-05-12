@@ -1,4 +1,4 @@
-import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=45";
+import { createBrowserChatRuntime, inferModelFamily } from "../examples/browser-loader.mjs?v=46";
 
 const elements = {
   status: document.querySelector("#smoke-status"),
