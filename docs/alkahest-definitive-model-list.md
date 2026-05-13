@@ -23,6 +23,8 @@ This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gem
 
 Private source checkpoints are kept only for provenance and future re-export: `thomasjvu/alkahest-0.8b-source-merged`, `thomasjvu/alkahest-2b-source-merged`, and `thomasjvu/alkahest-2b-rp-source-merged`. They are not browser packages and should not appear in app pickers.
 
+As of the 2026-05-13 release hygiene pass, the definitive app targets above are public experimental Hub repos. Their model cards still carry the experimental/use-at-your-own-risk warning; the source checkpoints stay private.
+
 ## 2B RP Answer
 
 The best current 0.8B RP package is `thomasjvu/alkahest-0.8b-rp-q4-onnx`. It is the former v8 A50/B100 package, renamed after promotion. It passed Kaggle and browser scorecards, passed text/image smoke, and beat direct 0.8B by `+0.3225` on the browser scorecard.

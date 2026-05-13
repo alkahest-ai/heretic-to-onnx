@@ -155,7 +155,7 @@ kaggle kernels push -p kaggle/rally_e2b_rp_text_export
 kaggle kernels push -p kaggle/rally_e2b_scorecard
 ```
 
-That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b` and RP `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate. Direct text was deleted/recreated and reuploaded on 2026-05-11 to clear bloated LFS history. The full text+image+audio repos `thomasjvu/rally-2b` and `thomasjvu/rally-2b-rp` exist privately as experimental package artifacts, but they are not app-promoted because no retained passing browser smoke exists.
+That path now uses Kaggle first and local HF upload only when Kaggle has no HF secret. The current promoted-off-Kaggle text targets are direct `thomasjvu/rally-2b-text@5d9ff9d0e098dbf13cd0d0be7149e6efa12068ca` and RP `thomasjvu/rally-2b-rp-text@afa2190cdff49d1ab52911020f74cb6cfa979098`; the RP scorecard beat direct by `+0.1000` and passed the minor-boundary gate. Direct text was deleted/recreated and reuploaded on 2026-05-11 to clear bloated LFS history. The full text+image+audio repos `thomasjvu/rally-2b` and `thomasjvu/rally-2b-rp` exist privately as experimental package artifacts, but they are not app-promoted because no retained passing browser smoke exists.
 
 For full text+image packages, prefer the template-composed mode instead of raw Gemma4 vision export:
 

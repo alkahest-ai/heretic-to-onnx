@@ -115,7 +115,7 @@ Keep this as a diagnostic URL-only target:
 - `onnx-community/Qwen3.5-0.8B-ONNX-OPT`
 
 The older training-knob RP repos were deleted or left as private provenance because the promoted RP packages above replace them.
-The Rally full text+image+audio repos remain private experimental Hub artifacts, but they are not picker-visible because the retained local smoke artifacts do not prove a passing browser run.
+The picker-visible repos above are public experimental Hub repos after the 2026-05-13 cleanup. The Rally full text+image+audio repos remain private experimental Hub artifacts, and they are not picker-visible because the retained local smoke artifacts do not prove a passing browser run.
 
 Older q4f16 exports, rejected SFT experiments, upstream controls, and RP candidates are intentionally hidden from the picker to avoid confusing smoke results.
 

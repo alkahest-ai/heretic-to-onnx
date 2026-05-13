@@ -111,19 +111,18 @@ It uses:
 - Transformers.js
 - WebGPU
 - a worker-backed runtime so large model downloads and WebGPU setup do not block the page
-- a built-in model picker for the published Alkahest and Rally browser ONNX repos
-- image input for all shipped lanes
-- video input for Alkahest `v2` lanes
-- audio and video input for Rally `v2` lanes, including `rally-2b-rp`
-- `thomasjvu/rally-2b-rp` by default
+- a built-in model picker for the smoke-tested Alkahest and Rally browser ONNX repos
+- image input for the smoke-tested Alkahest full lanes
+- `thomasjvu/alkahest-0.8b-q4-onnx` by default
 - text-first lazy session loading: decoder sessions warm first, then image/audio/video sessions load on first media prompt
 
-The intended browser lineup, once a repo has passed the browser release gate, spans:
+The current app-visible public experimental browser lineup is:
 
-- Qwen / Alkahest direct lanes: `text + image`
-- Qwen / Alkahest `v2` lanes: `text + image + video`
-- Gemma / Rally direct lanes: `text + image`
-- Gemma / Rally `v2` lanes, including `rally-2b-rp`: `text + image + audio + video`
+- Alkahest direct and RP full lanes: `text + image`
+- Alkahest direct text lanes: `text`
+- Rally direct and RP text lanes: `text`
+
+The Rally full text+image+audio packages are private experimental artifacts until direct and RP full browser smoke both pass.
 
 Run it locally from the repo root:
 
@@ -137,10 +136,10 @@ Then open:
 http://localhost:4173/browser-chat/
 ```
 
-To jump straight into the current Rally RP browser model:
+To jump straight into the current Rally RP text browser model:
 
 ```text
-http://localhost:4173/
+http://localhost:4173/browser-chat/?model=thomasjvu/rally-2b-rp-text
 ```
 
 Read `docs/browser-free-chat.md` before wiring private or custom model hosting.

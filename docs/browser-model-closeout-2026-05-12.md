@@ -2,7 +2,7 @@
 
 ## Final Status
 
-The browser app picker is complete for the smoke-tested targets in this pass. All visible presets are private experimental repos and should be treated as use-at-your-own-risk until a separate public deployment review.
+The browser app picker is complete for the smoke-tested targets in this pass. All visible presets are now public experimental repos and should still be treated as use-at-your-own-risk until a separate production deployment review.
 
 Visible app presets:
 
@@ -21,7 +21,7 @@ Not app-visible:
 
 | Lane | Repo(s) | Reason |
 | --- | --- | --- |
-| Source checkpoints | `*-source-merged` | Provenance/re-export checkpoints, not browser ONNX packages. |
+| Source checkpoints | `*-source-merged` | Private provenance/re-export checkpoints, not browser ONNX packages. |
 | Rally full text+image+audio | `thomasjvu/rally-2b`, `thomasjvu/rally-2b-rp` | Private experimental artifacts only. Package validation/upload completed, but retained local browser artifacts show full multimodal generation failures. |
 | Alkahest 4B | deleted/parked | Memory stress lane, not a browser app target. |
 | Old influence variants | deleted/hidden | Superseded by promoted RP packages. |
@@ -76,6 +76,7 @@ What changed during cleanup:
 
 Known residual risk:
 
-- All kept HF repos are private and experimental.
+- All app-visible HF repos are public but experimental.
+- Rally full packages and source checkpoint repos remain private.
 - Rally full packages still need fresh direct and RP full browser smoke before any image/audio app exposure.
 - Browser performance is desktop-class only; Rally text cold loads are several minutes on the tested machine.

@@ -8,15 +8,15 @@ This lane starts after the Alkahest 0.8B/2B checkpoint. It applies the same prom
 
 ## Target Repos
 
-Use `HF_OWNER=thomasjvu` for private app-facing recovery work unless a later release explicitly moves the public namespace.
+Use `HF_OWNER=thomasjvu` for app-facing recovery work unless a later release explicitly moves the public namespace. The text-only repos are public experimental app targets; full and source repos stay private until full multimodal browser smoke passes.
 
 | Target | Default repo variable | Purpose |
 | --- | --- | --- |
 | Direct Heretic full | `RALLY2_DIRECT_REPO=thomasjvu/rally-2b` | Private experimental full text+image+audio package. Package validation/upload completed, but no retained passing browser smoke exists; keep hidden from the app picker. |
-| Direct Heretic text | `RALLY2_DIRECT_TEXT_REPO=thomasjvu/rally-2b-text` | Text-only browser package with Gemma4 q4f16 embed + decoder sessions only. |
+| Direct Heretic text | `RALLY2_DIRECT_TEXT_REPO=thomasjvu/rally-2b-text` | Public experimental text-only browser package with Gemma4 q4f16 embed + decoder sessions only. |
 | RP source checkpoint | `RALLY2_MERGED_REPO=thomasjvu/rally-2b-rp-source-merged` | Full merged PyTorch/HF checkpoint for provenance and re-export. |
 | RP full browser package | `RALLY2_TUNED_REPO=thomasjvu/rally-2b-rp` | Private experimental full text+image+audio package. Package validation/upload completed, but no retained passing browser smoke exists; keep hidden from the app picker. |
-| RP text browser package | `RALLY2_TUNED_TEXT_REPO=thomasjvu/rally-2b-rp-text` | A100/B75 text-only browser package. |
+| RP text browser package | `RALLY2_TUNED_TEXT_REPO=thomasjvu/rally-2b-rp-text` | Public experimental A100/B75 text-only browser package. |
 
 ## Current Kaggle Status
 
@@ -25,8 +25,8 @@ As of 2026-05-12, the active Rally/Gemma E2B pass is staying on Kaggle instead o
 | Artifact | Status | Notes |
 | --- | --- | --- |
 | Two-stage SFT | Complete | `thomasjvu/rally-e2b-two-stage-sft-t4` version 8 completed on Kaggle T4 with the hard-boundary Stage B mix and language-only FastVision LoRA. The log shows `24,158,208` trainable parameters and no vision-tower LoRA attachment. |
-| Direct Heretic text | Re-exported, validated, cleaned, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package. On 2026-05-11, the bloated private `thomasjvu/rally-2b-text` repo was deleted/recreated and the validated direct-text package from `rally_e2b_direct_full_compose` v1 was uploaded with `hf upload-large-folder`. Current private repo is `thomasjvu/rally-2b-text`, HF commit `48bc24a9f76ef215637c78ca33c18308cde4962b`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; first cold pass took `572s` and generated `The quiet tavern offered a warm, comforting`. |
-| RP A100/B75 text | Re-exported, validated, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload replaced the legacy repo after clearing the old LFS-history storage issue. Current private repo is `thomasjvu/rally-2b-rp-text`, HF commit `a4065c02e9228d41cd19e527e5f66f969177b29a`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; cold pass took `454s` and generated `The tavern offered warm firelight and the`. |
+| Direct Heretic text | Re-exported, validated, cleaned, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload published the fixed opset 21 q4f16 package. On 2026-05-11, the bloated private `thomasjvu/rally-2b-text` repo was deleted/recreated and the validated direct-text package from `rally_e2b_direct_full_compose` v1 was uploaded with `hf upload-large-folder`. Current public experimental repo is `thomasjvu/rally-2b-text`, HF commit `5d9ff9d0e098dbf13cd0d0be7149e6efa12068ca`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; first cold pass took `572s` and generated `The quiet tavern offered a warm, comforting`. |
+| RP A100/B75 text | Re-exported, validated, uploaded, browser-smoked | Kaggle export completed with upload disabled, then local HF upload replaced the legacy repo after clearing the old LFS-history storage issue. Current public experimental repo is `thomasjvu/rally-2b-rp-text`, HF commit `afa2190cdff49d1ab52911020f74cb6cfa979098`, used storage `3.32 GB`, with the expected q4f16 embed and decoder sessions only. Browser smoke passed in Chrome 148 headless with `--use-angle=metal`; cold pass took `454s` and generated `The tavern offered warm firelight and the`. |
 | RP source checkpoint | Uploaded and verified | `thomasjvu/rally-e2b-rp-merged-upload` completed on 2026-05-12 after the `HF_TOKEN` Kaggle secret was added. The private HF repo `thomasjvu/rally-2b-rp-source-merged` contains the intended hard-boundary v8 checkpoint; `scaled_lora_merge.json` verifies `applied: 205` and `scale: 0.75`. |
 | Direct Heretic full | Private experimental, not app-promoted | `thomasjvu/rally-2b` was patched with the required Lisper q4f16 audio wrapper and external-data config, but retained browser smoke artifacts still show full multimodal generation failures, including `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)`. |
 | RP A100/B75 full | Private experimental, not app-promoted | `thomasjvu/rally-2b-rp` was built from the same template-composed full path. Keep hidden until direct and RP full browser smoke both pass in a fresh isolated run. |
@@ -157,7 +157,7 @@ The failed attempts before this pass are still useful history: the first thomasj
 ## Next Recovery Pass
 
 1. Treat `rally_e2b_export_prep` v4 plus the current local exporter patch as the source of record for future full-package compose runs; the compose path must include q4f16 audio wrapper files and external-data metadata.
-2. Treat the current direct and RP text repos as the app-visible Rally lane: `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b` and `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
+2. Treat the current direct and RP text repos as the app-visible Rally lane: `thomasjvu/rally-2b-text@5d9ff9d0e098dbf13cd0d0be7149e6efa12068ca` and `thomasjvu/rally-2b-rp-text@afa2190cdff49d1ab52911020f74cb6cfa979098`.
 3. Keep `thomasjvu/rally-2b-rp-source-merged` as the provenance checkpoint for the promoted Rally RP text/full packages; it verifies `applied: 205` and `scale: 0.75`.
 4. Recreate full Rally packages only after the `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)` image-generation failure is fixed.
 5. Retry full browser smoke off the main desktop or in a clean isolated browser profile, one model at a time, with the worker-backed runner.

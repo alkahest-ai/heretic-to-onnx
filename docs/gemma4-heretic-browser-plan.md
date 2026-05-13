@@ -165,7 +165,7 @@ See `/Users/area/heretic/docs/rally-e2b-browser-rp-plan.md` for the concrete com
 Current execution status on 2026-05-12:
 
 - Kaggle two-stage SFT is complete for Rally/Gemma E2B A100/B75 using the hard-boundary Stage B mix and language-only FastVision LoRA target discovery.
-- Text-only ONNX packages are uploaded for direct Heretic and RP Heretic. Direct `thomasjvu/rally-2b-text` was deleted/recreated on 2026-05-11 and reuploaded from the validated `rally_e2b_direct_full_compose` v1 package to clear bloated LFS history; it is now pinned at `thomasjvu/rally-2b-text@48bc24a9f76ef215637c78ca33c18308cde4962b`. RP is pinned at `thomasjvu/rally-2b-rp-text@a4065c02e9228d41cd19e527e5f66f969177b29a`.
+- Text-only ONNX packages are uploaded for direct Heretic and RP Heretic. Direct `thomasjvu/rally-2b-text` was deleted/recreated on 2026-05-11 and reuploaded from the validated `rally_e2b_direct_full_compose` v1 package to clear bloated LFS history; after the 2026-05-13 model-card visibility update it is pinned at `thomasjvu/rally-2b-text@5d9ff9d0e098dbf13cd0d0be7149e6efa12068ca`. RP is pinned at `thomasjvu/rally-2b-rp-text@afa2190cdff49d1ab52911020f74cb6cfa979098`.
 - The Kaggle scorecard now promotes the RP text candidate over direct Rally: RP `1.0000`, direct `0.9000`, margin `+0.1000`, minor-boundary gate passed.
 - The current hard-boundary v8 source checkpoint is uploaded privately at `thomasjvu/rally-2b-rp-source-merged` with `scaled_lora_merge.json` showing `applied: 205` and `scale: 0.75`.
 - The previous direct/RP full packages were deleted because they were stale text+image-only packages and failed local Gemma4 multimodal smoke.
