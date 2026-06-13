@@ -393,6 +393,9 @@ def main() -> int:
         "load_in_4bit": args.load_in_4bit,
         "full_finetuning": False,
     }
+    model_hint = args.model_name.lower()
+    if "gemma-4" in model_hint or "gemma4" in model_hint:
+        loader_kwargs["trust_remote_code"] = True
     if use_fast_vision:
         model, tokenizer = FastVisionModel.from_pretrained(**loader_kwargs)
     else:
