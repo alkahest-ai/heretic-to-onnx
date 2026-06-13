@@ -1,0 +1,15 @@
+{
+  "id": "thomasjvu/rally-12b-scorecard-a100",
+  "title": "Rally 12B Scorecard A100",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "thomasjvu/rally-12b-two-stage-sft-a100"
+  ]
+}

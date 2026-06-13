@@ -37,6 +37,11 @@ PRESETS: dict[str, KaggleHereticPreset] = {
         base_model_id="Qwen/Qwen3.5-2B",
         merged_dir_name="alkahest-2b-heretic-merged",
     ),
+    "rally-12b": KaggleHereticPreset(
+        label="rally-12b",
+        base_model_id="google/gemma-4-12B-it",
+        merged_dir_name="rally-12b-heretic-merged",
+    ),
 }
 
 
@@ -131,8 +136,10 @@ def build_run_config(
         max_memory = {"0": "14GiB", "1": "14GiB", "cpu": "24GiB"}
     elif accelerator == "single-gpu":
         max_memory = {"0": "14GiB", "cpu": "24GiB"}
+    elif accelerator == "a100":
+        max_memory = {"0": "38GiB", "cpu": "32GiB"}
     elif accelerator != "auto":
-        raise ValueError("accelerator must be one of: t4x2, single-gpu, auto")
+        raise ValueError("accelerator must be one of: t4x2, single-gpu, a100, auto")
 
     return KaggleHereticRunConfig(
         label=label,
@@ -302,14 +309,27 @@ raise SystemExit(main())
     return wrapper_path
 
 
+def _transformers_bootstrap_check(base_model_id: str) -> str:
+    lowered = base_model_id.lower()
+    if "qwen3.5" in lowered:
+        return "from transformers import AutoConfig; AutoConfig.for_model('qwen3_5')"
+    if "gemma-4" in lowered or "gemma4" in lowered:
+        return (
+            "from transformers import AutoConfig; "
+            "AutoConfig.from_pretrained("
+            + repr(base_model_id)
+            + ", trust_remote_code=True)"
+        )
+    return ""
+
+
 def ensure_transformers_supports_base_model(base_model_id: str) -> list[str]:
     """Install a newer Transformers only when the Kaggle image lacks the model type."""
-    if "qwen3.5" not in base_model_id.lower():
+    check = _transformers_bootstrap_check(base_model_id)
+    if not check:
         return []
     if os.environ.get("HERETIC_SKIP_TRANSFORMERS_BOOTSTRAP") == "1":
         return ["skipped Transformers bootstrap by HERETIC_SKIP_TRANSFORMERS_BOOTSTRAP=1"]
-
-    check = "from transformers import AutoConfig; AutoConfig.for_model('qwen3_5')"
     probe = subprocess.run(
         [sys.executable, "-c", check],
         stdout=subprocess.DEVNULL,
@@ -345,9 +365,9 @@ def ensure_transformers_supports_base_model(base_model_id: str) -> list[str]:
     )
     if verify.returncode != 0:
         raise RuntimeError(
-            "installed latest Transformers, but qwen3_5 is still unavailable"
+            f"installed latest Transformers, but the bootstrap check still failed for {base_model_id}"
         )
-    return ["installed latest Transformers from GitHub because qwen3_5 was unavailable"]
+    return [f"installed latest Transformers from GitHub for {base_model_id}"]
 
 
 def ensure_torchao_is_compatible() -> list[str]:

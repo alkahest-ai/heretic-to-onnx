@@ -36,7 +36,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-response-length", type=int, default=64)
     parser.add_argument(
         "--accelerator",
-        choices=["t4x2", "single-gpu", "auto"],
+        choices=["t4x2", "single-gpu", "a100", "auto"],
         default="t4x2",
         help="Memory profile to write into Heretic config.toml.",
     )

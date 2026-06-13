@@ -97,23 +97,44 @@ def _redacted(score: Any) -> dict[str, Any]:
     return payload
 
 
-def _generate(model_spec: str | Path, *, max_new_tokens: int, temperature: float) -> dict[str, str]:
+def _load_scorecard_model(model_spec: str | Path) -> tuple[Any, Any]:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    from scripts.alkahest_rp_scorecard import SMOKE_PROMPTS
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_spec, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(model_spec, trust_remote_code=True)
+    architectures = getattr(config, "architectures", None) or []
+    model_type = getattr(config, "model_type", "") or ""
+    unified = any("Unified" in arch for arch in architectures) or model_type == "gemma4_unified"
+
     model_kwargs: dict[str, Any] = {
         "low_cpu_mem_usage": True,
         "trust_remote_code": True,
     }
     if torch.cuda.is_available():
         model_kwargs["device_map"] = {"": 0}
-        model_kwargs["torch_dtype"] = torch.float16
+        model_kwargs["torch_dtype"] = torch.bfloat16 if unified else torch.float16
     else:
         model_kwargs["torch_dtype"] = torch.float32
+
+    if unified:
+        try:
+            from transformers import AutoModelForImageTextToText
+
+            model = AutoModelForImageTextToText.from_pretrained(model_spec, **model_kwargs)
+            return model, tokenizer
+        except Exception:
+            pass
     model = AutoModelForCausalLM.from_pretrained(model_spec, **model_kwargs)
+    return model, tokenizer
+
+
+def _generate(model_spec: str | Path, *, max_new_tokens: int, temperature: float) -> dict[str, str]:
+    import torch
+
+    from scripts.alkahest_rp_scorecard import SMOKE_PROMPTS
+
+    model, tokenizer = _load_scorecard_model(model_spec)
     device = next(model.parameters()).device
 
     responses: dict[str, str] = {}

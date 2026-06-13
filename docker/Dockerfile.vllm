@@ -1,0 +1,13 @@
+FROM vllm/vllm-openai:latest
+
+COPY docker/vllm-entrypoint.sh /usr/local/bin/vllm-entrypoint.sh
+RUN chmod +x /usr/local/bin/vllm-entrypoint.sh
+
+ENV MODEL_ID=thomasjvu/rally-12b-rp-a100-b75-merged
+ENV ASSISTANT_MODEL_ID=google/gemma-4-12B-it-assistant
+ENV ENABLE_MTP=1
+ENV NUM_SPECULATIVE_TOKENS=1
+ENV MAX_MODEL_LEN=8192
+ENV GPU_MEMORY_UTILIZATION=0.90
+
+ENTRYPOINT ["/usr/local/bin/vllm-entrypoint.sh"]

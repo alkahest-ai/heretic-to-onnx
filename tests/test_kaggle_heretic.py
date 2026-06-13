@@ -47,6 +47,14 @@ class KaggleHereticTests(unittest.TestCase):
         self.assertEqual(config.merged_output_dir.name, "rally-2b-heretic-merged")
         self.assertEqual(config.max_memory, {})
 
+    def test_rally_12b_preset_uses_unified_base_model(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = build_run_config(label="rally-12b", work_root=tmpdir, accelerator="a100")
+
+        self.assertEqual(config.base_model_id, "google/gemma-4-12B-it")
+        self.assertEqual(config.merged_output_dir.name, "rally-12b-heretic-merged")
+        self.assertEqual(config.max_memory["0"], "38GiB")
+
     def test_alkahest_0_8b_preset_uses_official_base_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = build_run_config(label="alkahest-0.8b", work_root=tmpdir)

@@ -284,6 +284,15 @@ def _model_has_vision_tower(model) -> bool:
     return any(name == "model.vision_tower" or ".vision_tower" in name for name, _module in model.named_modules())
 
 
+def _is_unified_gemma4(model) -> bool:
+    config = getattr(model, "config", None)
+    architectures = getattr(config, "architectures", None) or []
+    model_type = getattr(config, "model_type", "") or ""
+    if any("Unified" in arch for arch in architectures):
+        return True
+    return model_type == "gemma4_unified"
+
+
 def _discover_language_lora_target_modules(model) -> list[str]:
     linear_suffixes = tuple(f".{projection}.linear" for projection in LANGUAGE_LORA_PROJECTIONS)
     wrapper_suffixes = tuple(f".{projection}" for projection in LANGUAGE_LORA_PROJECTIONS)
@@ -360,6 +369,13 @@ def main() -> int:
     from datasets import DatasetDict, load_dataset
     from trl import SFTConfig, SFTTrainer
 
+    use_fast_vision_loader = os.environ.get("RALLY_USE_FAST_VISION_LOADER", "auto")
+    if use_fast_vision_loader == "auto":
+        model_hint = args.model_name.lower()
+        use_fast_vision = "e2b" in model_hint or "e4b" in model_hint
+    else:
+        use_fast_vision = use_fast_vision_loader == "1"
+
     dataset = load_dataset(
         "json",
         data_files={
@@ -370,15 +386,31 @@ def main() -> int:
     if not isinstance(dataset, DatasetDict):
         raise ValueError("expected DatasetDict from load_dataset")
 
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=args.model_name,
-        max_seq_length=args.max_seq_length,
-        load_in_4bit=args.load_in_4bit,
-        full_finetuning=False,
-    )
+    loader_kwargs = {
+        "model_name": args.model_name,
+        "max_seq_length": args.max_seq_length,
+        "load_in_4bit": args.load_in_4bit,
+        "full_finetuning": False,
+    }
+    if use_fast_vision:
+        model, tokenizer = FastVisionModel.from_pretrained(**loader_kwargs)
+    else:
+        model, tokenizer = FastLanguageModel.from_pretrained(**loader_kwargs)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    use_vision_peft = _model_has_vision_tower(model) and not args.lora_target_module
+    unified_gemma4 = _is_unified_gemma4(model)
+    use_vision_peft = (
+        _model_has_vision_tower(model)
+        and not args.lora_target_module
+        and not unified_gemma4
+    )
+    print(
+        "[model-profile]",
+        f"unified_gemma4={unified_gemma4}",
+        f"use_fast_vision_loader={use_fast_vision}",
+        f"use_vision_peft={use_vision_peft}",
+        flush=True,
+    )
     lora_target_modules = args.lora_target_module or _discover_language_lora_target_modules(model)
     print(
         "[lora-targets]",

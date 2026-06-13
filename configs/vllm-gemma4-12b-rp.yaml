@@ -1,0 +1,11 @@
+model_id: thomasjvu/rally-12b-rp-a100-b75-merged
+assistant_model_id: google/gemma-4-12B-it-assistant
+host: 0.0.0.0
+port: 8000
+max_model_len: 8192
+gpu_memory_utilization: 0.90
+trust_remote_code: true
+speculative_config:
+  method: mtp
+  model: google/gemma-4-12B-it-assistant
+  num_speculative_tokens: 1
