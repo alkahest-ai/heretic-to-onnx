@@ -17,7 +17,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model-name", default="thomasjvu/rally-12b-heretic-merged")
+    parser.add_argument("--model-name", default="igorls/gemma-4-12B-it-heretic")
     parser.add_argument("--work-dir", default="/kaggle/working/rally-12b-two-stage-sft")
     parser.add_argument("--stage-a-max-steps", type=int, default=300)
     parser.add_argument("--stage-b-max-steps", type=int, default=600)

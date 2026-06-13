@@ -9,7 +9,5 @@
   "enable_internet": true,
   "dataset_sources": [],
   "competition_sources": [],
-  "kernel_sources": [
-    "thomasjvu/rally-12b-heretic-a100"
-  ]
+  "kernel_sources": []
 }
