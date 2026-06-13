@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Rally 12B Kaggle push helper.
+#
+# Accelerator: use --accelerator NvidiaTeslaT4 (CLI name for "GPU T4").
+# Do NOT use GPU_T4_x2 — that request often downgrades to P100 (sm_60, unusable).
+# NvidiaTeslaT4 still frequently assigns 2× Tesla T4 (~14.5 GiB each).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

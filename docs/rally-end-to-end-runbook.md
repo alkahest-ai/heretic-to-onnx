@@ -174,7 +174,21 @@ kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
 
 That notebook now re-creates the A100/B75 merge from the two-stage SFT output, writes a file manifest/report, and only uploads to HF when the Kaggle `HF_TOKEN` secret is reachable. The validated v8 source checkpoint is kept privately at `thomasjvu/rally-2b-rp-source-merged`; `scaled_lora_merge.json` verifies `applied: 205` and `scale: 0.75`.
 
-## 11. Legacy One-Click H200 Path
+## 11. Gemma 4 12B Kaggle Path
+
+Push all 12B kernels with **`NvidiaTeslaT4`**, not `GPU_T4_x2`. The `GPU_T4_x2` accelerator request has repeatedly downgraded to P100 (sm_60), which fails under current PyTorch builds. `NvidiaTeslaT4` is the CLI name for Kaggle's "GPU T4" option and still often assigns **2× Tesla T4** (~14.5 GiB each).
+
+```bash
+export KAGGLE_API_TOKEN="$(cat ~/.kaggle/access_token)"
+bash scripts/kaggle_push_rally_12b.sh
+# or individually:
+kaggle kernels push -p kaggle/rally_12b_two_stage_sft --accelerator NvidiaTeslaT4 --timeout 43200
+kaggle kernels status thomasjvu/rally-12b-two-stage-sft-a100
+```
+
+The 12B SFT lane skips on-Kaggle Heretic when needed and starts from `igorls/gemma-4-12B-it-heretic`. Install **latest Transformers from main** before Unsloth load so `gemma4_unified` registers.
+
+## 12. Legacy One-Click H200 Path
 
 If you want the whole Gemma loop in one terminal command on Phala GPU TEE, use:
 
