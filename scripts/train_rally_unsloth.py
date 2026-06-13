@@ -13,6 +13,7 @@ from pathlib import Path
 os.environ.setdefault("UNSLOTH_COMPILE_DISABLE", "1")
 os.environ.setdefault("UNSLOTH_DISABLE_FAST_GENERATION", "1")
 os.environ.setdefault("UNSLOTH_TEXT_ONLY_PROCESSOR", "1")
+os.environ.setdefault("WANDB_DISABLED", "true")
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
