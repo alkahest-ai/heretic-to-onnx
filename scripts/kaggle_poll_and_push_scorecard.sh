@@ -22,12 +22,28 @@ while true; do
   case "${status}" in
     KernelWorkerStatus.COMPLETE)
       echo "Training complete. Pushing scorecard from ${SCORECARD_PATH}..."
-      "${KAGGLE_BIN}" kernels push \
-        -p "${ROOT_DIR}/${SCORECARD_PATH}" \
-        --accelerator "${ACCELERATOR}" \
-        --timeout "${TIMEOUT_SCORECARD}"
-      echo "Scorecard pushed."
-      exit 0
+      PUSH_DIR="${KAGGLE_SCORECARD_PUSH_DIR:-/tmp/rally-12b-scorecard-push}"
+      while true; do
+        rm -rf "${PUSH_DIR}"
+        mkdir -p "${PUSH_DIR}"
+        cp "${ROOT_DIR}/${SCORECARD_PATH}/__notebook__.ipynb" "${PUSH_DIR}/"
+        cp "${ROOT_DIR}/${SCORECARD_PATH}/kernel-metadata.json" "${PUSH_DIR}/"
+        output="$("${KAGGLE_BIN}" kernels push \
+          -p "${PUSH_DIR}" \
+          --accelerator "${ACCELERATOR}" \
+          --timeout "${TIMEOUT_SCORECARD}" 2>&1)" || true
+        if [[ "${output}" == *"successfully pushed"* ]]; then
+          echo "${output}"
+          exit 0
+        fi
+        if [[ "${output}" == *"Maximum batch GPU session count"* ]]; then
+          echo "$(date -u '+%H:%M:%S UTC') GPU slots full; retrying in ${POLL_SECONDS}s"
+          sleep "${POLL_SECONDS}"
+          continue
+        fi
+        echo "${output}" >&2
+        exit 1
+      done
       ;;
     KernelWorkerStatus.ERROR)
       echo "Training kernel errored. Not pushing scorecard." >&2
