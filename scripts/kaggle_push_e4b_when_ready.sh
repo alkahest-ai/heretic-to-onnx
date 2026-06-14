@@ -9,14 +9,16 @@ POLL_SECONDS="${KAGGLE_POLL_SECONDS:-120}"
 
 echo "Waiting for GPU slot, then pushing ${KERNEL_PATH}..."
 while true; do
-  if output="$("${KAGGLE_BIN}" kernels push -p "${ROOT_DIR}/${KERNEL_PATH}" --accelerator NvidiaTeslaT4 --timeout 21600 2>&1)"; then
+  output="$("${KAGGLE_BIN}" kernels push -p "${ROOT_DIR}/${KERNEL_PATH}" --accelerator NvidiaTeslaT4 --timeout 21600 2>&1)" || true
+  if [[ "${output}" == *"successfully pushed"* ]]; then
     echo "${output}"
     exit 0
   fi
-  if [[ "${output}" != *"Maximum batch GPU session count"* ]]; then
-    echo "${output}" >&2
-    exit 1
+  if [[ "${output}" == *"Maximum batch GPU session count"* ]]; then
+    echo "$(date -u '+%H:%M:%S UTC') GPU slots full; retrying in ${POLL_SECONDS}s"
+    sleep "${POLL_SECONDS}"
+    continue
   fi
-  echo "$(date -u '+%H:%M:%S UTC') GPU slots full; retrying in ${POLL_SECONDS}s"
-  sleep "${POLL_SECONDS}"
+  echo "${output}" >&2
+  exit 1
 done
