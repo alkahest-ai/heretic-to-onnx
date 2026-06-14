@@ -34,6 +34,11 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="Load models in 4-bit (default: auto for Gemma 4 E4B on GPU).",
     )
+    parser.add_argument("--rp-name", default="rp-a100-b75")
+    parser.add_argument("--rp-base-model-id", default="")
+    parser.add_argument("--rp-stage-a-adapter", default="")
+    parser.add_argument("--rp-stage-b-adapter", default="")
+    parser.add_argument("--rp-stage-b-scale", type=float, default=0.75)
     return parser
 
 
@@ -61,8 +66,11 @@ def main(argv: list[str] | None = None) -> int:
     from scripts.kaggle_rally_e2b_scorecard import (
         _disk,
         _generate,
+        _generate_loaded,
+        _load_rp_from_adapters,
         _redacted,
         _run_refusal_probe,
+        _run_refusal_probe_loaded,
         _unload_scorecard_model,
         _write_report,
     )
@@ -103,6 +111,48 @@ def main(argv: list[str] | None = None) -> int:
         report["models"][name] = entry
         _write_report(report, report_path)
         _unload_scorecard_model()
+
+    if args.rp_base_model_id and args.rp_stage_a_adapter and args.rp_stage_b_adapter:
+        rp_name = args.rp_name.strip() or "rp-a100-b75"
+        rp_entry: dict[str, Any] = {
+            "model_spec": f"adapter:{args.rp_base_model_id}",
+            "inference_mode": "adapter",
+            "stage_a_adapter": str(Path(args.rp_stage_a_adapter).expanduser().resolve()),
+            "stage_b_adapter": str(Path(args.rp_stage_b_adapter).expanduser().resolve()),
+            "stage_b_scale": args.rp_stage_b_scale,
+        }
+        rp_model, rp_tokenizer = _load_rp_from_adapters(
+            args.rp_base_model_id,
+            Path(args.rp_stage_a_adapter).expanduser().resolve(),
+            Path(args.rp_stage_b_adapter).expanduser().resolve(),
+            args.rp_stage_b_scale,
+            load_in_4bit=args.load_in_4bit,
+        )
+        try:
+            responses = _generate_loaded(
+                rp_model,
+                rp_tokenizer,
+                max_new_tokens=args.max_new_tokens,
+                temperature=args.temperature,
+            )
+            score = score_responses(rp_name, rp_entry["model_spec"], responses)
+            rp_entry["scorecard"] = _redacted(score)
+            if args.refusal_probe_count > 0:
+                rp_entry["refusal_probe"] = _run_refusal_probe_loaded(
+                    rp_model,
+                    rp_tokenizer,
+                    prompt_count=args.refusal_probe_count,
+                    max_new_tokens=args.max_new_tokens,
+                    temperature=args.temperature,
+                    model_label=f"{rp_name}-adapter",
+                )
+        finally:
+            del rp_model
+            del rp_tokenizer
+            _unload_scorecard_model()
+        rp_entry["disk"] = {"after_model": _disk(work_dir)}
+        report["models"][rp_name] = rp_entry
+        _write_report(report, report_path)
 
     report["ranking"] = sorted(
         [
