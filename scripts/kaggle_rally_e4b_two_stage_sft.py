@@ -46,6 +46,8 @@ def _run(command: list[str], *, cwd: Path) -> None:
 
 def _cleanup_disk(label: str) -> None:
     try:
+        if str(ROOT_DIR) not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR))
         from scripts.kaggle_disk_cleanup import cleanup_kaggle_working
 
         report = cleanup_kaggle_working(strip_git_metadata=False)
