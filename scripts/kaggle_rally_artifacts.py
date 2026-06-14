@@ -77,6 +77,12 @@ def find_artifacts(explicit: str, artifact_name: str) -> Path:
         ]
     )
     candidates.extend(Path("/kaggle/input").glob(f"**/{artifact_name}"))
+    input_root = Path("/kaggle/input")
+    if input_root.is_dir():
+        for mount in sorted(input_root.iterdir()):
+            if mount.is_dir():
+                candidates.append(mount)
+                candidates.extend(child for child in mount.iterdir() if child.is_dir())
 
     for candidate in candidates:
         if has_training_artifacts(candidate):
