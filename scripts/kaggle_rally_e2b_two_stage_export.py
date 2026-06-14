@@ -95,34 +95,15 @@ def _write_report(report: dict[str, Any], report_path: Path | None) -> None:
 
 
 def _has_merged_checkpoint(path: Path) -> bool:
-    return (path / "model.safetensors").exists() or (path / "model.safetensors.index.json").exists()
+    from scripts.kaggle_rally_artifacts import has_merged_checkpoint
+
+    return has_merged_checkpoint(path)
 
 
 def _find_artifacts(explicit: str, artifact_name: str) -> Path:
-    candidates: list[Path] = []
-    if explicit:
-        candidates.append(Path(explicit).expanduser())
-    candidates.extend(
-        [
-            Path("/kaggle/input") / artifact_name,
-            Path("/kaggle/input") / artifact_name / artifact_name,
-            Path("/kaggle/working") / artifact_name,
-        ]
-    )
-    candidates.extend(Path("/kaggle/input").glob(f"**/{artifact_name}"))
+    from scripts.kaggle_rally_artifacts import find_artifacts
 
-    for candidate in candidates:
-        if (
-            (candidate / "stage-a-adapter" / "adapter_model.safetensors").exists()
-            and (candidate / "stage-b-adapter" / "adapter_model.safetensors").exists()
-            and _has_merged_checkpoint(candidate / "stage-a-merged")
-        ):
-            return candidate.resolve()
-    checked = "\n".join(str(path) for path in candidates[:30])
-    raise FileNotFoundError(
-        "Could not locate completed Rally E2B two-stage artifacts. Add the training notebook output as a "
-        f"Kaggle kernel source or pass --artifact-dir. Checked:\n{checked}"
-    )
+    return find_artifacts(explicit, artifact_name)
 
 
 def _run(command: list[str], *, cwd: Path) -> None:
@@ -665,10 +646,17 @@ def main(argv: list[str] | None = None) -> int:
 
     selected_merged: Path | None = None
     if not args.skip_rp:
+        from scripts.kaggle_rally_artifacts import ensure_stage_a_merged
+
         artifacts = _find_artifacts(args.artifact_dir, args.artifact_name)
         report["artifact_dir"] = str(artifacts)
+        stage_a_merged = ensure_stage_a_merged(
+            artifacts,
+            base_model_id=args.direct_source_model_id,
+            scratch_dir=scratch_dir / "stage-a-merge",
+        )
         selected_merged = work_dir / f"{args.candidate_name}-merged"
-        _merge_scaled(artifacts / "stage-a-merged", artifacts / "stage-b-adapter", selected_merged, args.stage_b_scale)
+        _merge_scaled(stage_a_merged, artifacts / "stage-b-adapter", selected_merged, args.stage_b_scale)
         report["selected_merged"] = str(selected_merged)
         report["disk"]["after_merge"] = _disk(work_dir)
         _write_report(report, report_path)

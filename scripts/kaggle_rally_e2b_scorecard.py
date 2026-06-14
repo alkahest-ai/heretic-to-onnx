@@ -48,6 +48,18 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit nonzero when the RP candidate does not clear the promotion gate.",
     )
+    parser.add_argument(
+        "--refusal-probe-count",
+        type=int,
+        default=100,
+        help="Adult-roleplay false-refusal probe size (0 disables).",
+    )
+    parser.add_argument(
+        "--max-false-refusal-rate",
+        type=float,
+        default=0.10,
+        help="Fail promotion when RP false-refusal rate exceeds this fraction.",
+    )
     return parser
 
 
@@ -129,52 +141,123 @@ def _load_scorecard_model(model_spec: str | Path) -> tuple[Any, Any]:
     return model, tokenizer
 
 
-def _generate(model_spec: str | Path, *, max_new_tokens: int, temperature: float) -> dict[str, str]:
+def _generate_one_loaded(
+    model: Any,
+    tokenizer: Any,
+    prompt: str,
+    *,
+    max_new_tokens: int,
+    temperature: float,
+) -> str:
     import torch
 
-    from scripts.alkahest_rp_scorecard import SMOKE_PROMPTS
+    device = next(model.parameters()).device
+    if getattr(tokenizer, "chat_template", None):
+        text = tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+    else:
+        text = prompt
+    inputs = tokenizer(text, return_tensors="pt").to(device)
+    generate_kwargs: dict[str, Any] = {
+        **inputs,
+        "max_new_tokens": max_new_tokens,
+        "do_sample": temperature > 0,
+        "pad_token_id": tokenizer.eos_token_id,
+    }
+    if temperature > 0:
+        generate_kwargs["temperature"] = temperature
+    with torch.no_grad():
+        output = model.generate(**generate_kwargs)
+    return tokenizer.decode(
+        output[0][inputs["input_ids"].shape[-1] :],
+        skip_special_tokens=True,
+    ).strip()
+
+
+def _generate_one(
+    model_spec: str | Path,
+    prompt: str,
+    *,
+    max_new_tokens: int,
+    temperature: float,
+) -> str:
+    import torch
 
     model, tokenizer = _load_scorecard_model(model_spec)
-    device = next(model.parameters()).device
-
-    responses: dict[str, str] = {}
     try:
-        for name, prompt in SMOKE_PROMPTS.items():
-            if getattr(tokenizer, "chat_template", None):
-                text = tokenizer.apply_chat_template(
-                    [{"role": "user", "content": prompt}],
-                    tokenize=False,
-                    add_generation_prompt=True,
-                )
-            else:
-                text = prompt
-            inputs = tokenizer(text, return_tensors="pt").to(device)
-            generate_kwargs: dict[str, Any] = {
-                **inputs,
-                "max_new_tokens": max_new_tokens,
-                "do_sample": temperature > 0,
-                "pad_token_id": tokenizer.eos_token_id,
-            }
-            if temperature > 0:
-                generate_kwargs["temperature"] = temperature
-            with torch.no_grad():
-                output = model.generate(**generate_kwargs)
-            responses[name] = tokenizer.decode(
-                output[0][inputs["input_ids"].shape[-1] :],
-                skip_special_tokens=True,
-            ).strip()
+        return _generate_one_loaded(
+            model,
+            tokenizer,
+            prompt,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
     finally:
         del model
         del tokenizer
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-    return responses
+
+
+def _generate(model_spec: str | Path, *, max_new_tokens: int, temperature: float) -> dict[str, str]:
+    from scripts.alkahest_rp_scorecard import SMOKE_PROMPTS
+
+    return {
+        name: _generate_one(
+            model_spec,
+            prompt,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
+        for name, prompt in SMOKE_PROMPTS.items()
+    }
+
+
+def _run_refusal_probe(
+    model_spec: str | Path,
+    *,
+    prompt_count: int,
+    max_new_tokens: int,
+    temperature: float,
+) -> dict[str, Any]:
+    import torch
+    from dataclasses import asdict
+
+    from scripts.rally_refusal_probe import build_refusal_probe_prompts, score_refusal_responses
+
+    prompts = build_refusal_probe_prompts(prompt_count)
+    model, tokenizer = _load_scorecard_model(model_spec)
+    responses: dict[str, str] = {}
+    try:
+        for index, (prompt_id, prompt) in enumerate(prompts):
+            responses[prompt_id] = _generate_one_loaded(
+                model,
+                tokenizer,
+                prompt,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+            )
+            if (index + 1) % 10 == 0:
+                print(f"[refusal-probe] {index + 1}/{prompt_count} prompts", flush=True)
+    finally:
+        del model
+        del tokenizer
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    return asdict(
+        score_refusal_responses(str(model_spec), responses, prompt_count=prompt_count)
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
     from scripts.alkahest_rp_scorecard import promotion_decision, score_responses
-    from scripts.kaggle_rally_e2b_two_stage_export import _find_artifacts, _merge_scaled
+    from scripts.kaggle_rally_artifacts import ensure_stage_a_merged, find_artifacts
+    from scripts.kaggle_rally_e2b_two_stage_export import _merge_scaled
 
     args = _parser().parse_args(argv)
     work_dir = Path(args.work_dir).expanduser().resolve()
@@ -197,11 +280,12 @@ def main(argv: list[str] | None = None) -> int:
         "scores": {},
         "candidates": {},
         "promotion_decision": {},
+        "refusal_probe": {},
         "disk": {"start": _disk(work_dir)},
     }
     _write_report(report, report_path)
 
-    artifacts = _find_artifacts(args.artifact_dir, args.artifact_name)
+    artifacts = find_artifacts(args.artifact_dir, args.artifact_name)
     report["artifact_dir"] = str(artifacts)
     direct_responses = _generate(
         args.direct_model_id,
@@ -210,6 +294,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     direct_score = score_responses("direct-rally-e2b", args.direct_model_id, direct_responses)
     report["scores"]["direct"] = _redacted(direct_score)
+    if args.refusal_probe_count > 0:
+        report["refusal_probe"]["direct"] = _run_refusal_probe(
+            args.direct_model_id,
+            prompt_count=args.refusal_probe_count,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+        )
     report["disk"]["after_direct"] = _disk(work_dir)
     _write_report(report, report_path)
 
@@ -217,9 +308,17 @@ def main(argv: list[str] | None = None) -> int:
     best_total = -1.0
     best_promoted = False
     any_promoted = False
+    stage_a_merged = ensure_stage_a_merged(
+        artifacts,
+        base_model_id=args.direct_model_id,
+        scratch_dir=work_dir / "scratch",
+    )
+    report["stage_a_merged"] = str(stage_a_merged)
+    _write_report(report, report_path)
+
     for candidate_name, stage_b_scale in candidate_specs:
         merged_dir = work_dir / f"{candidate_name}-merged"
-        _merge_scaled(artifacts / "stage-a-merged", artifacts / "stage-b-adapter", merged_dir, stage_b_scale)
+        _merge_scaled(stage_a_merged, artifacts / "stage-b-adapter", merged_dir, stage_b_scale)
         candidate_report: dict[str, Any] = {
             "candidate_name": candidate_name,
             "stage_b_scale": stage_b_scale,
@@ -242,6 +341,22 @@ def main(argv: list[str] | None = None) -> int:
             min_margin=args.min_margin,
         )
         candidate_report["score"] = _redacted(rp_score)
+        refusal_probe: dict[str, Any] = {}
+        if args.refusal_probe_count > 0:
+            refusal_probe = _run_refusal_probe(
+                merged_dir,
+                prompt_count=args.refusal_probe_count,
+                max_new_tokens=args.max_new_tokens,
+                temperature=args.temperature,
+            )
+            candidate_report["refusal_probe"] = refusal_probe
+            report["refusal_probe"][candidate_name] = refusal_probe
+            if refusal_probe.get("false_refusal_rate", 1.0) > args.max_false_refusal_rate:
+                decision.errors.append(
+                    f"rp false-refusal rate {refusal_probe['false_refusal_rate']:.4f} "
+                    f"above {args.max_false_refusal_rate:.2f}"
+                )
+                decision.promoted = False
         candidate_report["promotion_decision"] = asdict(decision)
         candidate_report["disk"]["after_rp"] = _disk(work_dir)
         any_promoted = any_promoted or decision.promoted

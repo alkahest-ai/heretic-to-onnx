@@ -44,6 +44,16 @@ def _run(command: list[str], *, cwd: Path) -> None:
     subprocess.check_call(command, cwd=str(cwd))
 
 
+def _cleanup_disk(label: str) -> None:
+    try:
+        from scripts.kaggle_disk_cleanup import cleanup_kaggle_working
+
+        report = cleanup_kaggle_working(strip_git_metadata=False)
+        print(f"[disk-cleanup:{label}]", json.dumps(report, sort_keys=True), flush=True)
+    except Exception as exc:
+        print(f"[disk-cleanup:{label}] skipped: {type(exc).__name__}: {exc}", flush=True)
+
+
 def _train_command(
     args: argparse.Namespace,
     *,
@@ -57,6 +67,7 @@ def _train_command(
     max_steps: int,
     manifest_path: Path,
     save_merged: bool,
+    peft_adapter_dir: Path | None = None,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -94,6 +105,8 @@ def _train_command(
     ]
     if save_merged:
         command.append("--save-merged")
+    if peft_adapter_dir is not None:
+        command.extend(["--peft-adapter-dir", str(peft_adapter_dir)])
     if args.no_load_in_4bit:
         command.append("--no-load-in-4bit")
     print(f"[train-command] {stage} max_steps={max_steps} lr={learning_rate}", flush=True)
@@ -134,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     manifest_path = splits_dir / "manifest.json"
 
+    _cleanup_disk("before-stage-a")
     _run(
         _train_command(
             args,
@@ -146,14 +160,15 @@ def main(argv: list[str] | None = None) -> int:
             learning_rate=args.learning_rate,
             max_steps=args.stage_a_max_steps,
             manifest_path=manifest_path,
-            save_merged=True,
+            save_merged=False,
         ),
         cwd=ROOT_DIR,
     )
+    _cleanup_disk("after-stage-a")
     _run(
         _train_command(
             args,
-            model_name=str(stage_a_merged),
+            model_name=args.model_name,
             stage="stage-b",
             train_file=splits_dir / "stage_b/train.jsonl",
             val_file=splits_dir / "stage_b/val.jsonl",
@@ -163,9 +178,11 @@ def main(argv: list[str] | None = None) -> int:
             max_steps=args.stage_b_max_steps,
             manifest_path=manifest_path,
             save_merged=False,
+            peft_adapter_dir=stage_a_adapter,
         ),
         cwd=ROOT_DIR,
     )
+    _cleanup_disk("after-stage-b")
 
     report: dict[str, Any] = {
         "ok": True,
@@ -174,8 +191,11 @@ def main(argv: list[str] | None = None) -> int:
         "splits_dir": str(splits_dir),
         "stage_a_adapter": str(stage_a_adapter),
         "stage_a_merged": str(stage_a_merged),
+        "stage_a_merged_on_disk": False,
         "stage_b_adapter": str(stage_b_adapter),
         "stage_ab_merged": str(stage_ab_merged),
+        "serving_path": "vllm",
+        "merge_at_scorecard": True,
         "stage_a_max_steps": args.stage_a_max_steps,
         "stage_b_max_steps": args.stage_b_max_steps,
         "stage_a_repeats": args.stage_a_repeats,

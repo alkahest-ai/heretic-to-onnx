@@ -364,6 +364,11 @@ def main() -> int:
         default=0,
         help="Dataset preprocessing worker count for TRL. Use 0 to disable multiprocessing.",
     )
+    parser.add_argument(
+        "--peft-adapter-dir",
+        default="",
+        help="Optional Stage A adapter directory to merge in-memory before applying a new LoRA.",
+    )
     args = parser.parse_args()
 
     from unsloth import FastLanguageModel, FastVisionModel
@@ -400,6 +405,16 @@ def main() -> int:
         model, tokenizer = FastVisionModel.from_pretrained(**loader_kwargs)
     else:
         model, tokenizer = FastLanguageModel.from_pretrained(**loader_kwargs)
+    adapter_dir = Path(args.peft_adapter_dir).expanduser().resolve() if args.peft_adapter_dir else None
+    if adapter_dir is not None:
+        if not (adapter_dir / "adapter_model.safetensors").exists():
+            raise FileNotFoundError(f"missing adapter weights under {adapter_dir}")
+        from peft import PeftModel
+
+        print(f"[peft] loading stage adapter from {adapter_dir}", flush=True)
+        model = PeftModel.from_pretrained(model, str(adapter_dir))
+        model = model.merge_and_unload()
+        print("[peft] merged stage adapter in memory", flush=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     unified_gemma4 = _is_unified_gemma4(model)
@@ -499,6 +514,28 @@ def main() -> int:
         merged_dir.mkdir(parents=True, exist_ok=True)
         model.save_pretrained_merged(str(merged_dir), tokenizer, save_method="merged_16bit")
         _save_generation_config(model, merged_dir)
+
+    import gc
+
+    try:
+        import torch
+
+        del trainer
+        del model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+    if os.environ.get("RALLY_KAGGLE_DISK_CLEANUP", "1") == "1":
+        try:
+            from scripts.kaggle_disk_cleanup import cleanup_kaggle_working
+
+            cleanup_report = cleanup_kaggle_working(strip_git_metadata=False)
+            print("[disk-cleanup]", json.dumps(cleanup_report, sort_keys=True), flush=True)
+        except Exception as exc:
+            print(f"[disk-cleanup] skipped: {type(exc).__name__}: {exc}", flush=True)
 
     dataset_manifest_path = Path(args.dataset_manifest).expanduser().resolve()
     dataset_manifest = None

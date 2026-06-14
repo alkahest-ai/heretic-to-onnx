@@ -186,7 +186,9 @@ kaggle kernels push -p kaggle/rally_12b_two_stage_sft --accelerator NvidiaTeslaT
 kaggle kernels status thomasjvu/rally-12b-two-stage-sft-a100
 ```
 
-The 12B SFT lane skips on-Kaggle Heretic when needed and starts from `igorls/gemma-4-12B-it-heretic`. Install **latest Transformers from main** before Unsloth load so `gemma4_unified` registers.
+The 12B SFT lane skips on-Kaggle Heretic when needed and starts from `igorls/gemma-4-12B-it-heretic`. Install **latest Transformers from main** before Unsloth load so `gemma4_unified` registers. Training saves **LoRA adapters only** (no full merged weights on disk during SFT); merged checkpoints are built on-the-fly for scorecard/upload. Serve with **vLLM** (`configs/vllm-gemma4-12b-rp.yaml`), not WebGPU export.
+
+After SFT, run the scorecard kernel. It runs the 4-prompt RP gate plus a **100-prompt adult false-refusal probe** (expect direct Heretic near `100/100` refusals, RP near `6/100`). Promotion also requires RP false-refusal rate `<= 0.10`.
 
 ## 12. Legacy One-Click H200 Path
 
