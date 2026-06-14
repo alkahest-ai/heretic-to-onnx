@@ -3,7 +3,7 @@
 set -euo pipefail
 
 KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
-DELETE_KERNELS="${KAGGLE_DELETE_KERNELS:-thomasjvu/rally-e4b-sft-jun14v9}"
+DELETE_KERNELS="${KAGGLE_DELETE_KERNELS:-thomasjvu/rally-e4b-sft-jun14v9 thomasjvu/rally-12b-heretic-a100}"
 CLEAN_TMP="${KAGGLE_CLEAN_TMP:-1}"
 TMP_PATTERNS="${KAGGLE_TMP_PATTERNS:-/tmp/e4b_sft_error /tmp/12b_sft_full /tmp/12b_scorecard_v2_error /tmp/12b_scorecard_error /tmp/e4b_sft_v10_report /tmp/e2b_v3_report /tmp/e4b_compare_v3 /tmp/e4b_compare_v4_report /tmp/12b_scorecard_report}"
 
