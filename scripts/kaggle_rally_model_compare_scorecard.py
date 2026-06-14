@@ -28,6 +28,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=32)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--refusal-probe-count", type=int, default=100)
+    parser.add_argument(
+        "--load-in-4bit",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Load models in 4-bit (default: auto for Gemma 4 E4B on GPU).",
+    )
     return parser
 
 
@@ -57,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         _generate,
         _redacted,
         _run_refusal_probe,
+        _unload_scorecard_model,
         _write_report,
     )
 
@@ -80,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
             model_spec,
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
+            load_in_4bit=args.load_in_4bit,
         )
         score = score_responses(name, model_spec, responses)
         entry["scorecard"] = _redacted(score)
@@ -89,10 +97,12 @@ def main(argv: list[str] | None = None) -> int:
                 prompt_count=args.refusal_probe_count,
                 max_new_tokens=args.max_new_tokens,
                 temperature=args.temperature,
+                load_in_4bit=args.load_in_4bit,
             )
         entry["disk"] = {"after_model": _disk(work_dir)}
         report["models"][name] = entry
         _write_report(report, report_path)
+        _unload_scorecard_model()
 
     report["ranking"] = sorted(
         [

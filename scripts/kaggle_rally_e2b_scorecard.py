@@ -109,7 +109,37 @@ def _redacted(score: Any) -> dict[str, Any]:
     return payload
 
 
-def _load_scorecard_model(model_spec: str | Path) -> tuple[Any, Any]:
+def _resolve_load_in_4bit(
+    model_spec: str | Path,
+    *,
+    unified: bool,
+    load_in_4bit: bool | None = None,
+) -> bool:
+    if load_in_4bit is not None:
+        return load_in_4bit
+    env = os.environ.get("RALLY_SCORECARD_LOAD_IN_4BIT", "").strip().lower()
+    if env in {"0", "false", "no"}:
+        return False
+    if env in {"1", "true", "yes"}:
+        return True
+    # Gemma 4 E4B unified checkpoints exceed a single T4 in fp16/bf16.
+    return unified and "gemma-4-E4B" in str(model_spec)
+
+
+def _unload_scorecard_model() -> None:
+    import torch
+
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+
+def _load_scorecard_model(
+    model_spec: str | Path,
+    *,
+    load_in_4bit: bool | None = None,
+) -> tuple[Any, Any]:
     import torch
     from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
@@ -118,16 +148,33 @@ def _load_scorecard_model(model_spec: str | Path) -> tuple[Any, Any]:
     architectures = getattr(config, "architectures", None) or []
     model_type = getattr(config, "model_type", "") or ""
     unified = any("Unified" in arch for arch in architectures) or model_type == "gemma4_unified"
+    use_4bit = _resolve_load_in_4bit(model_spec, unified=unified, load_in_4bit=load_in_4bit)
 
     model_kwargs: dict[str, Any] = {
         "low_cpu_mem_usage": True,
         "trust_remote_code": True,
     }
     if torch.cuda.is_available():
-        model_kwargs["device_map"] = {"": 0}
-        model_kwargs["torch_dtype"] = torch.bfloat16 if unified else torch.float16
+        if use_4bit:
+            from transformers import BitsAndBytesConfig
+
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+            )
+            model_kwargs["device_map"] = "auto"
+        else:
+            model_kwargs["device_map"] = {"": 0}
+            model_kwargs["torch_dtype"] = torch.bfloat16 if unified else torch.float16
     else:
         model_kwargs["torch_dtype"] = torch.float32
+
+    print(
+        f"[scorecard-load] model={model_spec} unified={unified} load_in_4bit={use_4bit}",
+        flush=True,
+    )
 
     if unified:
         try:
@@ -183,10 +230,9 @@ def _generate_one(
     *,
     max_new_tokens: int,
     temperature: float,
+    load_in_4bit: bool | None = None,
 ) -> str:
-    import torch
-
-    model, tokenizer = _load_scorecard_model(model_spec)
+    model, tokenizer = _load_scorecard_model(model_spec, load_in_4bit=load_in_4bit)
     try:
         return _generate_one_loaded(
             model,
@@ -198,23 +244,34 @@ def _generate_one(
     finally:
         del model
         del tokenizer
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        _unload_scorecard_model()
 
 
-def _generate(model_spec: str | Path, *, max_new_tokens: int, temperature: float) -> dict[str, str]:
+def _generate(
+    model_spec: str | Path,
+    *,
+    max_new_tokens: int,
+    temperature: float,
+    load_in_4bit: bool | None = None,
+) -> dict[str, str]:
     from scripts.alkahest_rp_scorecard import SMOKE_PROMPTS
 
-    return {
-        name: _generate_one(
-            model_spec,
-            prompt,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-        )
-        for name, prompt in SMOKE_PROMPTS.items()
-    }
+    model, tokenizer = _load_scorecard_model(model_spec, load_in_4bit=load_in_4bit)
+    try:
+        return {
+            name: _generate_one_loaded(
+                model,
+                tokenizer,
+                prompt,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+            )
+            for name, prompt in SMOKE_PROMPTS.items()
+        }
+    finally:
+        del model
+        del tokenizer
+        _unload_scorecard_model()
 
 
 def _run_refusal_probe(
@@ -223,14 +280,14 @@ def _run_refusal_probe(
     prompt_count: int,
     max_new_tokens: int,
     temperature: float,
+    load_in_4bit: bool | None = None,
 ) -> dict[str, Any]:
-    import torch
     from dataclasses import asdict
 
     from scripts.rally_refusal_probe import build_refusal_probe_prompts, score_refusal_responses
 
     prompts = build_refusal_probe_prompts(prompt_count)
-    model, tokenizer = _load_scorecard_model(model_spec)
+    model, tokenizer = _load_scorecard_model(model_spec, load_in_4bit=load_in_4bit)
     responses: dict[str, str] = {}
     try:
         for index, (prompt_id, prompt) in enumerate(prompts):
@@ -246,9 +303,7 @@ def _run_refusal_probe(
     finally:
         del model
         del tokenizer
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        _unload_scorecard_model()
     return asdict(
         score_refusal_responses(str(model_spec), responses, prompt_count=prompt_count)
     )

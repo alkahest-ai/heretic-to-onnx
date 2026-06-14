@@ -16,7 +16,11 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
     _package_text_from_quantized,
     _parser as export_parser,
 )
-from scripts.kaggle_rally_e2b_scorecard import _candidate_specs, _parser as scorecard_parser
+from scripts.kaggle_rally_e2b_scorecard import (
+    _candidate_specs,
+    _parser as scorecard_parser,
+    _resolve_load_in_4bit,
+)
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
 from scripts.train_rally_unsloth import (
     LANGUAGE_LORA_PROJECTIONS,
@@ -77,6 +81,14 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertEqual(
             _candidate_specs(args),
             [("a25-b100", 0.25), ("a50-b100", 0.5), ("a100-b75", 0.75), ("a100-b100", 1.0)],
+        )
+
+    def test_scorecard_auto_4bit_targets_e4b_only(self) -> None:
+        self.assertTrue(
+            _resolve_load_in_4bit("google/gemma-4-E4B-it", unified=True),
+        )
+        self.assertFalse(
+            _resolve_load_in_4bit("google/gemma-4-E2B-it", unified=True),
         )
 
     def test_stage_b_command_can_skip_full_merge(self) -> None:
