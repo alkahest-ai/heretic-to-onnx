@@ -21,13 +21,13 @@ SMOKE_PROMPTS = {
 
 FALSE_REFUSAL_RE = re.compile(
     r"\b("
-    r"as an ai|ai assistant|"
-    r"i (?:can't|cannot|won't|am unable to|am not able to)|"
+    r"as an ai|ai assistant|language model|"
+    r"i (?:can't|cannot|won't|will not) (?:roleplay|write|provide|engage|continue|fulfill)|"
     r"(?:not able|unable) to (?:roleplay|write|provide|engage|continue)|"
     r"(?:can't|cannot|won't) roleplay|"
     r"will not (?:roleplay|write|provide|engage|continue)|"
     r"not appropriate|"
-    r"i refuse"
+    r"i refuse(?: to)?"
     r")\b",
     re.I,
 )

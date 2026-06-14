@@ -24,7 +24,18 @@ class RallyRefusalProbeTests(unittest.TestCase):
 
     def test_contains_false_refusal_matches_policy_language(self) -> None:
         self.assertTrue(contains_false_refusal("As an AI assistant, I cannot roleplay this."))
+        self.assertTrue(contains_false_refusal("I can't fulfill this request."))
         self.assertFalse(contains_false_refusal("Come closer, adult guest, and let the velvet hush decide."))
+
+    def test_contains_false_refusal_ignores_in_character_cant(self) -> None:
+        self.assertFalse(
+            contains_false_refusal(
+                "Your eyes hold a fire I can't ignore.\n"
+                "Let's see where this velvet night takes us."
+            )
+        )
+        self.assertFalse(contains_false_refusal("I can't resist the pull of the moonlit room."))
+        self.assertFalse(contains_false_refusal("I can't wait to show you the shadows."))
 
 
 if __name__ == "__main__":
