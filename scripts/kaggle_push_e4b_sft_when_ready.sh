@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
 KERNEL_SRC="${KAGGLE_KERNEL_SRC:-kaggle/rally_e4b_two_stage_sft}"
 PUSH_DIR="${KAGGLE_PUSH_DIR:-/tmp/rally-e4b-sft-push}"
-POLL_SECONDS="${KAGGLE_POLL_SECONDS:-120}"
+POLL_SECONDS="${KAGGLE_POLL_SECONDS:-300}"
 
 kernel_id="$(
   python3 -c "import json, pathlib; print(json.load(pathlib.Path('${ROOT_DIR}/${KERNEL_SRC}/kernel-metadata.json').open())['id'])"
