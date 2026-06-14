@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
-KERNEL_PATH="${KAGGLE_KERNEL_PATH:-kaggle/rally_e4b_heretic_compare}"
+KERNEL_PATH="${KAGGLE_KERNEL_PATH:-kaggle/rally_gemma4_e4b_compare}"
 POLL_SECONDS="${KAGGLE_POLL_SECONDS:-120}"
 
 echo "Waiting for GPU slot, then pushing ${KERNEL_PATH}..."

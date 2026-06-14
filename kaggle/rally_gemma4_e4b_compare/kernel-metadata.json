@@ -1,6 +1,6 @@
 {
-  "id": "thomasjvu/rally-gemma4-e4b-compare",
-  "title": "Rally Gemma4 E4B Compare",
+  "id": "thomasjvu/rally-gemma4-e4b-baseline-compare",
+  "title": "Rally Gemma4 E4B Baseline Compare",
   "code_file": "__notebook__.ipynb",
   "language": "python",
   "kernel_type": "notebook",
