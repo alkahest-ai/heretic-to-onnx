@@ -122,8 +122,11 @@ def _resolve_load_in_4bit(
         return False
     if env in {"1", "true", "yes"}:
         return True
-    # Gemma 4 E4B unified checkpoints exceed a single T4 in fp16/bf16.
-    return unified and "gemma-4-E4B" in str(model_spec)
+    spec = str(model_spec)
+    # Gemma 4 E4B/12B checkpoints exceed a single T4 in fp16/bf16.
+    if "gemma-4-12B" in spec or "gemma-4-12b" in spec.lower():
+        return True
+    return unified and "gemma-4-E4B" in spec
 
 
 def _unload_scorecard_model() -> None:
