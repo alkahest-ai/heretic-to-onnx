@@ -3,7 +3,7 @@
 set -euo pipefail
 
 KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
-KERNEL_ID="${KAGGLE_E4B_SFT_KERNEL:-thomasjvu/rally-e4b-sft-jun14v8}"
+KERNEL_ID="${KAGGLE_E4B_SFT_KERNEL:-thomasjvu/rally-e4b-sft-jun14v9}"
 POLL_SECONDS="${KAGGLE_POLL_SECONDS:-120}"
 
 echo "Polling ${KERNEL_ID} every ${POLL_SECONDS}s..."
