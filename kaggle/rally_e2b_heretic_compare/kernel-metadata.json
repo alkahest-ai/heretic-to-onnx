@@ -1,6 +1,6 @@
 {
-  "id": "thomasjvu/rally-e2b-scorecard",
-  "title": "Rally E2B Scorecard",
+  "id": "thomasjvu/rally-e2b-heretic-compare",
+  "title": "Rally E2B Heretic Compare",
   "code_file": "__notebook__.ipynb",
   "language": "python",
   "kernel_type": "notebook",

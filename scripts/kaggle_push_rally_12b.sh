@@ -38,6 +38,10 @@ push_kernel "kaggle/rally_12b_two_stage_sft" "${TIMEOUT_SFT}"
 echo "[3/4] RP scorecard"
 push_kernel "kaggle/rally_12b_scorecard" "${TIMEOUT_SCORECARD}"
 
+echo "[optional] E2B/E4B heretic compare scorecards"
+echo "  ${KAGGLE_BIN} kernels push -p ${ROOT_DIR}/kaggle/rally_e2b_heretic_compare --accelerator ${ACCELERATOR}"
+echo "  ${KAGGLE_BIN} kernels push -p ${ROOT_DIR}/kaggle/rally_e4b_heretic_compare --accelerator ${ACCELERATOR}"
+
 echo "[4/4] RP merged upload (CPU)"
 "${KAGGLE_BIN}" kernels push -p "${ROOT_DIR}/kaggle/rally_12b_rp_merged_upload"
 

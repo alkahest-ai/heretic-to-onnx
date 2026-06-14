@@ -1,6 +1,6 @@
 {
-  "id": "thomasjvu/rally-e2b-scorecard",
-  "title": "Rally E2B Scorecard",
+  "id": "thomasjvu/rally-e4b-heretic-compare",
+  "title": "Rally E4B Heretic Compare",
   "code_file": "__notebook__.ipynb",
   "language": "python",
   "kernel_type": "notebook",
@@ -9,7 +9,5 @@
   "enable_internet": true,
   "dataset_sources": [],
   "competition_sources": [],
-  "kernel_sources": [
-    "thomasjvu/rally-e2b-two-stage-sft-t4"
-  ]
+  "kernel_sources": []
 }
