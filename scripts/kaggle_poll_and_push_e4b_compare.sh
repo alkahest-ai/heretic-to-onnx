@@ -17,14 +17,25 @@ fi
 
 echo "Polling ${TRAIN_KERNEL} every ${POLL_SECONDS}s..."
 while true; do
-  status="$("${KAGGLE_BIN}" kernels status "${TRAIN_KERNEL}" 2>&1 | awk -F'"' '/status/{print $2; exit}')"
-  echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') status=${status:-unknown}"
+  status_output="$("${KAGGLE_BIN}" kernels status "${TRAIN_KERNEL}" 2>&1)" || true
+  status="$(printf '%s\n' "${status_output}" | awk -F'"' '/status/{print $2; exit}')"
+  if [[ -z "${status}" ]]; then
+    echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') status=not_registered_yet"
+    sleep "${POLL_SECONDS}"
+    continue
+  fi
+  echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') status=${status}"
   case "${status}" in
     KernelWorkerStatus.COMPLETE)
       echo "E4B SFT complete. Pushing compare from ${COMPARE_PATH}..."
+      PUSH_DIR="${KAGGLE_COMPARE_PUSH_DIR:-/tmp/rally-e4b-compare-push}"
       while true; do
+        rm -rf "${PUSH_DIR}"
+        mkdir -p "${PUSH_DIR}"
+        cp "${ROOT_DIR}/${COMPARE_PATH}/__notebook__.ipynb" "${PUSH_DIR}/"
+        cp "${ROOT_DIR}/${COMPARE_PATH}/kernel-metadata.json" "${PUSH_DIR}/"
         output="$("${KAGGLE_BIN}" kernels push \
-          -p "${ROOT_DIR}/${COMPARE_PATH}" \
+          -p "${PUSH_DIR}" \
           --accelerator "${ACCELERATOR}" \
           --timeout "${TIMEOUT_COMPARE}" 2>&1)" || true
         if [[ "${output}" == *"successfully pushed"* ]]; then
@@ -48,7 +59,7 @@ while true; do
       sleep "${POLL_SECONDS}"
       ;;
     *)
-      echo "Unknown status: ${status}" >&2
+      echo "Unhandled status: ${status}" >&2
       sleep "${POLL_SECONDS}"
       ;;
   esac
