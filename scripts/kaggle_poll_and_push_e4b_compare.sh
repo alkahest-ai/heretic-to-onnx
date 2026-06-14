@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
-TRAIN_KERNEL="${KAGGLE_TRAIN_KERNEL:-thomasjvu/rally-e4b-two-stage-sft-t4}"
+TRAIN_KERNEL="${KAGGLE_TRAIN_KERNEL:-thomasjvu/rally-e4b-sft-jun14v2}"
 COMPARE_PATH="${KAGGLE_COMPARE_PATH:-kaggle/rally_gemma4_e4b_compare}"
 ACCELERATOR="${KAGGLE_ACCELERATOR:-NvidiaTeslaT4}"
 TIMEOUT_COMPARE="${KAGGLE_TIMEOUT_COMPARE:-21600}"
