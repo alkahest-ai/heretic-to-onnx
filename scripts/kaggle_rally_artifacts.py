@@ -30,6 +30,39 @@ def resolve_hf_snapshot(model_id: str) -> Path:
     return Path(snapshot_download(model_id))
 
 
+def ensure_rp_merged(
+    artifacts: Path,
+    *,
+    base_model_id: str,
+    output_dir: Path,
+    stage_b_scale: float = 0.75,
+) -> Path:
+    """Merge stage-a and scaled stage-b into one checkpoint with a single disk write."""
+    from scripts.merge_lora_scaled import merge_two_stage_rp_to_dir
+
+    if has_merged_checkpoint(output_dir):
+        return output_dir
+
+    stage_a_adapter = artifacts / "stage-a-adapter"
+    stage_b_adapter = artifacts / "stage-b-adapter"
+    if not (stage_a_adapter / "adapter_model.safetensors").exists():
+        raise FileNotFoundError(f"missing stage-a adapter under {stage_a_adapter}")
+    if not (stage_b_adapter / "adapter_model.safetensors").exists():
+        raise FileNotFoundError(f"missing stage-b adapter under {stage_b_adapter}")
+
+    if output_dir.exists():
+        shutil.rmtree(output_dir, ignore_errors=True)
+    base_dir = resolve_hf_snapshot(base_model_id)
+    merge_two_stage_rp_to_dir(
+        base_dir,
+        stage_a_adapter,
+        stage_b_adapter,
+        output_dir,
+        stage_b_scale=stage_b_scale,
+    )
+    return output_dir
+
+
 def ensure_stage_a_merged(
     artifacts: Path,
     *,
