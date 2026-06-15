@@ -411,7 +411,7 @@ def _run_refusal_probe_loaded(
 
 def main(argv: list[str] | None = None) -> int:
     from scripts.alkahest_rp_scorecard import promotion_decision, score_responses
-    from scripts.kaggle_rally_artifacts import ensure_stage_a_merged, find_artifacts
+    from scripts.kaggle_rally_artifacts import ensure_rp_merged, ensure_stage_a_merged, find_artifacts
     from scripts.kaggle_rally_e2b_two_stage_export import _merge_scaled
 
     args = _parser().parse_args(argv)
@@ -485,36 +485,70 @@ def main(argv: list[str] | None = None) -> int:
             "stage_b_scale": stage_b_scale,
             "disk": {"before_rp": _disk(work_dir)},
         }
+        refusal_probe: dict[str, Any] = {}
+        rp_model_label = merged_dir
         if adapter_inference:
-            candidate_report["inference_mode"] = "adapter"
-            rp_model_label = f"rally-rp-{candidate_name}-adapter"
-            rp_model, rp_tokenizer = _load_rp_from_adapters(
-                args.direct_model_id,
-                artifacts / "stage-a-adapter",
-                artifacts / "stage-b-adapter",
-                stage_b_scale,
-            )
+            disk_merge_error: str | None = None
             try:
-                rp_responses = _generate_loaded(
-                    rp_model,
-                    rp_tokenizer,
+                if merged_dir.exists():
+                    shutil.rmtree(merged_dir, ignore_errors=True)
+                ensure_rp_merged(
+                    artifacts,
+                    base_model_id=args.direct_model_id,
+                    output_dir=merged_dir,
+                    stage_b_scale=stage_b_scale,
+                )
+                hf_cache = Path.home() / ".cache" / "huggingface"
+                if hf_cache.exists():
+                    shutil.rmtree(hf_cache, ignore_errors=True)
+                candidate_report["inference_mode"] = "disk_single_pass"
+                candidate_report["merged_dir"] = str(merged_dir)
+                candidate_report["disk"]["after_merge"] = _disk(work_dir)
+                rp_responses = _generate(
+                    merged_dir,
                     max_new_tokens=args.max_new_tokens,
                     temperature=args.temperature,
                 )
-                refusal_probe: dict[str, Any] = {}
                 if args.refusal_probe_count > 0:
-                    refusal_probe = _run_refusal_probe_loaded(
-                        rp_model,
-                        rp_tokenizer,
+                    refusal_probe = _run_refusal_probe(
+                        merged_dir,
                         prompt_count=args.refusal_probe_count,
                         max_new_tokens=args.max_new_tokens,
                         temperature=args.temperature,
-                        model_label=rp_model_label,
                     )
-            finally:
-                del rp_model
-                del rp_tokenizer
-                _unload_scorecard_model()
+            except Exception as exc:
+                disk_merge_error = f"{type(exc).__name__}: {exc}"
+                print(f"[rp-merge] disk single-pass failed; falling back to fp16 adapter merge: {disk_merge_error}", flush=True)
+                candidate_report["disk_merge_error"] = disk_merge_error
+                candidate_report["inference_mode"] = "adapter_fp16"
+                rp_model_label = f"rally-rp-{candidate_name}-adapter"
+                rp_model, rp_tokenizer = _load_rp_from_adapters(
+                    args.direct_model_id,
+                    artifacts / "stage-a-adapter",
+                    artifacts / "stage-b-adapter",
+                    stage_b_scale,
+                    load_in_4bit=False,
+                )
+                try:
+                    rp_responses = _generate_loaded(
+                        rp_model,
+                        rp_tokenizer,
+                        max_new_tokens=args.max_new_tokens,
+                        temperature=args.temperature,
+                    )
+                    if args.refusal_probe_count > 0:
+                        refusal_probe = _run_refusal_probe_loaded(
+                            rp_model,
+                            rp_tokenizer,
+                            prompt_count=args.refusal_probe_count,
+                            max_new_tokens=args.max_new_tokens,
+                            temperature=args.temperature,
+                            model_label=rp_model_label,
+                        )
+                finally:
+                    del rp_model
+                    del rp_tokenizer
+                    _unload_scorecard_model()
         else:
             _merge_scaled(stage_a_merged, artifacts / "stage-b-adapter", merged_dir, stage_b_scale)
             candidate_report["merged_dir"] = str(merged_dir)
@@ -524,7 +558,6 @@ def main(argv: list[str] | None = None) -> int:
                 max_new_tokens=args.max_new_tokens,
                 temperature=args.temperature,
             )
-            refusal_probe = {}
             if args.refusal_probe_count > 0:
                 refusal_probe = _run_refusal_probe(
                     merged_dir,
@@ -538,7 +571,7 @@ def main(argv: list[str] | None = None) -> int:
 
         rp_score = score_responses(
             f"rally-e2b-rp-{candidate_name}",
-            rp_model_label if adapter_inference else merged_dir,
+            str(rp_model_label),
             rp_responses,
         )
         decision = promotion_decision(
