@@ -65,6 +65,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Score RP by merging LoRA adapters in GPU memory (required for 12B on T4).",
     )
+    parser.add_argument(
+        "--rp-merged-model-id",
+        default="",
+        help="Optional HF repo/path with pre-merged RP weights. Skips on-Kaggle merge (needed for 12B where merged safetensors exceed working disk).",
+    )
     return parser
 
 
@@ -151,6 +156,38 @@ def _unload_scorecard_model() -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
+
+
+def _purge_hf_cache() -> None:
+    hf_cache = Path.home() / ".cache" / "huggingface"
+    if hf_cache.exists():
+        shutil.rmtree(hf_cache, ignore_errors=True)
+
+
+def _max_gpu_vram_gb() -> float:
+    import torch
+
+    if not torch.cuda.is_available() or torch.cuda.device_count() == 0:
+        return 0.0
+    return max(
+        torch.cuda.get_device_properties(i).total_memory / 1024**3
+        for i in range(torch.cuda.device_count())
+    )
+
+
+def _disk_merge_feasible(base_model_id: str, work_dir: Path) -> bool:
+    """12B merged checkpoints exceed Kaggle's ~19.5 GiB working disk."""
+    if "12b" not in base_model_id.lower():
+        return True
+    free_gb = shutil.disk_usage(work_dir).free / 1024**3
+    return free_gb >= 22.0
+
+
+def _resolve_rp_merged_model_id(args: argparse.Namespace) -> str:
+    explicit = (args.rp_merged_model_id or "").strip()
+    if explicit:
+        return explicit
+    return os.environ.get("RALLY_RP_MERGED_MODEL_ID", "").strip()
 
 
 def _load_scorecard_model(
@@ -457,6 +494,8 @@ def main(argv: list[str] | None = None) -> int:
             temperature=args.temperature,
         )
     report["disk"]["after_direct"] = _disk(work_dir)
+    _purge_hf_cache()
+    _unload_scorecard_model()
     _write_report(report, report_path)
 
     best_name = ""
@@ -465,6 +504,9 @@ def main(argv: list[str] | None = None) -> int:
     any_promoted = False
     adapter_inference = _use_adapter_inference(args)
     report["adapter_inference"] = adapter_inference
+    rp_merged_model_id = _resolve_rp_merged_model_id(args)
+    if rp_merged_model_id:
+        report["rp_merged_model_id"] = rp_merged_model_id
     stage_a_merged: Path | None = None
     if adapter_inference:
         report["stage_a_adapter"] = str(artifacts / "stage-a-adapter")
@@ -488,67 +530,104 @@ def main(argv: list[str] | None = None) -> int:
         refusal_probe: dict[str, Any] = {}
         rp_model_label = merged_dir
         if adapter_inference:
-            disk_merge_error: str | None = None
-            try:
-                if merged_dir.exists():
-                    shutil.rmtree(merged_dir, ignore_errors=True)
-                ensure_rp_merged(
-                    artifacts,
-                    base_model_id=args.direct_model_id,
-                    output_dir=merged_dir,
-                    stage_b_scale=stage_b_scale,
-                )
-                hf_cache = Path.home() / ".cache" / "huggingface"
-                if hf_cache.exists():
-                    shutil.rmtree(hf_cache, ignore_errors=True)
-                candidate_report["inference_mode"] = "disk_single_pass"
-                candidate_report["merged_dir"] = str(merged_dir)
-                candidate_report["disk"]["after_merge"] = _disk(work_dir)
+            if rp_merged_model_id:
+                candidate_report["inference_mode"] = "hf_premerged"
+                candidate_report["merged_model_id"] = rp_merged_model_id
+                rp_model_label = rp_merged_model_id
                 rp_responses = _generate(
-                    merged_dir,
+                    rp_merged_model_id,
                     max_new_tokens=args.max_new_tokens,
                     temperature=args.temperature,
                 )
                 if args.refusal_probe_count > 0:
                     refusal_probe = _run_refusal_probe(
-                        merged_dir,
+                        rp_merged_model_id,
                         prompt_count=args.refusal_probe_count,
                         max_new_tokens=args.max_new_tokens,
                         temperature=args.temperature,
                     )
-            except Exception as exc:
-                disk_merge_error = f"{type(exc).__name__}: {exc}"
-                print(f"[rp-merge] disk single-pass failed; falling back to fp16 adapter merge: {disk_merge_error}", flush=True)
-                candidate_report["disk_merge_error"] = disk_merge_error
-                candidate_report["inference_mode"] = "adapter_fp16"
-                rp_model_label = f"rally-rp-{candidate_name}-adapter"
-                rp_model, rp_tokenizer = _load_rp_from_adapters(
-                    args.direct_model_id,
-                    artifacts / "stage-a-adapter",
-                    artifacts / "stage-b-adapter",
-                    stage_b_scale,
-                    load_in_4bit=False,
-                )
-                try:
-                    rp_responses = _generate_loaded(
-                        rp_model,
-                        rp_tokenizer,
-                        max_new_tokens=args.max_new_tokens,
-                        temperature=args.temperature,
-                    )
-                    if args.refusal_probe_count > 0:
-                        refusal_probe = _run_refusal_probe_loaded(
-                            rp_model,
-                            rp_tokenizer,
-                            prompt_count=args.refusal_probe_count,
+            else:
+                disk_merge_error: str | None = None
+                rp_responses: dict[str, str] | None = None
+                if _disk_merge_feasible(args.direct_model_id, work_dir):
+                    try:
+                        _purge_hf_cache()
+                        if merged_dir.exists():
+                            shutil.rmtree(merged_dir, ignore_errors=True)
+                        ensure_rp_merged(
+                            artifacts,
+                            base_model_id=args.direct_model_id,
+                            output_dir=merged_dir,
+                            stage_b_scale=stage_b_scale,
+                        )
+                        _purge_hf_cache()
+                        candidate_report["inference_mode"] = "disk_single_pass"
+                        candidate_report["merged_dir"] = str(merged_dir)
+                        candidate_report["disk"]["after_merge"] = _disk(work_dir)
+                        rp_model_label = merged_dir
+                        rp_responses = _generate(
+                            merged_dir,
                             max_new_tokens=args.max_new_tokens,
                             temperature=args.temperature,
-                            model_label=rp_model_label,
                         )
-                finally:
-                    del rp_model
-                    del rp_tokenizer
+                        if args.refusal_probe_count > 0:
+                            refusal_probe = _run_refusal_probe(
+                                merged_dir,
+                                prompt_count=args.refusal_probe_count,
+                                max_new_tokens=args.max_new_tokens,
+                                temperature=args.temperature,
+                            )
+                    except Exception as exc:
+                        disk_merge_error = f"{type(exc).__name__}: {exc}"
+                        print(
+                            f"[rp-merge] disk single-pass failed; trying fallbacks: {disk_merge_error}",
+                            flush=True,
+                        )
+                        candidate_report["disk_merge_error"] = disk_merge_error
+                else:
+                    disk_merge_error = "disk_merge_skipped: 12B merged weights exceed Kaggle working disk"
+                    candidate_report["disk_merge_error"] = disk_merge_error
+                    print(f"[rp-merge] {disk_merge_error}", flush=True)
+
+                if rp_responses is None:
+                    _purge_hf_cache()
                     _unload_scorecard_model()
+                    if _max_gpu_vram_gb() >= 38.0:
+                        candidate_report["inference_mode"] = "adapter_fp16"
+                        rp_model_label = f"rally-rp-{candidate_name}-adapter"
+                        rp_model, rp_tokenizer = _load_rp_from_adapters(
+                            args.direct_model_id,
+                            artifacts / "stage-a-adapter",
+                            artifacts / "stage-b-adapter",
+                            stage_b_scale,
+                            load_in_4bit=False,
+                        )
+                        try:
+                            rp_responses = _generate_loaded(
+                                rp_model,
+                                rp_tokenizer,
+                                max_new_tokens=args.max_new_tokens,
+                                temperature=args.temperature,
+                            )
+                            if args.refusal_probe_count > 0:
+                                refusal_probe = _run_refusal_probe_loaded(
+                                    rp_model,
+                                    rp_tokenizer,
+                                    prompt_count=args.refusal_probe_count,
+                                    max_new_tokens=args.max_new_tokens,
+                                    temperature=args.temperature,
+                                    model_label=rp_model_label,
+                                )
+                        finally:
+                            del rp_model
+                            del rp_tokenizer
+                            _unload_scorecard_model()
+                    else:
+                        raise RuntimeError(
+                            f"{disk_merge_error or 'disk merge failed'}; "
+                            "no A100-class GPU for fp16 adapter merge. "
+                            "Set --rp-merged-model-id or RALLY_RP_MERGED_MODEL_ID to a pre-merged HF checkpoint."
+                        )
         else:
             _merge_scaled(stage_a_merged, artifacts / "stage-b-adapter", merged_dir, stage_b_scale)
             candidate_report["merged_dir"] = str(merged_dir)

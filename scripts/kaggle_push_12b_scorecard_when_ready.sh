@@ -7,6 +7,7 @@ KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
 KERNEL_SRC="${KAGGLE_KERNEL_SRC:-kaggle/rally_12b_scorecard}"
 PUSH_DIR="${KAGGLE_PUSH_DIR:-/tmp/rally-12b-scorecard-push}"
 POLL_SECONDS="${KAGGLE_POLL_SECONDS:-60}"
+ACCELERATOR="${KAGGLE_ACCELERATOR:-NvidiaTeslaT4}"
 BLOCKING_KERNELS="${KAGGLE_BLOCKING_KERNELS:-thomasjvu/rally-e4b-compare-jun14v2 thomasjvu/rally-12b-scorecard-a100}"
 
 kernel_id="$(
@@ -50,7 +51,7 @@ while true; do
   cp "${ROOT_DIR}/${KERNEL_SRC}/kernel-metadata.json" "${PUSH_DIR}/"
   output="$("${KAGGLE_BIN}" kernels push \
     -p "${PUSH_DIR}" \
-    --accelerator NvidiaTeslaT4 \
+    --accelerator "${ACCELERATOR}" \
     --timeout 21600 2>&1)" || true
   echo "$(date -u '+%H:%M:%S UTC') ${output}"
   if [[ "${output}" == *"successfully pushed"* ]]; then

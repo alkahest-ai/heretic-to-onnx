@@ -1,6 +1,6 @@
 {
-  "id": "thomasjvu/rally-12b-scorecard-jun15v5",
-  "title": "Rally 12B Scorecard Jun15v5",
+  "id": "thomasjvu/rally-12b-scorecard-jun15v8",
+  "title": "Rally 12B Scorecard Jun15v8",
   "code_file": "__notebook__.ipynb",
   "language": "python",
   "kernel_type": "notebook",
@@ -11,5 +11,6 @@
   "competition_sources": [],
   "kernel_sources": [
     "thomasjvu/rally-12b-two-stage-sft-a100"
-  ]
+  ],
+  "machine_shape": "NvidiaTeslaT4"
 }

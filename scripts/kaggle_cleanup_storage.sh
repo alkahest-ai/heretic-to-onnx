@@ -45,6 +45,7 @@ for kernel in \
   thomasjvu/rally-e2b-heretic-compare \
   thomasjvu/rally-e4b-sft-jun14v10 \
   thomasjvu/rally-e4b-compare-jun14v2 \
+  thomasjvu/rally-e4b-compare-jun14v10 \
   thomasjvu/rally-12b-two-stage-sft-a100 \
   thomasjvu/rally-12b-scorecard-a100; do
   status="$("${KAGGLE_BIN}" kernels status "${kernel}" 2>&1 | awk -F'"' '/status/{print $2; exit}')" || status=missing
