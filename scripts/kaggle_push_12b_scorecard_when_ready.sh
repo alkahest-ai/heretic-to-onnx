@@ -8,7 +8,7 @@ KERNEL_SRC="${KAGGLE_KERNEL_SRC:-kaggle/rally_12b_scorecard}"
 PUSH_DIR="${KAGGLE_PUSH_DIR:-/tmp/rally-12b-scorecard-push}"
 POLL_SECONDS="${KAGGLE_POLL_SECONDS:-60}"
 ACCELERATOR="${KAGGLE_ACCELERATOR:-NvidiaTeslaT4}"
-BLOCKING_KERNELS="${KAGGLE_BLOCKING_KERNELS:-thomasjvu/rally-e4b-compare-jun14v2 thomasjvu/rally-12b-scorecard-a100}"
+BLOCKING_KERNELS="${KAGGLE_BLOCKING_KERNELS:-thomasjvu/rally-e4b-compare-jun14v2 thomasjvu/rally-12b-scorecard-jun15v8}"
 
 kernel_id="$(
   python3 -c "import json, pathlib; print(json.load(pathlib.Path('${ROOT_DIR}/${KERNEL_SRC}/kernel-metadata.json').open())['id'])"

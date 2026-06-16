@@ -3,9 +3,38 @@
 set -euo pipefail
 
 KAGGLE_BIN="${KAGGLE_BIN:-kaggle}"
-DELETE_KERNELS="${KAGGLE_DELETE_KERNELS:-thomasjvu/rally-e4b-sft-jun14v9 thomasjvu/rally-12b-heretic-a100}"
+DELETE_KERNELS="${KAGGLE_DELETE_KERNELS:-\
+thomasjvu/rally-e4b-sft-jun14v9 \
+thomasjvu/rally-12b-heretic-a100 \
+thomasjvu/rally-e4b-compare-jun14v6-fp16 \
+thomasjvu/rally-e4b-compare-jun14v7-diskmerge \
+thomasjvu/rally-e4b-compare-jun14v8-rpmerge \
+thomasjvu/rally-e4b-compare-jun14v9-onepass \
+thomasjvu/rally-12b-scorecard-jun15v5 \
+thomasjvu/rally-12b-scorecard-jun15v6 \
+thomasjvu/rally-12b-scorecard-jun15v7 \
+thomasjvu/rally-12b-scorecard-a100}"
 CLEAN_TMP="${KAGGLE_CLEAN_TMP:-1}"
-TMP_PATTERNS="${KAGGLE_TMP_PATTERNS:-/tmp/e4b_sft_error /tmp/12b_sft_full /tmp/12b_scorecard_v2_error /tmp/12b_scorecard_error /tmp/e4b_sft_v10_report /tmp/e2b_v3_report /tmp/e4b_compare_v3 /tmp/e4b_compare_v4_report /tmp/12b_scorecard_report}"
+TMP_PATTERNS="${KAGGLE_TMP_PATTERNS:-\
+/tmp/e4b_sft_error \
+/tmp/12b_sft_full \
+/tmp/12b_scorecard_v2_error \
+/tmp/12b_scorecard_error \
+/tmp/12b_scorecard_v5_report \
+/tmp/12b_scorecard_v6_report \
+/tmp/12b_scorecard_v7_report \
+/tmp/12b_scorecard_v8_report \
+/tmp/12b_scorecard_v8_final \
+/tmp/12b_v8_full \
+/tmp/12b_a100_old_log \
+/tmp/12b_a100_pull \
+/tmp/e4b_sft_v10_report \
+/tmp/e4b_compare_v9_report \
+/tmp/e4b_compare_v10_report \
+/tmp/e2b_v3_report \
+/tmp/e4b_compare_v3 \
+/tmp/e4b_compare_v4_report \
+/tmp/12b_scorecard_report}"
 
 if ! command -v "${KAGGLE_BIN}" >/dev/null 2>&1; then
   echo "kaggle CLI not found" >&2
@@ -47,7 +76,7 @@ for kernel in \
   thomasjvu/rally-e4b-compare-jun14v2 \
   thomasjvu/rally-e4b-compare-jun14v10 \
   thomasjvu/rally-12b-two-stage-sft-a100 \
-  thomasjvu/rally-12b-scorecard-a100; do
+  thomasjvu/rally-12b-scorecard-jun15v8; do
   status="$("${KAGGLE_BIN}" kernels status "${kernel}" 2>&1 | awk -F'"' '/status/{print $2; exit}')" || status=missing
   echo "  ${kernel}: ${status}"
 done
