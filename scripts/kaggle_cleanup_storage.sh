@@ -13,7 +13,8 @@ thomasjvu/rally-e4b-compare-jun14v9-onepass \
 thomasjvu/rally-12b-scorecard-jun15v5 \
 thomasjvu/rally-12b-scorecard-jun15v6 \
 thomasjvu/rally-12b-scorecard-jun15v7 \
-thomasjvu/rally-12b-scorecard-a100}"
+thomasjvu/rally-12b-scorecard-a100 \
+thomasjvu/rally-e4b-compare-jun14v2}"
 CLEAN_TMP="${KAGGLE_CLEAN_TMP:-1}"
 TMP_PATTERNS="${KAGGLE_TMP_PATTERNS:-\
 /tmp/e4b_sft_error \
@@ -73,7 +74,6 @@ echo "Cleanup done. Active Rally kernels to keep:"
 for kernel in \
   thomasjvu/rally-e2b-heretic-compare \
   thomasjvu/rally-e4b-sft-jun14v10 \
-  thomasjvu/rally-e4b-compare-jun14v2 \
   thomasjvu/rally-e4b-compare-jun14v10 \
   thomasjvu/rally-12b-two-stage-sft-a100 \
   thomasjvu/rally-12b-scorecard-jun15v8; do

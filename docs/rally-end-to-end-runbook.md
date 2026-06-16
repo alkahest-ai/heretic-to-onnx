@@ -143,7 +143,15 @@ After upload, validate the package contract in a browser/WebGPU environment usin
 
 Desktop Safari / desktop Chromium should be the main validation targets.
 
-## 10. Current E2B Kaggle Path
+## 10. Kaggle secrets and GPU assignment
+
+Add **`HF_TOKEN`** under Kaggle **Settings → Secrets** for the notebook owner account before any kernel that downloads private Hugging Face repos (12B pre-merged RP, merged-upload notebooks). If `UserSecretsClient().get_secret('HF_TOKEN')` logs `ConnectionError`, the run continues unauthenticated and gated repos fail with HTTP 401 — re-save the secret and rerun; training itself does not need the token for public bases.
+
+Push GPU kernels with **`--accelerator NvidiaTeslaT4`** and set `"machine_shape": "NvidiaTeslaT4"` in `kernel-metadata.json`. Do **not** use `GPU_T4_x2`; it often downgrades to P100 (sm_60), which breaks current PyTorch/bitsandbytes builds.
+
+Full root-cause write-up: [rally-gemma-minor-gate-postmortem.md](rally-gemma-minor-gate-postmortem.md).
+
+## 11. Current E2B Kaggle Path
 
 After the Alkahest 0.8B/2B closeout, use the E2B-only Kaggle lane before touching E4B:
 
@@ -174,7 +182,18 @@ kaggle kernels push -p kaggle/rally_e2b_rp_merged_upload
 
 That notebook now re-creates the A100/B75 merge from the two-stage SFT output, writes a file manifest/report, and only uploads to HF when the Kaggle `HF_TOKEN` secret is reachable. The validated v8 source checkpoint is kept privately at `thomasjvu/rally-2b-rp-source-merged`; `scaled_lora_merge.json` verifies `applied: 205` and `scale: 0.75`.
 
-## 11. Gemma 4 12B Kaggle Path
+## 12. Gemma 4 E4B Kaggle Path
+
+Canonical compare kernel: **`thomasjvu/rally-e4b-compare-jun14v10`**. SFT source: **`thomasjvu/rally-e4b-sft-jun14v10`**.
+
+```bash
+kaggle kernels push -p kaggle/rally_gemma4_e4b_compare --accelerator NvidiaTeslaT4
+bash scripts/kaggle_poll_e4b_compare_v10.sh
+```
+
+RP scoring uses **`ensure_rp_merged()`** (CPU single-pass disk bake), then 4-bit load. Never score RP via in-GPU 4-bit `merge_and_unload()` — see postmortem.
+
+## 13. Gemma 4 12B Kaggle Path
 
 Push all 12B kernels with **`NvidiaTeslaT4`**, not `GPU_T4_x2`. The `GPU_T4_x2` accelerator request has repeatedly downgraded to P100 (sm_60), which fails under current PyTorch builds. `NvidiaTeslaT4` is the CLI name for Kaggle's "GPU T4" option and still often assigns **2× Tesla T4** (~14.5 GiB each).
 
@@ -188,9 +207,22 @@ kaggle kernels status thomasjvu/rally-12b-two-stage-sft-a100
 
 The 12B SFT lane skips on-Kaggle Heretic when needed and starts from `igorls/gemma-4-12B-it-heretic`. Install **latest Transformers from main** before Unsloth load so `gemma4_unified` registers. Training saves **LoRA adapters only** (no full merged weights on disk during SFT); merged checkpoints are built on-the-fly for scorecard/upload. Serve with **vLLM** (`configs/vllm-gemma4-12b-rp.yaml`), not WebGPU export.
 
-After SFT, run the scorecard kernel. It runs the 4-prompt RP gate plus a **100-prompt adult false-refusal probe** (expect direct Heretic near `100/100` refusals, RP near `6/100`). Promotion also requires RP false-refusal rate `<= 0.10`.
+After SFT, bake merged weights (12B exceeds Kaggle working disk if merged on-notebook):
 
-## 12. Legacy One-Click H200 Path
+```bash
+kaggle kernels push -p kaggle/rally_12b_rp_merged_upload
+# publishes thomasjvu/rally-12b-rp-a100-b75-merged when HF_TOKEN is set
+```
+
+Then run the scorecard kernel **`thomasjvu/rally-12b-scorecard-jun15v8`**. It passes `--rp-merged-model-id thomasjvu/rally-12b-rp-a100-b75-merged` and scores in 4-bit on 2× T4. The 4-prompt gate plus **100-prompt adult false-refusal probe** applies; promotion requires RP false-refusal rate `<= 0.10`.
+
+```bash
+bash scripts/kaggle_poll_12b_scorecard_v8.sh
+```
+
+Serve merged 12B RP with vLLM: `configs/vllm-gemma4-12b-rp.yaml`.
+
+## 14. Legacy One-Click H200 Path
 
 If you want the whole Gemma loop in one terminal command on Phala GPU TEE, use:
 

@@ -69,6 +69,10 @@ Gemma4 Rally export now defaults to ONNX opset 21, matching the Lisper/reference
 
 The next exporter path is a reference-template transplant instead of another generic Torch trace. The `optimize-gemma4-text-package` command takes the packaged text repo, a local merged Gemma4 checkpoint, and a reference Gemma4 q4f16 ONNX template, then replaces the decoder with the optimized WebGPU graph and re-quantized source weights. The Rally Kaggle export notebook now runs that transplant after text export and before upload/validation.
 
+## Minor-boundary merge postmortem (E2B / E4B / 12B)
+
+See [rally-gemma-minor-gate-postmortem.md](rally-gemma-minor-gate-postmortem.md) for the June 2026 root-cause analysis (4-bit `merge_and_unload` vs CPU disk bake), canonical Kaggle kernels, and HF weight repos.
+
 ## Kaggle Execution
 
 Use Kaggle instead of Phala for the active lane. The workflow mirrors the Alkahest notebooks:
