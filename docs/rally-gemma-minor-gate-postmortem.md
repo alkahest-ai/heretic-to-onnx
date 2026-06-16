@@ -162,7 +162,7 @@ Kaggle push:
 | `0320da0` | 12B pre-merged HF path, GPU guards |
 | `5ce08f3` | Kaggle kernel cleanup after validation |
 
-Branch merged to `main`: `codex/kaggle-heretic-2b-run` (June 2026).
+Merged to `main` at `2e6988d` (fast-forward from `codex/kaggle-heretic-2b-run`, June 2026).
 
 ## Follow-up (optional, post-gate)
 
