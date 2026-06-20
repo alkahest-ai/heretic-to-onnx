@@ -25,7 +25,7 @@ Root-cause write-up: [rally-gemma-minor-gate-postmortem.md](rally-gemma-minor-ga
 | E4B export prep | `thomasjvu/rally-e4b-export-prep` |
 | E4B direct text export | `thomasjvu/rally-e4b-direct-text-export` |
 | E4B RP merged upload | `thomasjvu/rally-e4b-rp-merged-upload` |
-| E4B RP text export | `thomasjvu/rally-e4b-rp-text-export` |
+| E4B RP text export | `thomasjvu/rally-e4b-rp-text-export-jun20` |
 | 12B SFT | `thomasjvu/rally-12b-two-stage-sft-a100` |
 | 12B merged upload | `thomasjvu/rally-12b-rp-merged-upload` |
 | 12B scorecard | `thomasjvu/rally-12b-scorecard-jun15v8` |

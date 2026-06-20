@@ -206,6 +206,7 @@ kaggle kernels push -p kaggle/rally_e4b_export_prep
 kaggle kernels push -p kaggle/rally_e4b_two_stage_export --accelerator NvidiaTeslaT4
 kaggle kernels push -p kaggle/rally_e4b_rp_merged_upload
 kaggle kernels push -p kaggle/rally_e4b_rp_text_export --accelerator NvidiaTeslaT4
+# canonical slug: thomasjvu/rally-e4b-rp-text-export-jun20 (prior slug poisoned on Kaggle)
 ```
 
 Set `RALLY_UPLOAD=1` in the export notebooks when `HF_TOKEN` is configured. Target HF repos: `thomasjvu/rally-4b-text`, `thomasjvu/rally-4b-rp-text`, provenance `thomasjvu/rally-4b-rp-source-merged`. Run Chrome WebGPU smoke before app-picker exposure. Full matrix: [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md).
