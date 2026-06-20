@@ -8,7 +8,7 @@ Closeout checkpoint: `docs/alkahest-closeout-2026-05-04.md`.
 
 ## Active Scope
 
-This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gemma is documented separately, and 4B remains parked.
+This pass is limited to the Qwen3.5 Alkahest 0.8B and 2B browser lane. Rally/Gemma E2B text is app-visible; Rally E4B/12B status lives in [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md). Qwen 4B remains parked.
 
 ## Definitive App Targets
 

@@ -164,8 +164,18 @@ Kaggle push:
 
 Merged to `main` at `2e6988d` (fast-forward from `codex/kaggle-heretic-2b-run`, June 2026).
 
-## Follow-up (optional, post-gate)
+## Follow-up (post-gate, June 2026)
 
-- Browser ONNX export / vLLM serving for E4B and 12B (scorecard validates checkpoints, not app delivery)
+Delivery scaffolding landed on `main`:
+
+- E4B export lane: `kaggle/rally_e4b_export_prep`, `rally_e4b_two_stage_export`, `rally_e4b_rp_merged_upload`, `rally_e4b_rp_text_export`
+- E4B manifests: `configs/heretic-to-onnx.gemma4-e4b-heretic-text.yaml`, `configs/heretic-to-onnx.gemma4-e4b-rp-text.yaml`
+- 12B vLLM: `scripts/serve_vllm_gemma4.sh`, `scripts/vllm_smoke_gemma4_12b.sh`, `configs/vllm-gemma4-12b-rp.yaml`
+- Closeout matrix: [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md)
+
+Still operator-dependent:
+
+- Run Kaggle E4B export + browser smoke before picker exposure
+- Run vLLM smoke on GPU hardware for 12B
 - Re-run `rally-12b-rp-merged-upload` after SFT recipe changes
-- Tune false-refusal rate (E4B RP ~5% on 100-prompt probe — within gate, monitor in product)
+- Optional: tune E4B false-refusal rate (~5% on 100-prompt probe)

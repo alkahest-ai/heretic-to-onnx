@@ -4,7 +4,7 @@ Date: 2026-05-04
 
 ## Scope
 
-This lane starts after the Alkahest 0.8B/2B checkpoint. It applies the same promotion discipline that selected Alkahest 2B RP A100/B75, but only to Gemma 4 E2B Rally. E4B stays parked.
+This lane starts after the Alkahest 0.8B/2B checkpoint. It applies the same promotion discipline that selected Alkahest 2B RP A100/B75. E2B text delivery is complete; E4B/12B gate validation and export lanes are documented in [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md).
 
 ## Target Repos
 

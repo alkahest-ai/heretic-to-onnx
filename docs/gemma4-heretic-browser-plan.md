@@ -173,4 +173,4 @@ Current execution status on 2026-05-12:
 - Kaggle `thomasjvu/rally-e2b-export-prep` version 5 staged commit `a6761aba989c9f44c986af3229ce4fcd649a4144` and included `onnx/audio_encoder_q4f16.*`.
 - Direct full `thomasjvu/rally-2b` and RP full `thomasjvu/rally-2b-rp` were uploaded privately from validated Kaggle package outputs after Kaggle HF auth failed at publish time, but they are experimental artifacts only.
 - The retained local smoke artifacts do not prove a passing full Rally browser run. The recorded full-package smoke attempts failed during Gemma4 multimodal generation, including `GatherBlockQuantized ... Invalid dispatch group size (0, 1, 1)`. Do not expose Rally full packages in the picker until a fresh direct and RP full browser smoke pass is captured.
-- E4B remains out of scope for this pass.
+- E4B RP passed the June 2026 minor gate on Kaggle; browser ONNX export is in progress via `kaggle/rally_e4b_*` notebooks. See [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md).

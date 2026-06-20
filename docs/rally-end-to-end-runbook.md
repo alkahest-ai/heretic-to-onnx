@@ -193,6 +193,23 @@ bash scripts/kaggle_poll_e4b_compare_v10.sh
 
 RP scoring uses **`ensure_rp_merged()`** (CPU single-pass disk bake), then 4-bit load. Never score RP via in-GPU 4-bit `merge_and_unload()` — see postmortem.
 
+E4B browser export lane (after gate pass):
+
+```bash
+bash scripts/kaggle_push_rally_e4b_export.sh
+```
+
+Or step by step:
+
+```bash
+kaggle kernels push -p kaggle/rally_e4b_export_prep
+kaggle kernels push -p kaggle/rally_e4b_two_stage_export --accelerator NvidiaTeslaT4
+kaggle kernels push -p kaggle/rally_e4b_rp_merged_upload
+kaggle kernels push -p kaggle/rally_e4b_rp_text_export --accelerator NvidiaTeslaT4
+```
+
+Set `RALLY_UPLOAD=1` in the export notebooks when `HF_TOKEN` is configured. Target HF repos: `thomasjvu/rally-4b-text`, `thomasjvu/rally-4b-rp-text`, provenance `thomasjvu/rally-4b-rp-source-merged`. Run Chrome WebGPU smoke before app-picker exposure. Full matrix: [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md).
+
 ## 13. Gemma 4 12B Kaggle Path
 
 Push all 12B kernels with **`NvidiaTeslaT4`**, not `GPU_T4_x2`. The `GPU_T4_x2` accelerator request has repeatedly downgraded to P100 (sm_60), which fails under current PyTorch builds. `NvidiaTeslaT4` is the CLI name for Kaggle's "GPU T4" option and still often assigns **2× Tesla T4** (~14.5 GiB each).
@@ -221,6 +238,14 @@ bash scripts/kaggle_poll_12b_scorecard_v8.sh
 ```
 
 Serve merged 12B RP with vLLM: `configs/vllm-gemma4-12b-rp.yaml`.
+
+```bash
+bash scripts/serve_vllm_gemma4.sh
+# after the server is ready:
+bash scripts/vllm_smoke_gemma4_12b.sh
+```
+
+Requires local GPU (or Docker with `--gpus all`) and read access to `thomasjvu/rally-12b-rp-a100-b75-merged`. 12B is not a WebGPU/browser target.
 
 ## 14. Legacy One-Click H200 Path
 

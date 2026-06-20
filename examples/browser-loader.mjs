@@ -157,6 +157,24 @@ export const DEFAULT_MODEL_PRESETS = [
     dtype: GEMMA4_WEBGPU_TEXT_DTYPE,
     note: "Browser-smoked A100/B75 RP text package. Kaggle scorecard total 1.0000 with +0.1000 margin over direct.",
   },
+  {
+    label: "Rally 4B Text Q4F16",
+    modelId: ownedModel("rally-4b-text"),
+    family: "gemma4",
+    modalities: "text",
+    approxDownload: "~6.5 GB",
+    dtype: GEMMA4_WEBGPU_TEXT_DTYPE,
+    note: "Gemma4 E4B direct text package. Run browser smoke after Kaggle export before treating as production-ready.",
+  },
+  {
+    label: "Rally 4B RP Text Q4F16",
+    modelId: ownedModel("rally-4b-rp-text"),
+    family: "gemma4",
+    modalities: "text",
+    approxDownload: "~6.5 GB",
+    dtype: GEMMA4_WEBGPU_TEXT_DTYPE,
+    note: "Gate-validated A100/B75 E4B RP text package. Kaggle minor 1.0; browser smoke pending post-export.",
+  },
 ];
 
 function normalizeMessages(messages) {

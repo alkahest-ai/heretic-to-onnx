@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -18,8 +19,10 @@ from scripts.kaggle_rally_e2b_two_stage_export import (
 )
 from scripts.kaggle_rally_e2b_scorecard import (
     _candidate_specs,
+    _disk_merge_feasible,
     _parser as scorecard_parser,
     _resolve_load_in_4bit,
+    _resolve_rp_merged_model_id,
 )
 from scripts.kaggle_rally_e2b_two_stage_sft import _parser as sft_parser, _train_command
 from scripts.train_rally_unsloth import (
@@ -90,6 +93,16 @@ class KaggleRallyE2BTests(unittest.TestCase):
         self.assertFalse(
             _resolve_load_in_4bit("google/gemma-4-E2B-it", unified=True),
         )
+
+    def test_disk_merge_feasible_allows_e4b(self) -> None:
+        with TemporaryDirectory() as tmp:
+            self.assertTrue(_disk_merge_feasible("google/gemma-4-E4B-it", Path(tmp)))
+
+    def test_resolve_rp_merged_model_id_empty_without_env(self) -> None:
+        from argparse import Namespace
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(_resolve_rp_merged_model_id(Namespace(rp_merged_model_id="")), "")
 
     def test_stage_b_command_can_skip_full_merge(self) -> None:
         args = sft_parser().parse_args([])

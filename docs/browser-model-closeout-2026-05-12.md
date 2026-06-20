@@ -80,3 +80,7 @@ Known residual risk:
 - Rally full packages and source checkpoint repos remain private.
 - Rally full packages still need fresh direct and RP full browser smoke before any image/audio app exposure.
 - Browser performance is desktop-class only; Rally text cold loads are several minutes on the tested machine.
+
+## June 2026 update (E4B / 12B)
+
+Rally E4B RP and 12B RP passed the Kaggle minor gate. E4B browser export kernels and 12B vLLM serve scaffolding are on `main`. See [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md) for the promotion matrix. Rally 4B text presets are in the loader but remain smoke-pending until Kaggle export completes.

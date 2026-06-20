@@ -1,0 +1,15 @@
+{
+  "id": "thomasjvu/rally-e4b-direct-text-export",
+  "title": "Rally E4B Direct Text Export",
+  "code_file": "__notebook__.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "thomasjvu/rally-e4b-export-prep"
+  ]
+}

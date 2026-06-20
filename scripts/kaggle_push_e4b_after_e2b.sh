@@ -18,9 +18,9 @@ fi
 
 echo "Polling ${E2B_KERNEL} every ${POLL_SECONDS}s..."
 while true; do
-  status="$("${KAGGLE_BIN}" kernels status "${E2B_KERNEL}" 2>&1 | awk -F'"' '/status/{print $2; exit}')"
-  echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') e2b_status=${status:-unknown}"
-  case "${status}" in
+  kernel_status="$("${KAGGLE_BIN}" kernels status "${E2B_KERNEL}" 2>&1 | awk -F'"' '/status/{print $2; exit}')"
+  echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') e2b_status=${kernel_status:-unknown}"
+  case "${kernel_status}" in
     KernelWorkerStatus.COMPLETE)
       echo "E2B compare complete. Target E4B kernel ${E4B_KERNEL} from ${E4B_PATH}..."
       if "${KAGGLE_BIN}" kernels status "${E4B_KERNEL}" 2>&1 | grep -qE 'KernelWorkerStatus\.(RUNNING|COMPLETE|QUEUED|STARTING)'; then
@@ -37,7 +37,7 @@ while true; do
       sleep "${POLL_SECONDS}"
       ;;
     *)
-      echo "Unknown E2B status: ${status}" >&2
+      echo "Unknown E2B status: ${kernel_status}" >&2
       sleep "${POLL_SECONDS}"
       ;;
   esac

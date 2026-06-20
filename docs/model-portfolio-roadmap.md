@@ -39,7 +39,7 @@ These are the fastest wins because they avoid training in the first pass.
 - Source: `coder3101/gemma-4-E4B-it-heretic`
 - Goal: convert to browser/WebGPU ONNX
 - Public name: `alkahest-ai/rally-4b`
-- Status: parked; do not expose E4B in the browser app during the Alkahest 0.8B/2B finish pass.
+- Status: gate-validated June 2026 (`rally-e4b-compare-jun14v10`, RP minor 1.0). Browser export lane scaffolded; picker exposure waits on ONNX export + WebGPU smoke. See [rally-e4b-12b-closeout-2026-06.md](rally-e4b-12b-closeout-2026-06.md).
 
 Reason to do these first:
 

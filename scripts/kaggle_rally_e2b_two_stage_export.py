@@ -58,6 +58,26 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--optimized-template-dir", default="", help="Local reference Gemma4 ONNX package/template dir.")
     parser.add_argument("--optimized-template-model-id", default="onnx-community/gemma-4-E2B-it-ONNX")
     parser.add_argument("--optimized-template-revision", default="")
+    parser.add_argument(
+        "--direct-full-template",
+        default="configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml",
+        help="Manifest for direct full Gemma4 packages.",
+    )
+    parser.add_argument(
+        "--direct-text-template",
+        default="configs/heretic-to-onnx.gemma4-e2b-heretic-ara-text.yaml",
+        help="Manifest for direct text-only Gemma4 packages.",
+    )
+    parser.add_argument(
+        "--rp-full-template",
+        default="configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml",
+        help="Manifest for RP full Gemma4 packages.",
+    )
+    parser.add_argument(
+        "--rp-text-template",
+        default="configs/heretic-to-onnx.gemma4-e2b-rp-text.yaml",
+        help="Manifest for RP text-only Gemma4 packages.",
+    )
     parser.add_argument("--score", action="store_true", default=True)
     parser.add_argument("--no-score", dest="score", action="store_false")
     parser.add_argument("--require-score", action="store_true")
@@ -685,8 +705,8 @@ def main(argv: list[str] | None = None) -> int:
                 source_model_id=args.direct_source_model_id,
                 full_repo=args.direct_full_repo,
                 text_repo=args.direct_text_repo,
-                full_template="configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml",
-                text_template="configs/heretic-to-onnx.gemma4-e2b-heretic-ara-text.yaml",
+                full_template=args.direct_full_template,
+                text_template=args.direct_text_template,
                 work_dir=work_dir / "direct",
                 scratch_dir=scratch_dir / "direct",
                 args=args,
@@ -708,8 +728,8 @@ def main(argv: list[str] | None = None) -> int:
                 source_model_id=str(selected_merged),
                 full_repo=args.rp_full_repo,
                 text_repo=args.rp_text_repo,
-                full_template="configs/heretic-to-onnx.gemma4-e2b-heretic-ara.yaml",
-                text_template="configs/heretic-to-onnx.gemma4-e2b-rp-text.yaml",
+                full_template=args.rp_full_template,
+                text_template=args.rp_text_template,
                 work_dir=work_dir / "rp",
                 scratch_dir=scratch_dir / "rp",
                 args=args,
